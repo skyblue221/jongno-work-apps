@@ -1006,6 +1006,7 @@ function saveStaffAdmin(data) {
       const C = STAFF_COLUMNS;
       sheet.getRange(rowNumber, C.STAFF_NAME, 1, 2).setValues([[values[0], values[1]]]);
       sheet.getRange(rowNumber, C.ACTIVE, 1, 4).setValues([[values[4], values[5], values[6], values[7]]]);
+      STAFF_MEMO_ = null;
       return { success: true, message: name + ' 님 정보를 고쳤어요.' };
     }
 
@@ -1018,6 +1019,7 @@ function saveStaffAdmin(data) {
     row[STAFF_COLUMNS.ROLE - 1] = role;
     row[STAFF_COLUMNS.PROGRAMS - 1] = programs;
     sheet.getRange(sheet.getLastRow() + 1, 1, 1, STAFF_COLUMN_COUNT).setValues([row]);
+    STAFF_MEMO_ = null;
 
     return { success: true, message: name + ' 님을 등록했어요. 본인이 접속해서 서명을 등록하면 돼요.' };
   } finally {
@@ -1036,6 +1038,7 @@ function saveMySignature(signature) {
   const file = saveStaffSignatureImage_({ signatureData: signature, staffName: me.name, staffId: me.staffId });
   const sheet = getRequiredSheet(ss_(), STAFF_SHEET_NAME);
   sheet.getRange(me.rowNumber, STAFF_COLUMNS.SIGNATURE_FILE_ID, 1, 2).setValues([[file.getId(), file.getUrl()]]);
+  STAFF_MEMO_ = null;
 
   return { success: true, image: imageDataUrl_(file.getId()) };
 }
@@ -1071,6 +1074,7 @@ function saveSubstitute(data) {
   getRequiredSheet(ss_(), STAFF_SHEET_NAME)
     .getRange(owner.rowNumber, STAFF_COLUMNS.SUBSTITUTE, 1, 3)
     .setValues([[sub, sub ? from : '', sub ? to : '']]);
+  STAFF_MEMO_ = null;
 
   return { success: true };
 }
@@ -1603,12 +1607,20 @@ function ensureStaffColumns_(sheet) {
  * 데이터 읽기
  * ============================================================ */
 
+/** 스프레드시트는 한 번 실행에 한 번만 엶 (예전에는 읽을 때마다 새로 열어서 느렸어요) */
+let SS_MEMO_ = null;
 function ss_() {
-  return SpreadsheetApp.openById(SPREADSHEET_ID);
+  return SS_MEMO_ || (SS_MEMO_ = SpreadsheetApp.openById(SPREADSHEET_ID));
 }
 
 
+/** 담당자 명단도 한 번 실행에 한 번만 읽음 (담당자 저장 후에는 다시 읽게 비움) */
+let STAFF_MEMO_ = null;
 function readStaff_() {
+  if (!STAFF_MEMO_) STAFF_MEMO_ = readStaffSheet_();
+  return STAFF_MEMO_.slice();
+}
+function readStaffSheet_() {
   const sheet = getRequiredSheet(ss_(), STAFF_SHEET_NAME);
   const lastRow = sheet.getLastRow();
   if (lastRow < 2) return [];
@@ -1816,14 +1828,21 @@ function esc_(v) {
 }
 
 
+/** 날짜·시간 칸 표시 형식 — 칸마다 따로 하지 않고 한 줄을 한 번에 (6번 → 2번) */
 function formatActivityRow_(sheet, rowNumber) {
   const C = ACTIVITY_COLUMNS;
-  sheet.getRange(rowNumber, C.SUBMITTED_AT).setNumberFormat('yyyy-mm-dd hh:mm:ss');
-  sheet.getRange(rowNumber, C.BIRTH_DATE).setNumberFormat('yyyy-mm-dd');
-  sheet.getRange(rowNumber, C.ACTIVITY_DATE).setNumberFormat('yyyy-mm-dd');
-  sheet.getRange(rowNumber, C.CALCULATED_TIME).setNumberFormat('[h]"시간 "mm"분"');
-  sheet.getRange(rowNumber, C.FINAL_APPROVED_TIME).setNumberFormat('[h]"시간 "mm"분"');
-  sheet.getRange(rowNumber, C.STAFF_CONFIRMED_AT).setNumberFormat('yyyy-mm-dd hh:mm:ss');
+  const want = {};
+  want[C.SUBMITTED_AT] = 'yyyy-mm-dd hh:mm:ss';
+  want[C.BIRTH_DATE] = 'yyyy-mm-dd';
+  want[C.ACTIVITY_DATE] = 'yyyy-mm-dd';
+  want[C.CALCULATED_TIME] = '[h]"시간 "mm"분"';
+  want[C.FINAL_APPROVED_TIME] = '[h]"시간 "mm"분"';
+  want[C.STAFF_CONFIRMED_AT] = 'yyyy-mm-dd hh:mm:ss';
+  const cols = Object.keys(want).map(Number), first = Math.min.apply(null, cols), last = Math.max.apply(null, cols);
+  const range = sheet.getRange(rowNumber, first, 1, last - first + 1);
+  const formats = range.getNumberFormats();
+  cols.forEach(function (c) { formats[0][c - first] = want[c]; });
+  range.setNumberFormats(formats);
 }
 
 

@@ -150,7 +150,8 @@ function doGet() {
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
-function setupSheets() {
+function setupSheets() { return withFinderRefresh_(setupSheets_impl_, arguments); }
+function setupSheets_impl_() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const criteria = getOrCreateSheet_(ss, SHEETS.criteria);
   const internalResources = getOrCreateSheet_(ss, SHEETS.internalResources);
@@ -178,13 +179,45 @@ function getProgramFinderData() {
   if (!ss.getSheetByName(SHEETS.internalResources)) {
     throw new Error('프로그램현황 시트를 찾을 수 없습니다. 시트 이름을 확인해주세요.');
   }
-  return {
+  // 상담할 때 여는 화면이라 자주 불림 → 한 번 읽은 내용을 기억해 두고, 저장하거나 시트를 고치면 새로 읽음
+  return finderCached_(() => ({
     criteria: ss.getSheetByName(SHEETS.criteria) ? getCriteria_() : {},
     resources: getResources_(true),
     settings: publicSettings_(),
     checkRules: getCheckRules_(),
-  };
+  }));
 }
+
+// ── 빠른 찾기 화면 임시 저장(캐시) ──
+function finderCached_(load) {
+  let cache, prefix;
+  try {
+    cache = CacheService.getScriptCache();
+    prefix = 'finder-v1:' + (PropertiesService.getDocumentProperties().getProperty('finderRev') || '0');
+    const m = JSON.parse(cache.get(prefix) || 'null');
+    if (m && m.count > 0) {
+      const keys = Array.from({ length: m.count }, (_, i) => prefix + ':' + m.token + ':' + i), parts = cache.getAll(keys);
+      if (keys.every((k) => typeof parts[k] === 'string')) return JSON.parse(keys.map((k) => parts[k]).join(''));
+    }
+  } catch (e) { cache = null; }
+  const data = load();
+  if (cache) try {
+    const json = JSON.stringify(data), count = Math.ceil(json.length / 30000);
+    if (count && count <= 60) {
+      const token = Utilities.getUuid().slice(0, 8), parts = {};
+      for (let i = 0; i < count; i++) parts[prefix + ':' + token + ':' + i] = json.slice(i * 30000, (i + 1) * 30000);
+      cache.putAll(parts, 21600); cache.put(prefix, JSON.stringify({ count, token }), 21600);
+    }
+  } catch (e) { /* 임시 저장은 실패해도 괜찮아요 */ }
+  return data;
+}
+function bumpFinder_() {
+  try { PropertiesService.getDocumentProperties().setProperty('finderRev', Utilities.getUuid().slice(0, 8)); } catch (e) {}
+}
+/** 시트에서 직접 고치면 빠른 찾기 화면도 새 내용으로 */
+function onEdit(e) { bumpFinder_(); }
+/** 저장 기능: 저장이 끝나면(실패해도) 빠른 찾기 화면을 새로 읽게 함 */
+function withFinderRefresh_(fn, args) { try { return fn.apply(null, args); } finally { bumpFinder_(); } }
 
 function getProgramManagementData(adminPin) {
   requireEditor_(adminPin);
@@ -214,7 +247,8 @@ function getProgramManagementData(adminPin) {
 }
 
 
-function yearRollover(adminPin) {
+function yearRollover(adminPin) { return withFinderRefresh_(yearRollover_impl_, arguments); }
+function yearRollover_impl_(adminPin) {
   requireAdmin_(adminPin);
   const sheet = ensureInternalResourceSheet_();
   const headers = getSheetHeaders_(sheet);
@@ -896,7 +930,8 @@ function normalizeText_(value) {
   return value === null || value === undefined ? '' : String(value).trim();
 }
 
-function importOverallStatusSheet() {
+function importOverallStatusSheet() { return withFinderRefresh_(importOverallStatusSheet_impl_, arguments); }
+function importOverallStatusSheet_impl_() {
   const SOURCE_SPREADSHEET_ID = '18AQDL0EXV6ojnPd1tmt5De1zA8GDePoiUiK6WAQ_0q8';
   const TARGET_SHEET_NAME = '전체현황';
 
@@ -1274,7 +1309,8 @@ function getCheckRules_() {
   return rules;
 }
 
-function saveSettings(pin, values) {
+function saveSettings(pin, values) { return withFinderRefresh_(saveSettings_impl_, arguments); }
+function saveSettings_impl_(pin, values) {
   const user = requireAdmin_(pin);
   ensureStage2Sheets_();
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.settings);
@@ -1304,7 +1340,8 @@ function saveSettings(pin, values) {
 }
 
 // ── 프로그램: 확인일·변경이력 ──
-function updateProgramQuick(adminPin, resourceId, updates) {
+function updateProgramQuick(adminPin, resourceId, updates) { return withFinderRefresh_(updateProgramQuick_impl_, arguments); }
+function updateProgramQuick_impl_(adminPin, resourceId, updates) {
   const user = requireEditor_(adminPin);
   ensureStage2Sheets_();
   const id = normalizeText_(resourceId);
@@ -1329,7 +1366,8 @@ function confirmProgram(adminPin, resourceId) {
   return updateProgramQuick(adminPin, resourceId, {});
 }
 
-function saveProgramResource(adminPin, payload) {
+function saveProgramResource(adminPin, payload) { return withFinderRefresh_(saveProgramResource_impl_, arguments); }
+function saveProgramResource_impl_(adminPin, payload) {
   const user = requireEditor_(adminPin);
   ensureStage2Sheets_();
   const data = payload || {};
@@ -1432,7 +1470,8 @@ function normalizeExternalActive_(value) {
   return normalizeActiveValue_(text);
 }
 
-function saveExternalResource(adminPin, payload) {
+function saveExternalResource(adminPin, payload) { return withFinderRefresh_(saveExternalResource_impl_, arguments); }
+function saveExternalResource_impl_(adminPin, payload) {
   const user = requireEditor_(adminPin);
   const isAdmin = user === '관리자(PIN)' || isAdminEmail_(user);
   ensureStage2Sheets_();
@@ -1489,7 +1528,8 @@ function saveExternalResource(adminPin, payload) {
 }
 
 // 검토중 → 승인(화면에 표시), 확인일 기록
-function approveExternalResource(adminPin, resourceId) {
+function approveExternalResource(adminPin, resourceId) { return withFinderRefresh_(approveExternalResource_impl_, arguments); }
+function approveExternalResource_impl_(adminPin, resourceId) {
   requireAdmin_(adminPin);
   return saveExternalResource(adminPin, { '외부자원ID': resourceId, '활성여부': 'O', '최종확인일': today_() });
 }
@@ -1619,7 +1659,8 @@ function parseLinkAnalysis_(text) {
 }
 
 // 분석 결과 중 고른 항목을 "검토중"으로 저장
-function saveAnalyzedItems(adminPin, items, sourceUrl) {
+function saveAnalyzedItems(adminPin, items, sourceUrl) { return withFinderRefresh_(saveAnalyzedItems_impl_, arguments); }
+function saveAnalyzedItems_impl_(adminPin, items, sourceUrl) {
   requireEditor_(adminPin);
   const saved = [];
   (items || []).forEach((item) => {
