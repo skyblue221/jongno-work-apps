@@ -1,0 +1,2328 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <base target="_top">
+
+  <meta charset="UTF-8">
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  >
+
+  <style>
+    :root {
+      --background: #f5f6f8;
+      --panel: #ffffff;
+      --text: #202124;
+      --subtext: #5f6368;
+      --border: #d8dce1;
+      --primary: #2457a7;
+      --primary-dark: #17468d;
+      --error: #b3261e;
+      --success: #176b36;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 20px 14px 40px;
+      background: var(--background);
+      color: var(--text);
+      font-family:
+        Arial,
+        "Apple SD Gothic Neo",
+        "Noto Sans KR",
+        sans-serif;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 680px;
+      margin: 0 auto;
+    }
+
+    .header {
+      margin-bottom: 18px;
+      text-align: center;
+    }
+
+    .header h1 {
+      margin: 0 0 8px;
+      font-size: 27px;
+    }
+
+    .header p {
+      margin: 0;
+      color: var(--subtext);
+      line-height: 1.6;
+    }
+
+    .card {
+      margin-bottom: 16px;
+      padding: 22px;
+      background: var(--panel);
+      border-radius: 16px;
+      box-shadow: 0 3px 14px rgba(0, 0, 0, 0.06);
+    }
+
+    .section-title {
+      margin: 0 0 18px;
+      font-size: 19px;
+    }
+
+    .field {
+      margin-bottom: 18px;
+    }
+
+    .field:last-child {
+      margin-bottom: 0;
+    }
+
+    label,
+    legend {
+      display: block;
+      margin-bottom: 7px;
+      font-size: 15px;
+      font-weight: 700;
+    }
+
+    .required {
+      color: var(--error);
+    }
+
+    input,
+    textarea,
+    select {
+      width: 100%;
+      min-height: 48px;
+      padding: 11px 12px;
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      background: white;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 16px;
+    }
+
+    input:focus,
+    textarea:focus,
+    select:focus {
+      border-color: var(--primary);
+      outline: 3px solid rgba(36, 87, 167, 0.14);
+    }
+
+    textarea {
+      min-height: 120px;
+      resize: vertical;
+      line-height: 1.6;
+    }
+
+    .two-columns {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    fieldset {
+      margin: 0;
+      padding: 0;
+      border: 0;
+    }
+
+    .radio-group {
+      display: flex;
+      gap: 10px;
+    }
+
+    .radio-option {
+      display: flex;
+      flex: 1;
+      align-items: center;
+      gap: 8px;
+      min-height: 48px;
+      margin: 0;
+      padding: 10px 13px;
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      font-weight: 400;
+      cursor: pointer;
+    }
+
+    .radio-option input {
+      width: 20px;
+      height: 20px;
+      min-height: auto;
+      margin: 0;
+    }
+
+    .search-wrap {
+      position: relative;
+    }
+
+    .search-results {
+      display: none;
+      position: absolute;
+      z-index: 20;
+      top: calc(100% + 4px);
+      left: 0;
+      right: 0;
+      max-height: 240px;
+      overflow-y: auto;
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      background: white;
+      box-shadow: 0 8px 22px rgba(0, 0, 0, 0.12);
+    }
+
+    .search-result-button {
+      display: block;
+      width: 100%;
+      min-height: 44px;
+      padding: 10px 12px;
+      border: 0;
+      border-radius: 0;
+      background: white;
+      color: var(--text);
+      text-align: left;
+      font-size: 16px;
+      font-weight: 400;
+    }
+
+    .search-result-button:hover,
+    .search-result-button:focus {
+      background: #f1f5fb;
+      outline: none;
+    }
+
+    .empty-result {
+      padding: 12px;
+      color: var(--subtext);
+      font-size: 14px;
+    }
+
+    .volunteer-info {
+      display: none;
+      margin-top: 12px;
+      padding: 14px;
+      background: #f1f5fb;
+      border-radius: 9px;
+      color: #344054;
+      line-height: 1.7;
+    }
+
+    .verify-button {
+      width: 100%;
+      background: #e8eef8;
+      color: var(--primary-dark);
+    }
+
+    .volunteer-info.ok {
+      background: #e8f4ec;
+      color: var(--success);
+    }
+
+    .volunteer-info.fail {
+      background: #fcebea;
+      color: var(--error);
+    }
+
+    .meal-note {
+      margin: 8px 0 0;
+      color: var(--subtext);
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .notice-box {
+      margin-top: 12px;
+      padding: 14px;
+      background: #f8f9fa;
+      border-radius: 9px;
+      color: var(--subtext);
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .suggestion-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .suggestion-button {
+      min-height: 38px;
+      padding: 8px 11px;
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      background: #f8f9fa;
+      color: var(--text);
+      font-size: 14px;
+      font-weight: 400;
+    }
+
+    .suggestion-button:hover {
+      background: #f1f5fb;
+    }
+
+    .time-result {
+      margin-top: 14px;
+      padding: 15px;
+      background: #f1f5fb;
+      border-radius: 10px;
+      line-height: 1.6;
+    }
+
+    .time-result strong {
+      color: var(--primary-dark);
+      font-size: 18px;
+    }
+
+    .canvas-wrap {
+      position: relative;
+      width: 100%;
+      height: 210px;
+      overflow: hidden;
+      border: 2px solid #555;
+      border-radius: 10px;
+      background: white;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      background: white;
+      touch-action: none;
+      cursor: crosshair;
+    }
+
+    .signature-guide {
+      margin: 8px 0 0;
+      color: var(--subtext);
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .confirm-box {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      margin-bottom: 18px;
+      padding: 14px;
+      background: #f8f9fa;
+      border-radius: 9px;
+      line-height: 1.6;
+    }
+
+    .confirm-box input {
+      flex: 0 0 auto;
+      width: 21px;
+      height: 21px;
+      min-height: auto;
+      margin: 2px 0 0;
+    }
+
+    .confirm-box label {
+      margin: 0;
+      font-weight: 400;
+      cursor: pointer;
+    }
+
+    button {
+      min-height: 52px;
+      padding: 12px 17px;
+      border: 0;
+      border-radius: 9px;
+      font-family: inherit;
+      font-size: 17px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    button:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+
+    .clear-button {
+      width: 100%;
+      margin-top: 12px;
+      background: #e7e9ec;
+      color: var(--text);
+    }
+
+    .submit-button {
+      width: 100%;
+      background: var(--primary);
+      color: white;
+    }
+
+    .submit-button:hover:not(:disabled) {
+      background: var(--primary-dark);
+    }
+
+    #message {
+      display: none;
+      margin-top: 16px;
+      padding: 14px;
+      border-radius: 9px;
+      font-weight: 700;
+      line-height: 1.6;
+    }
+
+    #message.success {
+      display: block;
+      background: #e8f4ec;
+      color: var(--success);
+    }
+
+    #message.error {
+      display: block;
+      background: #fcebea;
+      color: var(--error);
+    }
+
+    .loading {
+      padding: 16px;
+      color: var(--subtext);
+      text-align: center;
+    }
+
+    .completion {
+      display: none;
+      padding: 28px 22px;
+      text-align: center;
+    }
+
+    .completion h2 {
+      margin: 0 0 12px;
+      font-size: 24px;
+    }
+
+    .completion p {
+      margin: 7px 0;
+      line-height: 1.6;
+    }
+
+    .log-id {
+      margin: 18px 0;
+      padding: 14px;
+      background: #f1f5fb;
+      border-radius: 9px;
+      font-weight: 700;
+    }
+
+    .new-entry-button {
+      width: 100%;
+      margin-top: 12px;
+      background: #e7e9ec;
+      color: var(--text);
+    }
+
+    @media (max-width: 520px) {
+      body {
+        padding: 14px 10px 30px;
+      }
+
+      .card {
+        padding: 19px 16px;
+      }
+
+      .two-columns {
+        grid-template-columns: 1fr;
+        gap: 0;
+      }
+
+      .radio-group {
+        flex-direction: column;
+      }
+
+      .canvas-wrap {
+        height: 190px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <main class="container">
+
+    <div id="formArea">
+
+      <header class="header">
+        <h1>자원봉사 활동일지</h1><p id="appBuild" style="font-size:12px;color:#68756d">활동일지 v2 · 연결 확인 중</p>
+
+        <p>
+          봉사자 정보를 확인하고 활동내용을 작성한 뒤
+          직접 서명해 주세요.
+        </p>
+      </header>
+
+
+      <section class="card">
+
+        <h2 class="section-title">봉사자 확인</h2>
+
+        <fieldset class="field">
+
+          <legend>
+            봉사자 등록 여부
+            <span class="required">*</span>
+          </legend>
+
+          <div class="radio-group">
+
+            <label class="radio-option">
+              <input
+                type="radio"
+                name="registrationType"
+                value="등록봉사자"
+                checked
+                onchange="changeRegistrationType()"
+              >
+              등록 봉사자
+            </label>
+
+            <label class="radio-option">
+              <input
+                type="radio"
+                name="registrationType"
+                value="미등록봉사자"
+                onchange="changeRegistrationType()"
+              >
+              명단에 없어요
+            </label>
+
+          </div>
+
+        </fieldset>
+
+
+        <div id="registeredArea">
+
+          <div class="two-columns">
+            <div class="field">
+              <label for="verifyName">
+                성명
+                <span class="required">*</span>
+              </label>
+              <input id="verifyName" type="text" autocomplete="off" placeholder="예: 홍길동" oninput="resetVerify()">
+            </div>
+
+            <div class="field">
+              <label for="verifyPhone">
+                연락처 뒤 4자리
+                <span class="required">*</span>
+              </label>
+              <input id="verifyPhone" type="text" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="예: 1234" oninput="resetVerify()">
+            </div>
+          </div>
+
+          <button type="button" id="verifyButton" class="verify-button" onclick="verifyVolunteer()">
+            본인 확인
+          </button>
+
+          <input id="selectedVolunteerRow" type="hidden">
+
+          <div id="volunteerInfo" class="volunteer-info"></div>
+
+        </div>
+
+
+        <div
+          id="unregisteredArea"
+          style="display:none;"
+        >
+
+          <div class="field">
+            <label for="unregisteredName">
+              성명
+              <span class="required">*</span>
+            </label>
+
+            <input
+              id="unregisteredName"
+              type="text"
+              placeholder="성명을 입력해 주세요"
+            >
+          </div>
+
+          <div class="field">
+            <label for="unregisteredBirthDate">
+              생년월일
+              <span class="required">*</span>
+            </label>
+
+            <input
+              id="unregisteredBirthDate"
+              type="date"
+            >
+          </div>
+
+          <div class="field">
+            <label for="unregisteredPhoneLast4">
+              연락처 뒤 4자리
+              <span class="required">*</span>
+            </label>
+
+            <input
+              id="unregisteredPhoneLast4"
+              type="text"
+              inputmode="numeric"
+              maxlength="4"
+              placeholder="예: 1234"
+            >
+          </div>
+
+          <div class="field">
+            <label for="unregisteredOrganization">
+              소속
+            </label>
+
+            <input
+              id="unregisteredOrganization"
+              type="text"
+              placeholder="학교, 회사, 단체 등 (선택)"
+            >
+          </div>
+
+          <div class="notice-box">
+            명단에 없는 봉사자는 활동일지만 임시로 기록됩니다.
+            정식 봉사자 등록은 담당자가 신청서를 확인한 뒤 별도로 처리합니다.
+          </div>
+
+        </div>
+
+      </section>
+
+
+      <section class="card">
+
+        <h2 class="section-title">활동기록</h2>
+
+        <div class="field">
+
+          <label for="activityDate">
+            활동일
+            <span class="required">*</span>
+          </label>
+
+          <input
+            id="activityDate"
+            type="date"
+            onchange="oldDateConfirmed = ''"
+          >
+
+        </div>
+
+
+        <div class="field">
+
+          <label for="programSelect">
+            봉사프로그램
+            <span class="required">*</span>
+          </label>
+
+          <select id="programSelect" onchange="programChanged()">
+            <option value="">불러오는 중...</option>
+          </select>
+
+          <input
+            id="programOther"
+            type="text"
+            maxlength="100"
+            autocomplete="off"
+            placeholder="프로그램 이름을 입력해 주세요"
+            style="display:none; margin-top:8px;"
+            onchange="loadActivityContentList()"
+          >
+
+        </div>
+
+
+        <div class="field">
+
+          <label for="activityContent">
+            활동내용
+            <span class="required">*</span>
+          </label>
+
+          <textarea
+            id="activityContent"
+            maxlength="1000"
+            placeholder="추천 문구를 선택하거나 활동한 내용을 직접 작성해 주세요"
+          ></textarea>
+
+          <div
+            id="activityContentSuggestions" aria-label="담당자가 지정한 활동내용 추천 문구"
+            class="suggestion-list"
+          ></div>
+
+        </div>
+
+
+        <div class="two-columns">
+
+          <div class="field">
+
+            <label for="startTime">
+              시작시간
+              <span class="required">*</span>
+            </label>
+
+            <input
+              id="startTime"
+              type="time"
+              oninput="updateCalculatedTime()"
+            >
+
+          </div>
+
+
+          <div class="field">
+
+            <label for="endTime">
+              종료시간
+              <span class="required">*</span>
+            </label>
+
+            <input
+              id="endTime"
+              type="time"
+              oninput="updateCalculatedTime()"
+            >
+
+          </div>
+
+        </div>
+
+
+        <fieldset class="field">
+
+          <legend>
+            식사 여부
+            <span class="required">*</span>
+          </legend>
+
+          <div class="radio-group">
+
+            <label class="radio-option">
+              <input
+                type="radio"
+                name="mealStatus"
+                value="식사함"
+              >
+              식사함
+            </label>
+
+            <label class="radio-option">
+              <input
+                type="radio"
+                name="mealStatus"
+                value="식사하지 않음"
+              >
+              식사하지 않음
+            </label>
+
+          </div>
+
+          <p class="meal-note">
+            식사한 경우, 식사 시간은 담당자가 확인할 때 빼고 인정해요.
+          </p>
+
+        </fieldset>
+
+
+        <div class="time-result" aria-live="polite">
+
+          계산된 활동시간:
+
+          <strong id="calculatedTime">
+            시간을 입력해 주세요
+          </strong>
+
+        </div>
+
+      </section>
+
+
+      <section class="card">
+
+        <h2 class="section-title">본인 확인 및 서명</h2>
+
+        <div class="confirm-box">
+
+          <input
+            id="confirmation"
+            type="checkbox"
+          >
+
+          <label for="confirmation">
+            위에 작성한 활동내용이 사실임을 확인합니다.
+          </label>
+
+        </div>
+
+
+        <div class="field">
+
+          <label>
+            본인 서명
+            <span class="required">*</span>
+          </label>
+
+          <div class="canvas-wrap">
+
+            <canvas
+              id="signatureCanvas"
+              aria-label="전자서명 입력란"
+            ></canvas>
+
+          </div>
+
+          <p class="signature-guide">
+            손가락, 터치펜 또는 마우스로 서명해 주세요.
+          </p>
+
+          <button
+            type="button"
+            class="clear-button"
+            onclick="clearSignature()"
+          >
+            서명 다시 쓰기
+          </button>
+
+        </div>
+
+      </section>
+
+
+      <button
+        type="button"
+        id="submitButton"
+        class="submit-button"
+        onclick="submitForm()"
+      >
+        활동일지 제출
+      </button>
+
+      <div
+        id="message"
+        role="alert"
+        aria-live="assertive"
+      ></div>
+
+    </div>
+
+
+    <section
+      id="completionArea"
+      class="card completion"
+    >
+
+      <h2>제출이 완료되었습니다</h2>
+
+      <p>
+        <strong id="completedVolunteer"></strong>님의
+        활동일지가 저장되었습니다.
+      </p>
+
+      <div class="log-id">
+        일지번호:
+        <span id="completedLogId"></span>
+      </div>
+
+      <p>
+        계산된 활동시간:
+        <strong id="completedTime"></strong>
+      </p>
+
+      <p id="completedMeal" class="meal-note"></p>
+
+      <button
+        type="button"
+        class="new-entry-button"
+        onclick="resetForNewEntry()"
+      >
+        새 활동일지 작성
+      </button>
+
+    </section>
+
+  </main>
+
+
+  <script>
+
+
+    let programList = [];
+    let activityContentList = [];
+
+
+    const canvas =
+      document.getElementById('signatureCanvas');
+
+    const context =
+      canvas.getContext('2d');
+
+    let isDrawing = false;
+    let hasSignature = false;
+    let activePointerId = null;
+
+
+    document.addEventListener(
+      'DOMContentLoaded',
+      function () {
+        setDefaultDate();
+        google.script.run.withSuccessHandler(function(info){document.getElementById('appBuild').textContent=info.buildVersion;}).withFailureHandler(function(){document.getElementById('appBuild').textContent='서버 버전 확인 필요 · 봉사자용 배포도 새 버전으로 업데이트해 주세요.';}).getActivityLogBuildInfo();
+        initializeCanvas();
+        loadProgramList();
+        loadActivityContentList();
+        changeRegistrationType();
+      }
+    );
+
+
+    function getRegistrationType() {
+
+      const selected =
+        document.querySelector(
+          'input[name="registrationType"]:checked'
+        );
+
+      return selected
+        ? selected.value
+        : '';
+    }
+
+
+    function changeRegistrationType() {
+
+      const type =
+        getRegistrationType();
+
+      const registeredArea =
+        document.getElementById(
+          'registeredArea'
+        );
+
+      const unregisteredArea =
+        document.getElementById(
+          'unregisteredArea'
+        );
+
+      if (type === '등록봉사자') {
+
+        registeredArea.style.display =
+          'block';
+
+        unregisteredArea.style.display =
+          'none';
+
+      } else {
+
+        registeredArea.style.display =
+          'none';
+
+        unregisteredArea.style.display =
+          'block';
+
+      }
+
+      hideMessage();
+    }
+
+
+    function resetVerify() {
+
+      document.getElementById('selectedVolunteerRow').value = '';
+
+      const info = document.getElementById('volunteerInfo');
+      info.style.display = 'none';
+      info.className = 'volunteer-info';
+      info.innerHTML = '';
+    }
+
+
+    function verifyVolunteer() {
+
+      hideMessage();
+
+      const name = document.getElementById('verifyName').value.trim();
+      const phone = document.getElementById('verifyPhone').value.trim();
+      const info = document.getElementById('volunteerInfo');
+      const button = document.getElementById('verifyButton');
+
+      if (!name || !/^\d{4}$/.test(phone)) {
+        showMessage('성명과 연락처 뒤 4자리(숫자 4개)를 입력해 주세요.', 'error');
+        return;
+      }
+
+      button.disabled = true;
+      button.textContent = '확인 중...';
+
+      google.script.run
+        .withSuccessHandler(function (result) {
+
+          button.disabled = false;
+          button.textContent = '본인 확인';
+
+          if (result && result.found) {
+
+            document.getElementById('selectedVolunteerRow').value = String(result.token);
+
+            info.className = 'volunteer-info ok';
+            info.innerHTML =
+              '<strong>' + escapeHtml(result.name) + '</strong>님, 확인되었어요.' +
+              (result.organization ? '<br>소속: ' + escapeHtml(result.organization) : '');
+
+          } else {
+
+            info.className = 'volunteer-info fail';
+            info.innerHTML =
+              '명단에서 찾지 못했어요. 성명과 번호를 다시 확인해 주세요.<br>' +
+              '처음 오셨다면 위에서 <strong>명단에 없어요</strong>를 선택해 주세요.';
+
+          }
+
+          info.style.display = 'block';
+
+        })
+        .withFailureHandler(function (error) {
+
+          button.disabled = false;
+          button.textContent = '본인 확인';
+
+          showMessage(error && error.message ? error.message : '확인 중 오류가 발생했어요.', 'error');
+
+        })
+        .findVolunteer(name, phone);
+    }
+
+
+    function loadProgramList() {
+
+      google.script.run
+
+        .withSuccessHandler(function (list) {
+
+          programList =
+            Array.isArray(list)
+              ? list
+              : [];
+
+          renderProgramOptions();
+
+        })
+
+        .withFailureHandler(function () {
+
+          programList = [];
+
+        })
+
+        .getProgramList();
+    }
+
+
+    function renderProgramOptions() {
+
+      const select = document.getElementById('programSelect');
+
+      select.innerHTML =
+        '<option value="">프로그램을 골라 주세요</option>' +
+        programList.map(function (program) {
+          return '<option value="' + escapeHtml(program) + '">' + escapeHtml(program) + '</option>';
+        }).join('') +
+        '<option value="__other">기타 (목록에 없어요)</option>';
+    }
+
+
+    function programChanged() {
+
+      const isOther = document.getElementById('programSelect').value === '__other';
+      const other = document.getElementById('programOther');
+
+      other.style.display = isOther ? 'block' : 'none';
+
+      if (isOther) {
+        other.focus();
+      } else {
+        other.value = '';
+      }
+
+      loadActivityContentList();
+    }
+
+
+    function getProgramValue() {
+
+      const value = document.getElementById('programSelect').value;
+
+      return value === '__other'
+        ? document.getElementById('programOther').value.trim()
+        : value;
+    }
+
+
+    /* 활동일이 이 날짜 수보다 오래되면 한 번 더 확인 */
+    const OLD_DATE_DAYS = 30;
+    let oldDateConfirmed = '';
+
+
+    function isRealDate(value){const m=String(value||'').match(/^(\d{4})-(\d{2})-(\d{2})$/);if(!m||Number(m[1])<1000)return false;const d=new Date(0);d.setHours(0,0,0,0);d.setFullYear(Number(m[1]),Number(m[2])-1,Number(m[3]));return d.getFullYear()===Number(m[1])&&d.getMonth()===Number(m[2])-1&&d.getDate()===Number(m[3]);}
+
+    function daysAgo(dateText) {
+
+      const parts = dateText.split('-').map(Number);
+      const target = new Date(parts[0], parts[1] - 1, parts[2]);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      return Math.round((today - target) / 86400000);
+    }
+
+
+    function loadActivityContentList() {
+      const requestedProgram=getProgramValue();
+
+      google.script.run
+
+        .withSuccessHandler(function (list) {
+
+          if(requestedProgram!==getProgramValue())return;
+          activityContentList =
+            Array.isArray(list)
+              ? list
+              : [];
+
+          renderActivityContentSuggestions();
+
+        })
+
+        .withFailureHandler(function () {
+
+          /*
+           * 이 기능이 Code.gs에 아직 없더라도
+           * 활동일지 전체가 멈추지 않게 처리
+           */
+          activityContentList = [];
+
+        })
+
+        .getActivityContentList(requestedProgram);
+    }
+
+
+    function renderActivityContentSuggestions() {
+
+      const box =
+        document.getElementById(
+          'activityContentSuggestions'
+        );
+
+      box.innerHTML = '';
+
+
+      activityContentList
+        .slice(0, 8)
+        .forEach(function (content) {
+
+          const button =
+            document.createElement(
+              'button'
+            );
+
+          button.type =
+            'button';
+
+          button.className =
+            'suggestion-button';
+
+
+          button.textContent =
+            content.length > 24
+              ? content.slice(
+                  0,
+                  24
+                ) + '...'
+              : content;
+
+
+          button.title =
+            content;
+
+
+          button.onclick =
+            function () {
+
+              document
+                .getElementById(
+                  'activityContent'
+                )
+                .value =
+                  content;
+
+            };
+
+
+          box.appendChild(
+            button
+          );
+
+        });
+    }
+
+
+    function setDefaultDate() {
+
+      const today =
+        new Date();
+
+      const year =
+        today.getFullYear();
+
+      const month =
+        String(
+          today.getMonth() + 1
+        ).padStart(
+          2,
+          '0'
+        );
+
+      const day =
+        String(
+          today.getDate()
+        ).padStart(
+          2,
+          '0'
+        );
+
+
+      document
+        .getElementById(
+          'activityDate'
+        )
+        .value =
+          year +
+          '-' +
+          month +
+          '-' +
+          day;
+
+      document.getElementById('unregisteredBirthDate').max = year + '-' + month + '-' + day;
+      document.getElementById('activityDate').max =
+        year + '-' + month + '-' + day;
+    }
+
+
+    function initializeCanvas() {
+
+      resizeCanvas();
+
+
+      canvas.addEventListener(
+        'pointerdown',
+        startDrawing
+      );
+
+      canvas.addEventListener(
+        'pointermove',
+        draw
+      );
+
+      canvas.addEventListener(
+        'pointerup',
+        stopDrawing
+      );
+
+      canvas.addEventListener(
+        'pointercancel',
+        stopDrawing
+      );
+
+
+      canvas.addEventListener(
+        'pointerleave',
+        function (event) {
+
+          if (isDrawing) {
+            stopDrawing(
+              event
+            );
+          }
+
+        }
+      );
+
+
+      window.addEventListener(
+        'resize',
+        resizeCanvas
+      );
+    }
+
+
+    function resizeCanvas() {
+
+      const rect =
+        canvas.getBoundingClientRect();
+
+
+      if (
+        rect.width === 0 ||
+        rect.height === 0
+      ) {
+        return;
+      }
+
+
+      const ratio =
+        Math.max(
+          window.devicePixelRatio ||
+            1,
+          1
+        );
+
+
+      let previousImage =
+        null;
+
+
+      if (
+        hasSignature &&
+        canvas.width > 0 &&
+        canvas.height > 0
+      ) {
+
+        previousImage =
+          canvas.toDataURL(
+            'image/png'
+          );
+
+      }
+
+
+      canvas.width =
+        Math.round(
+          rect.width *
+          ratio
+        );
+
+
+      canvas.height =
+        Math.round(
+          rect.height *
+          ratio
+        );
+
+
+      context.setTransform(
+        ratio,
+        0,
+        0,
+        ratio,
+        0,
+        0
+      );
+
+
+      setCanvasStyle();
+
+
+      if (previousImage) {
+
+        const image =
+          new Image();
+
+
+        image.onload =
+          function () {
+
+            context.drawImage(
+              image,
+              0,
+              0,
+              rect.width,
+              rect.height
+            );
+
+          };
+
+
+        image.src =
+          previousImage;
+
+      }
+    }
+
+
+    function setCanvasStyle() {
+
+      context.lineWidth =
+        3;
+
+      context.lineCap =
+        'round';
+
+      context.lineJoin =
+        'round';
+
+      context.strokeStyle =
+        '#111111';
+    }
+
+
+    function getCanvasPosition(event) {
+
+      const rect =
+        canvas.getBoundingClientRect();
+
+
+      return {
+
+        x:
+          event.clientX -
+          rect.left,
+
+        y:
+          event.clientY -
+          rect.top
+
+      };
+    }
+
+
+    function startDrawing(event) {
+
+      event.preventDefault();
+
+
+      activePointerId =
+        event.pointerId;
+
+
+      canvas.setPointerCapture(
+        activePointerId
+      );
+
+
+      isDrawing =
+        true;
+
+      hasSignature =
+        true;
+
+
+      const position =
+        getCanvasPosition(
+          event
+        );
+
+
+      context.beginPath();
+
+
+      context.moveTo(
+        position.x,
+        position.y
+      );
+
+
+      context.lineTo(
+        position.x + 0.1,
+        position.y + 0.1
+      );
+
+
+      context.stroke();
+    }
+
+
+    function draw(event) {
+
+      if (
+        !isDrawing ||
+        event.pointerId !==
+          activePointerId
+      ) {
+        return;
+      }
+
+
+      event.preventDefault();
+
+
+      const position =
+        getCanvasPosition(
+          event
+        );
+
+
+      context.lineTo(
+        position.x,
+        position.y
+      );
+
+
+      context.stroke();
+    }
+
+
+    function stopDrawing(event) {
+
+      if (
+        event.pointerId !==
+        activePointerId
+      ) {
+        return;
+      }
+
+
+      event.preventDefault();
+
+
+      isDrawing =
+        false;
+
+
+      context.closePath();
+
+
+      if (
+        canvas.hasPointerCapture(
+          activePointerId
+        )
+      ) {
+
+        canvas.releasePointerCapture(
+          activePointerId
+        );
+
+      }
+
+
+      activePointerId =
+        null;
+    }
+
+
+    function clearSignature() {
+
+      const rect =
+        canvas.getBoundingClientRect();
+
+
+      context.clearRect(
+        0,
+        0,
+        rect.width,
+        rect.height
+      );
+
+
+      hasSignature =
+        false;
+
+      isDrawing =
+        false;
+
+      activePointerId =
+        null;
+
+
+      hideMessage();
+    }
+
+
+    function updateCalculatedTime() {
+
+      const startTime =
+        document
+          .getElementById(
+            'startTime'
+          )
+          .value;
+
+
+      const endTime =
+        document
+          .getElementById(
+            'endTime'
+          )
+          .value;
+
+
+      const result =
+        document
+          .getElementById(
+            'calculatedTime'
+          );
+
+
+      if (
+        !startTime ||
+        !endTime
+      ) {
+
+        result.textContent =
+          '시간을 입력해 주세요';
+
+        return;
+      }
+
+
+      const minutes =
+        calculateMinutes(
+          startTime,
+          endTime
+        );
+
+
+      if (
+        minutes <= 0
+      ) {
+
+        result.textContent =
+          '종료시간을 다시 확인해 주세요';
+
+        return;
+      }
+
+
+      result.textContent =
+        formatMinutes(
+          minutes
+        );
+    }
+
+
+    function calculateMinutes(
+      startTime,
+      endTime
+    ) {
+
+      const startParts =
+        startTime
+          .split(':')
+          .map(Number);
+
+
+      const endParts =
+        endTime
+          .split(':')
+          .map(Number);
+
+
+      return (
+        endParts[0] * 60 +
+        endParts[1] -
+        (
+          startParts[0] * 60 +
+          startParts[1]
+        )
+      );
+    }
+
+
+    function formatMinutes(
+      totalMinutes
+    ) {
+
+      const hours =
+        Math.floor(
+          totalMinutes / 60
+        );
+
+
+      const minutes =
+        totalMinutes % 60;
+
+
+      if (
+        hours === 0
+      ) {
+
+        return (
+          minutes +
+          '분'
+        );
+      }
+
+
+      if (
+        minutes === 0
+      ) {
+
+        return (
+          hours +
+          '시간'
+        );
+      }
+
+
+      return (
+        hours +
+        '시간 ' +
+        minutes +
+        '분'
+      );
+    }
+
+
+    function getMealStatus() {
+
+      const selected =
+        document.querySelector(
+          'input[name="mealStatus"]:checked'
+        );
+
+
+      return selected
+        ? selected.value
+        : '';
+    }
+
+
+    function submitForm() {
+
+      hideMessage();
+
+
+      const registrationType =
+        getRegistrationType();
+
+
+      const data = {
+
+        registrationType:
+          registrationType,
+
+        volunteerRow:
+          document
+            .getElementById(
+              'selectedVolunteerRow'
+            )
+            .value,
+
+        verifyName:
+          document.getElementById('verifyName').value.trim(),
+
+        verifyPhone:
+          document.getElementById('verifyPhone').value.trim(),
+
+        unregisteredName:
+          document
+            .getElementById(
+              'unregisteredName'
+            )
+            .value
+            .trim(),
+
+        unregisteredBirthDate:
+          document
+            .getElementById(
+              'unregisteredBirthDate'
+            )
+            .value,
+
+        unregisteredPhoneLast4:
+          document
+            .getElementById(
+              'unregisteredPhoneLast4'
+            )
+            .value
+            .trim(),
+
+        unregisteredOrganization:
+          document
+            .getElementById(
+              'unregisteredOrganization'
+            )
+            .value
+            .trim(),
+
+        activityDate:
+          document
+            .getElementById(
+              'activityDate'
+            )
+            .value,
+
+        program:
+          getProgramValue(),
+
+        activityContent:
+          document
+            .getElementById(
+              'activityContent'
+            )
+            .value
+            .trim(),
+
+        startTime:
+          document
+            .getElementById(
+              'startTime'
+            )
+            .value,
+
+        endTime:
+          document
+            .getElementById(
+              'endTime'
+            )
+            .value,
+
+        mealStatus:
+          getMealStatus(),
+
+        signature:
+          hasSignature
+            ? canvas.toDataURL(
+                'image/png'
+              )
+            : ''
+
+      };
+
+
+      const errorMessage =
+        validateForm(
+          data
+        );
+
+
+      if (
+        errorMessage
+      ) {
+
+        showMessage(
+          errorMessage,
+          'error'
+        );
+
+        return;
+      }
+
+
+      const ago = daysAgo(data.activityDate);
+
+      if (ago > OLD_DATE_DAYS && oldDateConfirmed !== data.activityDate) {
+
+        oldDateConfirmed = data.activityDate;
+
+        showMessage(
+          '활동일이 ' + ago + '일 전(' + data.activityDate + ')이에요. 날짜가 맞으면 [활동일지 제출]을 한 번 더 눌러 주세요.',
+          'error'
+        );
+
+        return;
+      }
+
+
+      const submitButton =
+        document
+          .getElementById(
+            'submitButton'
+          );
+
+
+      submitButton.disabled =
+        true;
+
+
+      submitButton.textContent =
+        '저장 중입니다...';
+
+
+      google.script.run
+
+        .withSuccessHandler(
+          function (result) {
+
+            submitButton.disabled =
+              false;
+
+            submitButton.textContent =
+              '활동일지 제출';
+
+
+            showCompletion(
+              result
+            );
+
+          }
+        )
+
+        .withFailureHandler(
+          function (error) {
+
+            submitButton.disabled =
+              false;
+
+            submitButton.textContent =
+              '활동일지 제출';
+
+
+            showMessage(
+              error &&
+              error.message
+                ? error.message
+                : '저장 중 오류가 발생했습니다.',
+              'error'
+            );
+
+          }
+        )
+
+        .saveActivityLog(
+          data
+        );
+    }
+
+
+    function validateForm(data) {
+      if(data.activityDate&&!isRealDate(data.activityDate))return '활동일에 실제로 존재하는 날짜를 입력해 주세요.';
+      if(data.registrationType==='미등록봉사자'&&data.unregisteredBirthDate){
+        if(!isRealDate(data.unregisteredBirthDate))return '생년월일에 실제로 존재하는 날짜를 입력해 주세요.';
+        if(daysAgo(data.unregisteredBirthDate)<0)return '생년월일은 오늘 이후 날짜로 입력할 수 없어요.';
+      }
+
+
+      if (
+        !data.registrationType
+      ) {
+
+        return '봉사자 등록 여부를 선택해 주세요.';
+      }
+
+
+      if (
+        data.registrationType ===
+          '등록봉사자' &&
+        !data.volunteerRow
+      ) {
+
+        return '성명과 연락처 뒤 4자리를 입력하고 [본인 확인]을 눌러 주세요.';
+      }
+
+
+      if (
+        data.registrationType ===
+        '미등록봉사자'
+      ) {
+
+        if (
+          !data.unregisteredName
+        ) {
+
+          return '성명을 입력해 주세요.';
+        }
+
+
+        if (
+          !data.unregisteredBirthDate
+        ) {
+
+          return '생년월일을 입력해 주세요.';
+        }
+
+
+        if (
+          !/^\d{4}$/.test(
+            data.unregisteredPhoneLast4
+          )
+        ) {
+
+          return '연락처 뒤 4자리를 숫자 4자리로 입력해 주세요.';
+        }
+
+      }
+
+
+      if (
+        !data.activityDate
+      ) {
+
+        return '활동일을 입력해 주세요.';
+      }
+
+
+      if (daysAgo(data.activityDate) < 0) {
+
+        return '오늘 이후 날짜는 고를 수 없어요. 활동일을 확인해 주세요.';
+      }
+
+
+      if (
+        !data.program
+      ) {
+
+        return document.getElementById('programSelect').value === '__other'
+          ? '프로그램 이름을 입력해 주세요.'
+          : '봉사프로그램을 골라 주세요.';
+      }
+
+
+      if (
+        !data.activityContent
+      ) {
+
+        return '활동내용을 입력해 주세요.';
+      }
+
+
+      if (
+        !data.startTime ||
+        !data.endTime
+      ) {
+
+        return '시작시간과 종료시간을 입력해 주세요.';
+      }
+
+
+      if (
+        calculateMinutes(
+          data.startTime,
+          data.endTime
+        ) <= 0
+      ) {
+
+        return '종료시간은 시작시간보다 늦어야 합니다.';
+      }
+
+
+      if (
+        !data.mealStatus
+      ) {
+
+        return '식사 여부를 선택해 주세요.';
+      }
+
+
+      if (
+        !document
+          .getElementById(
+            'confirmation'
+          )
+          .checked
+      ) {
+
+        return '활동내용 확인란에 체크해 주세요.';
+      }
+
+
+      if (
+        !data.signature
+      ) {
+
+        return '본인 서명을 작성해 주세요.';
+      }
+
+
+      return '';
+    }
+
+
+    function showCompletion(result) {
+
+      document
+        .getElementById(
+          'formArea'
+        )
+        .style.display =
+          'none';
+
+
+      document
+        .getElementById(
+          'completionArea'
+        )
+        .style.display =
+          'block';
+
+
+      document
+        .getElementById(
+          'completedVolunteer'
+        )
+        .textContent =
+          result.volunteerName ||
+          '봉사자';
+
+
+      document
+        .getElementById(
+          'completedLogId'
+        )
+        .textContent =
+          result.logId ||
+          '';
+
+
+      document
+        .getElementById(
+          'completedTime'
+        )
+        .textContent =
+          result.activityTimeText ||
+          '';
+
+
+      document.getElementById('completedMeal').textContent =
+        result.mealStatus === '식사함'
+          ? '식사 시간은 담당자가 확인한 뒤 빼고 인정해요.'
+          : '';
+
+      window.scrollTo({
+        top: 0,
+        behavior: 'smooth'
+      });
+    }
+
+
+    function resetForNewEntry() {
+
+      document
+        .getElementById(
+          'formArea'
+        )
+        .style.display =
+          'block';
+
+
+      document
+        .getElementById(
+          'completionArea'
+        )
+        .style.display =
+          'none';
+
+
+      document
+        .querySelector(
+          'input[name="registrationType"][value="등록봉사자"]'
+        )
+        .checked =
+          true;
+
+
+      changeRegistrationType();
+
+
+      document.getElementById('verifyName').value = '';
+      document.getElementById('verifyPhone').value = '';
+
+      resetVerify();
+
+
+      document
+        .getElementById(
+          'unregisteredName'
+        )
+        .value =
+          '';
+
+
+      document
+        .getElementById(
+          'unregisteredBirthDate'
+        )
+        .value =
+          '';
+
+
+      document
+        .getElementById(
+          'unregisteredPhoneLast4'
+        )
+        .value =
+          '';
+
+
+      document
+        .getElementById(
+          'unregisteredOrganization'
+        )
+        .value =
+          '';
+
+
+      document.getElementById('programSelect').value = '';
+      document.getElementById('programOther').value = '';
+      document.getElementById('programOther').style.display = 'none';
+      oldDateConfirmed = '';
+
+
+      document
+        .getElementById(
+          'activityContent'
+        )
+        .value =
+          '';
+
+
+      document
+        .getElementById(
+          'startTime'
+        )
+        .value =
+          '';
+
+
+      document
+        .getElementById(
+          'endTime'
+        )
+        .value =
+          '';
+
+
+      document
+        .getElementById(
+          'confirmation'
+        )
+        .checked =
+          false;
+
+
+      document
+        .querySelectorAll(
+          'input[name="mealStatus"]'
+        )
+        .forEach(
+          function (input) {
+
+            input.checked =
+              false;
+
+          }
+        );
+
+
+      document
+        .getElementById(
+          'calculatedTime'
+        )
+        .textContent =
+          '시간을 입력해 주세요';
+
+
+      setDefaultDate();
+
+      clearSignature();
+
+      hideMessage();
+
+
+      setTimeout(
+        resizeCanvas,
+        50
+      );
+
+
+      window.scrollTo({
+        top: 0,
+        behavior: 'smooth'
+      });
+    }
+
+
+    function showMessage(
+      message,
+      type
+    ) {
+
+      const box =
+        document.getElementById(
+          'message'
+        );
+
+
+      box.textContent =
+        message;
+
+
+      box.className =
+        type;
+
+
+      box.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center'
+      });
+    }
+
+
+    function hideMessage() {
+
+      const box =
+        document.getElementById(
+          'message'
+        );
+
+
+      box.textContent =
+        '';
+
+
+      box.className =
+        '';
+    }
+
+
+    function formatBirthDate(value) {
+
+      if (
+        !value
+      ) {
+        return '';
+      }
+
+
+      return String(
+        value
+      ).replace(
+        /-/g,
+        '.'
+      );
+    }
+
+
+    function escapeHtml(value) {
+
+      return String(
+        value || ''
+      )
+        .replace(
+          /&/g,
+          '&amp;'
+        )
+        .replace(
+          /</g,
+          '&lt;'
+        )
+        .replace(
+          />/g,
+          '&gt;'
+        )
+        .replace(
+          /"/g,
+          '&quot;'
+        )
+        .replace(
+          /'/g,
+          '&#039;'
+        );
+    }
+
+
+  </script>
+
+</body>
+</html>

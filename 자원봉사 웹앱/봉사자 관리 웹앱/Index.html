@@ -1,0 +1,962 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <style>
+    :root{font-family:system-ui,'Apple SD Gothic Neo',sans-serif;color:#193641;background:#f5f8f8}
+    *{box-sizing:border-box}
+    body{margin:0}
+    header{background:#123c48;color:white;padding:22px max(18px,calc((100vw - 1100px)/2))}
+    h1{font-size:23px;margin:0 0 5px}
+    header small{color:#c9dddd}
+    main{max-width:1100px;margin:20px auto;padding:0 16px}
+    nav{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:20px}
+    button{cursor:pointer;border:1px solid #c5d6d8;background:white;border-radius:9px;padding:10px 14px;color:#153943;font-weight:600}
+    button.primary{background:#176a76;color:white;border-color:#176a76}
+    button.selected{background:#d9ecee;border-color:#176a76}
+    button:disabled{opacity:.5;cursor:wait}
+    .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:12px}
+    .card,.panel{background:white;border:1px solid #dce7e8;border-radius:13px;padding:17px;margin-bottom:14px}
+    .metric{font-size:29px;font-weight:800;margin:8px 0 0}
+    .muted{color:#61777c;font-size:13px}
+    .tools{display:flex;flex-wrap:wrap;gap:9px;align-items:center;margin-bottom:15px}
+    input,select,textarea{width:100%;padding:10px;border:1px solid #c9d8db;border-radius:8px;background:white;font:inherit}
+    textarea{min-height:76px}
+    .tools input{max-width:300px}
+    .tools select{max-width:175px}
+    .form{display:grid;grid-template-columns:repeat(auto-fit,minmax(205px,1fr));gap:12px}
+    .field{display:flex;flex-direction:column;gap:5px;font-size:13px;font-weight:600}
+    .wide{grid-column:1/-1}
+    table{width:100%;border-collapse:collapse;min-width:620px}
+    th,td{text-align:left;padding:11px;border-bottom:1px solid #ebf0f0;font-size:13px}
+    th{background:#f0f5f5}
+    .overflow{overflow:auto}
+    .pill{display:inline-block;background:#e9f1f1;padding:4px 8px;border-radius:30px;font-size:12px}
+    .notice{background:#fff9e9;border:1px solid #eddcb2;border-radius:9px;padding:12px;font-size:13px;margin-bottom:14px}
+    #message{min-height:24px;font-size:13px;margin:8px 0;color:#0a5965}
+    section[hidden]{display:none}
+    .detail{border-top:1px solid #e3eeee;padding-top:12px;margin-top:12px}
+    .flex{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+    .small{font-size:12px}
+    h2{font-size:18px;margin:0 0 14px}
+    h3{font-size:15px}
+    .placeholder{padding:35px;text-align:center;color:#61777c}
+    dialog{width:min(960px,calc(100% - 24px));max-height:90dvh;padding:0;border:1px solid #c5d6d8;border-radius:8px;color:inherit;overflow:auto}
+    dialog::backdrop{background:rgb(0 0 0 / 35%)}
+    .dialogHeader{position:sticky;top:0;z-index:1;background:white;border-bottom:1px solid #dce7e8;padding:14px 18px;display:flex;align-items:center;gap:12px;justify-content:space-between}
+    .dialogHeader h2{margin:0;overflow-wrap:anywhere}.dialogBody{padding:18px;overflow-wrap:anywhere}
+    .closeDialog{width:36px;height:36px;flex:none;padding:0;font-size:24px;border-radius:6px}
+    .metricButton{display:block;border:0;padding:0;background:transparent;text-align:left;font:inherit;color:inherit;text-decoration:underline;text-underline-offset:4px;max-width:100%;overflow-wrap:anywhere}
+    .metricButton:hover{color:#176a76}.detailFacts{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(210px,100%),1fr));gap:10px}.detailFacts p{margin:0}
+    details.panel>summary{cursor:pointer;padding:2px 0}
+    .syncLine{font-size:15px;color:#193641;margin:0 0 6px}.syncLine b{font-size:17px}
+    .warn{color:#a33131;font-weight:700}.ok{color:#0a5965;font-weight:700}
+    .bars{display:flex;align-items:stretch;gap:6px;height:200px;margin:6px 0 18px}
+    .bar{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center}
+    .barTrack{flex:1;width:100%;display:flex;flex-direction:column;justify-content:flex-end;align-items:center}
+    .barVal{font-size:12px;font-weight:700;margin-bottom:2px}
+    .barFill{width:72%;max-width:46px;background:#176a76;border-radius:5px 5px 0 0;min-height:2px}
+    .bar.current .barFill{background:#e0a339}
+    .barLabel{font-size:12px;margin-top:5px;font-weight:600}.barSub{font-size:10px;color:#61777c;white-space:nowrap}
+    .chartPair{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(320px,100%),1fr));gap:18px}
+    #thanksRows thead th{position:sticky;top:0;z-index:1}
+    .noPhone{color:#a33131;font-weight:600}
+    #smsRows table{min-width:680px}
+    button.small{padding:3px 7px;font-size:11px;border-radius:6px}
+    .orgBlock{border-top:1px solid #e3eeee;padding:10px 0}.orgBlock p{margin:4px 0}
+    body.viewer .ownerOnly{display:none!important}
+    [hidden]{display:none!important}
+    #roleBadge{background:#fff3d6;color:#6b4a00;font-weight:700}
+    @media(max-width:520px){header{padding:18px}th,td{padding:8px}button{padding:9px}h1{font-size:21px}}
+    .recordDisclosure>summary{cursor:pointer;padding:12px 14px;background:#f2f7f7;border:1px solid #d8e5e5;border-radius:9px;font-weight:700;line-height:1.5}
+  .recordDisclosure[open]>summary{margin-bottom:12px}
+  .recordDisclosure>summary:focus-visible{outline:3px solid #168391;outline-offset:2px}
+  .historyScroll{max-height:26rem;overflow:auto;overscroll-behavior:contain}
+  .historyScroll thead th{position:sticky;top:0;z-index:1}
+  .recordDisclosure+.recordDisclosure{margin-top:12px}
+  .tools.actionBar{align-items:flex-end;gap:12px}
+  .actionBar .field{margin:0;gap:6px}
+  .actionBar>button,.actionBar>select,.actionBar>input,.actionBar .field>select,.actionBar .field>input{height:44px;box-sizing:border-box}
+  .actionBar>button{display:inline-flex;align-items:center;justify-content:center;white-space:nowrap}
+  .pastAwardLookup{margin:8px 0 24px}
+  .recognitionMini{border-top:1px solid #dce5e5;margin-top:18px;padding-top:10px}
+  .recognitionStats{display:flex;flex-wrap:wrap;gap:12px 28px}
+  .recognitionStats span{display:inline-flex;align-items:baseline;gap:8px}
+  .recognitionStats b{font-size:20px;color:#176d78}
+</style>
+</head>
+<body>
+<header>
+  <h1>자원봉사자 통합 관리</h1>
+  <small>사람의 강점과 참여, 감사의 기록을 한곳에</small> <span id="roleBadge" class="pill" hidden>보기 전용</span>
+</header>
+<main>
+  <nav>
+    <button data-tab="dashboard" class="selected">대시보드</button>
+    <button data-tab="people" class="ownerOnly">봉사자 명단</button>
+    <button data-tab="personForm" class="ownerOnly">봉사자 등록</button>
+    <button data-tab="import" class="ownerOnly">명단 가져오기</button>
+    <button data-tab="records" class="ownerOnly">참여·관계 기록</button>
+    <button data-tab="awards" class="ownerOnly">인정·포상</button>
+    <button data-tab="lunch" class="ownerOnly">중식비</button>
+    <button data-tab="reports">연간보고·배지</button>
+    <button data-tab="access" class="ownerOnly">권한 관리</button>
+  </nav>
+  <div id="message" role="status" aria-live="polite"></div>
+
+  <section id="dashboard">
+    <div class="tools">
+      <label for="year">기준연도</label>
+      <select id="year"></select>
+      <button onclick="reload()">새로고침</button>
+    </div>
+
+    <div class="panel">
+      <h2>① 실적 반영 현황</h2>
+      <div id="syncBox" class="muted">불러오는 중입니다.</div>
+    </div>
+    <div class="panel ownerOnly"><h2>명단 등록 확인</h2><p id="registrationNote" class="muted"></p><div id="registrationRows" class="overflow"></div>
+    </div>
+
+    <div class="panel ownerOnly">
+      <div class="flex"><h2 style="margin:0">② 이번 달 문자 대상</h2><span id="smsCount" class="pill"></span></div>
+      <div class="tools" style="margin:12px 0 0">
+        <button id="openSms">명단 보기·고르기</button>
+        <button id="copySms" class="primary">엑셀용 복사 (이름·연락처)</button>
+        <button id="printSms">PDF 명단 (기안 첨부용)</button>
+      </div>
+      <p id="smsNote" class="small" role="status"></p>
+    </div>
+
+    <div class="panel">
+      <h2>③ 보고용 숫자</h2>
+      <div class="cards" id="reportCards"></div>
+      <p id="reportNote" class="muted"></p>
+      <h3>월별 연인원 <span class="muted small">(막대 아래: 그달 실인원 · 막대에 마우스를 올리면 시간까지)</span></h3>
+      <div id="monthChart"></div>
+      <h3>연도별 실인원 <span class="muted small">(막대 아래: 연인원)</span></h3>
+      <div id="yearChart"></div>
+      <div class="recognitionMini" aria-live="polite">
+        <p id="recognitionYear" class="small muted">배지·포상 현황</p>
+        <div id="recognitionStats" class="recognitionStats"></div>
+        <p class="small muted">이력 기준일 기준 · 항목별 중복 제외</p>
+      </div>
+    </div>
+
+    <details class="panel">
+    <summary><b>④ 자세히 보기</b> <span class="muted">— 통합 통계 · 집계 기준 · 진우 요약</span></summary>
+    <h2 style="margin-top:14px">통합 참여 통계</h2>
+    <div class="cards" id="metrics"></div>
+    <div class="panel">
+      <h2>집계 기준</h2>
+      <p class="muted">진우·기존 활동·과거 연도 명단을 함께 집계합니다. 과거 자료는 이름·생년월일로 확인하고, 생년월일이 없는 진우 자료는 이름(A/B/C 포함)으로 식별합니다. 같은 이름의 생년월일이 여러 개면 진우 인원은 확인이 필요합니다.</p>
+      <p class="muted" id="combinedNote">기록상 첫 참여는 보유 자료 기준입니다.</p>
+      <button id="auditExcluded" hidden>식별 불가 기록 확인</button>
+    </div>
+    <div class="panel">
+      <h2>진우 자료 요약</h2>
+      <div id="jinwooYearMetrics" class="cards" aria-live="polite"></div>
+      <div id="jinwooTypes" class="overflow"></div>
+      <p id="jinwooYearNote" class="muted"></p>
+      <div id="jinwooChecks" class="tools"></div>
+      <details><summary>진우 가져오기 내역 — 전체 보관 기간</summary><div id="jinwooMetrics" class="detailFacts" style="padding-top:12px"></div></details>
+    </div>
+    </details>
+  </section>
+
+  <section id="people" hidden>
+    <div class="tools">
+      <input id="search" placeholder="이름 · 소속 · 재능 · 관심사 검색" oninput="renderPeople()" aria-label="봉사자 검색">
+      <select id="statusFilter" onchange="renderPeople()">
+        <option value="">상태 전체</option><option>활동 중</option><option>일시중단</option><option>종결</option><option>확인 필요</option>
+      </select>
+      <button onclick="exportPeople()" class="ownerOnly">명단 CSV 내려받기</button>
+      <button id="assignPeopleIds" class="ownerOnly">빈 ID 채우기</button>
+      <button id="refreshPeopleAges" class="ownerOnly">연령 다시 계산</button>
+    </div>
+    <div class="panel overflow">
+      <table><thead><tr><th>이름</th><th>상태</th><th>소속</th><th>재능/관심</th><th>상세</th></tr></thead><tbody id="peopleRows"></tbody></table>
+    </div>
+  </section>
+
+  <section id="personForm" hidden>
+    <div class="panel">
+      <h2 id="formTitle">봉사자 등록</h2>
+      <form id="peopleForm" class="form">
+        <input type="hidden" name="id">
+        <label class="field">이름 *<input name="name" required maxlength="80"></label>
+        <label class="field">생년월일<input name="birthDate" type="date"><span id="birthWarning" class="small warn" hidden></span></label>
+        <label class="field">연령 (자동 계산)<input name="age" readonly placeholder="저장 후 자동 계산"></label>
+        <label class="field">VMS ID<input name="vmsId" maxlength="100"></label>
+        <label class="field">1365 ID<input name="vol1365Id" maxlength="100"></label>
+        <label class="field">연락처<input name="phone" maxlength="40" placeholder="010-0000-0000"></label>
+        <label class="field">소속<input name="affiliation" maxlength="100"></label>
+        <label class="field">구분<select name="kind"><option>개인</option><option>단체</option></select></label>
+        <label class="field">등록일<input name="registrationDate" type="date"></label>
+        <label class="field">상태<select name="status"><option>확인 필요</option><option>활동 중</option><option>일시중단</option><option>종결</option></select></label>
+        <label class="field">최초 활동일<input name="firstActivityDate" type="date"></label>
+        <label class="field">최근 활동일<input name="lastActivityDate" type="date"></label>
+        <label class="field">재능 (쉼표로 구분)<input name="talents" placeholder="사진 촬영, 디자인"></label>
+        <label class="field">관심 활동<input name="interests" placeholder="캠페인, 프로그램 지원"></label>
+        <label class="field">참여 가능 시간<input name="availability" placeholder="토요일 오전"></label>
+        <label class="field wide">담당자 참고사항<textarea name="notes" placeholder="필요한 업무 정보만 기록하고 민감정보는 피하세요."></textarea></label>
+        <div class="wide"><label><input id="confirmDuplicate" type="checkbox" name="confirmDuplicate" value="true" style="width:auto"> 기존 인물과 동일하지 않음을 확인했을 때만 체크</label></div>
+        <div class="wide"><button class="primary" type="submit">저장</button> <button type="button" onclick="resetPerson()">새로 작성</button></div>
+      </form>
+    </div>
+  </section>
+
+  <section id="import" hidden>
+    <div class="tools"><button id="organizeSheets">사용 안 하는 탭 숨기기</button><span id="organizeResult" role="status"></span></div>
+    <div class="panel">
+      <h2>과거 연도 자료 가져오기</h2>
+      <div class="form">
+        <label class="field">연도<input id="historyYear" type="number" min="1900" max="2200" value="2024"></label>
+        <label class="field">자료 종류<select id="historyKind"><option value="roster">실인원 — 연도별 명단</option><option value="activity">연인원 — 날짜별 활동</option></select></label>
+        <label class="field">원본 탭 이름<input id="historySheet" placeholder="예: 2024년 실인원"></label>
+        <label class="field">범위 (선택)<input id="historyRange" placeholder="예: A1:T1000"></label>
+      </div>
+      <div class="tools" style="margin-top:12px"><button id="previewHistory">가져오기 확인</button><button id="saveHistory" class="primary" disabled>확인한 자료 가져오기</button></div>
+      <p id="historyResult" role="status">가져오기 전입니다.</p>
+    </div>
+    <div class="panel">
+      <h2>진우 기간별봉사현황 가져오기</h2>
+      <p class="muted">진우 엑셀 파일을 구글시트로 열고, 전체 표를 현재 스프레드시트의 <b>JinwooRaw</b> 탭에 붙여 넣은 뒤 실행하세요. 기존 PEOPLE·ACTIVITY·AWARDS는 자동으로 바꾸지 않습니다. 진우 실적은 등록번호·활동구분을 기준으로 추가·갱신하며, 이번 파일에 없는 기존 실적은 보존합니다.</p>
+      <div class="tools">
+        <input id="jinwooRawSheet" value="JinwooRaw" aria-label="진우 원본 탭 이름">
+        <button id="runJinwooImport" class="primary">진우 자료 가져오기</button>
+      </div>
+      <div id="jinwooImportResult" class="muted">가져오기 전입니다.</div>
+    </div>
+
+    <div class="panel">
+      <h2>기존 봉사자 명단 가져오기</h2>
+      <p class="muted">CSV(UTF-8) 파일을 읽습니다. 엑셀에서 CSV UTF-8로 저장한 뒤 선택하세요. 원본 명단은 별도로 보관하세요. 중복 의심 인원은 자동으로 건너뜁니다.</p>
+      <p class="muted">인식 열: 이름, 생년월일, 연령, 연락처, VMS ID, 1365 ID, 소속, 구분, 등록일, 비고(또는 참고사항)</p>
+      <input type="file" id="csvFile" accept=".csv,text/csv">
+      <p id="importPreview" class="muted">파일을 선택하면 미리보기가 표시됩니다.</p>
+      <button id="runImport" class="primary" disabled>검토한 명단 가져오기</button>
+      <div id="importResult"></div>
+    </div>
+  </section>
+
+  <section id="records" hidden>
+    <div class="notice">공식 실적을 재입력하지 않는 것이 기본 원칙입니다. 이 화면은 엑셀 연동 전 기능 확인과 누락 이력 보완을 위한 수동 입력입니다.</div>
+    <div class="panel">
+      <h2>활동 이력 추가</h2>
+      <form id="activityForm" class="form">
+        <label class="field">봉사자 *<select name="personId" class="personSelect" required></select></label>
+        <label class="field">활동일 *<input type="date" name="date" required></label>
+        <label class="field">활동 분야<input name="category" placeholder="식당 배식"></label>
+        <label class="field">횟수<input type="number" min="0" step="1" name="count" value="1"></label>
+        <label class="field">시간<input type="number" min="0" step="0.5" name="hours" value="0"></label>
+        <label class="field">출처<select name="source"><option>직접 입력</option><option>진우</option><option>VMS</option><option>1365</option></select></label>
+        <label class="field">외부기록ID (선택)<input name="externalId"></label>
+        <label class="field wide">메모<input name="note"></label>
+        <div><button class="primary" type="submit">활동 기록 저장</button></div>
+      </form>
+    </div>
+    <div class="panel">
+      <h2>연락·관계 기록 추가</h2>
+      <form id="contactForm" class="form">
+        <label class="field">봉사자 *<select name="personId" class="personSelect" required></select></label>
+        <label class="field">날짜<input name="date" type="date" required></label>
+        <label class="field">유형<select name="type"><option>활동 제안</option><option>감사 연락</option><option>참여 문의</option><option>안부 연락</option><option>기타</option></select></label>
+        <label class="field wide">내용<textarea name="note"></textarea></label>
+        <div><button class="primary" type="submit">관계 기록 저장</button></div>
+      </form>
+    </div>
+  </section>
+
+  <section id="lunch" hidden>
+    <div class="panel">
+      <h2>🍚 중식비 입력</h2>
+      <p class="muted">같은 날, 같은 프로그램, 같은 시간이면 여러 명을 한 번에 넣을 수 있어요. 이름은 줄바꿈이나 쉼표로 나눠 주세요. 비고(장애인·비장애인)가 다른 분은 따로 입력해 주세요.</p>
+      <form id="lunchForm" class="form">
+        <label class="field">일자 *<input name="date" type="date" required></label>
+        <label class="field">프로그램명 *<input name="program" required maxlength="120" placeholder="예: 식당배식지원" list="lunchPrograms"></label>
+        <label class="field">시작 *<input name="start" type="time" required value="10:00"></label>
+        <label class="field">종료 *<input name="end" type="time" required value="13:00"></label>
+        <label class="field">총 시간 (비우면 자동)<input name="hours" type="number" min="0" step="0.5" placeholder="자동 계산"></label>
+        <label class="field">비고<select name="note"><option>비장애인</option><option>장애인</option></select></label>
+        <label class="field">1인 금액(원)<input name="amount" type="number" min="0" step="500" value="4000"></label>
+        <label class="field">명단에서 찾아 넣기<input id="lunchPick" list="lunchPeople" placeholder="이름을 입력하고 고르면 아래에 추가돼요" autocomplete="off"></label>
+        <label class="field wide">이름 * <span class="muted small">(여러 명은 줄바꿈·쉼표로 구분 · 단체는 예: 홍길동(신한은행))</span><textarea name="names" required placeholder="강윤경&#10;윤지안"></textarea></label>
+        <div class="wide"><button class="primary" type="submit">중식비 기록 저장</button> <span id="lunchFormNote" class="small" role="status"></span></div>
+      </form>
+      <datalist id="lunchPeople"></datalist><datalist id="lunchPrograms"></datalist>
+    </div>
+    <div class="panel">
+      <div class="tools actionBar">
+        <select id="lunchYear" aria-label="중식비 연도"></select>
+        <select id="lunchMonth" aria-label="중식비 월"></select>
+        <button id="loadLunch">명단 보기</button>
+        <button id="printLunch" class="primary" disabled>PDF (기안 첨부용)</button>
+        <button id="xlsxLunch" disabled>엑셀 내려받기</button>
+      </div>
+      <h2 id="lunchTitle">월별 중식비 명단</h2>
+      <p id="lunchNote" class="small" role="status"></p>
+      <div id="lunchRows" class="overflow"></div>
+    </div>
+    <details class="panel">
+      <summary><b>기존 중식비 시트 가져오기</b> <span class="muted">— 처음 한 번만</span></summary>
+      <p class="muted small" style="margin-top:12px">지금까지 쓰던 중식비 구글시트 주소를 붙여넣으면 「중식비 내역」 탭과 월별 탭(예: 25.12월)의 기록을 이 앱으로 가져와요. 원본 시트는 바꾸지 않고, 이미 있는 기록(같은 일자·이름·시작시간)은 건너뛰어요. 금액이 없는 「중식비 내역」 기록은 4,000원으로 넣어요.</p>
+      <div class="tools"><input id="lunchImportUrl" placeholder="https://docs.google.com/spreadsheets/d/..." style="max-width:520px"><button id="runLunchImport" class="primary">가져오기</button></div>
+      <p id="lunchImportNote" class="small" role="status"></p>
+    </details>
+  </section>
+
+  <section id="reports" hidden>
+    <div class="panel">
+      <h2>📊 연간 자원봉사 현황 <span class="muted small">(구청 제출용)</span></h2>
+      <p class="muted">활동 실적 기준이에요(교육·모집연계 제외). 단체는 PEOPLE에 소속이 있거나 구분이 단체인 분, 또는 선택 연도 진우에 기업·단체 활동 표기가 있는 분이에요. 소속은 현재 명단 정보 기준입니다.</p>
+      <div class="tools actionBar">
+        <select id="annualYear" aria-label="연간 현황 연도"></select>
+        <button id="loadAnnual" class="primary">현황 보기</button>
+        <button id="copyAnnual" disabled>표 복사</button>
+        <button id="exportAnnual" class="ownerOnly" disabled>명단 CSV 내려받기</button>
+      </div>
+      <p id="annualNote" class="small" role="status"></p>
+      <div id="annualSummary" class="overflow"></div>
+      <div id="annualGroups"></div>
+      <div id="annualIndividuals"></div>
+    </div>
+    <div class="panel ownerOnly">
+      <h2>🏅 배지 신청 대상</h2>
+      <p class="muted">기준: 그린 200 · 실버 500 · 골드 1,000 · 골드2 2,000 · 골드3 3,000 · 골드4 5,000 · 골드5 10,000시간. 우리 기관 기록의 누적 활동시간으로 찾은 후보예요. VMS에서 실제 누적시간을 확인한 뒤 신청해주세요. 선택한 연도에 활동한 분을 대상으로, 그 연도까지의 누적시간으로 후보를 찾아요. 명단의 현재 상태와 관계없이 실제 활동기록으로 판단합니다. 신청 중과 봉사자 수령 완료를 구분합니다.</p>
+      <div class="tools actionBar"><label class="field">활동연도<select id="badgeYear" aria-label="배지 활동연도"></select></label><button id="loadBadges" class="primary">배지 대상 보기</button><button id="exportBadges" disabled>CSV 내려받기</button></div>
+      <p id="badgeNote" class="small" role="status"></p>
+      <div id="badgeRows" class="overflow"></div>
+    </div>
+  </section>
+
+  <section id="awards" hidden>
+    <div class="panel">
+      <h2>🎁 연말 감사명단</h2>
+      <p class="muted">해당 연도 활동 실적(교육·모집연계 제외) 5회 이상인 분을 활동시간 → 횟수 순으로 보여줘요. 상위 30명이 자동으로 체크되고, 빼거나 더할 분은 체크로 고르면 돼요. 💌는 그해 인정·포상에 종류 '감사·인정'으로 기록된 추천 수상자예요.</p>
+      <div class="tools actionBar">
+        <select id="thanksYear" aria-label="감사명단 연도"></select>
+        <button id="loadThanks" class="primary">감사명단 보기</button>
+        <button id="exportThanks" disabled>CSV 내려받기</button>
+      </div>
+      <p id="thanksNote" class="muted" role="status"></p>
+      <div id="thanksWorkspace" hidden>
+        <details id="thanksCandidates" class="recordDisclosure"><summary id="thanksCandidatesTitle">감사명단 후보 선택</summary>
+          <div id="thanksRows" class="historyScroll"></div>
+          <div class="tools actionBar"><button id="finishThanksSelection" class="primary">선택 완료 · 선정 명단 보기</button></div>
+        </details>
+        <details id="thanksSelected" class="recordDisclosure" hidden><summary id="thanksSelectedTitle">선정 명단</summary>
+          <div id="thanksSelectedRows" class="historyScroll"></div>
+          <div class="tools"><button id="editThanksSelection">선정 명단 수정</button></div>
+      <div id="thanksRecord" class="tools" hidden style="margin-top:12px">
+        <span id="thanksCount" class="pill"></span>
+        <input id="thanksAwardName" aria-label="포상 이름" style="max-width:260px">
+        <select id="thanksAwardStatus" aria-label="진행상태" style="max-width:130px"><option>선정</option><option>지급 완료</option></select>
+        <button id="recordThanks" class="primary">선택한 분 인정·포상에 기록</button>
+        <button id="resetThanks">상위 30명으로 되돌리기</button>
+      </div>
+      <p id="thanksRecordNote" class="small" role="status"></p>
+        </details>
+      </div>
+    </div>
+    <div class="panel ownerOnly">
+      <h2>인정·포상 이력 추가</h2>
+      <details class="pastAwardLookup"><summary><b>검색에 없는 과거 봉사자 찾기</b></summary>
+        <p class="muted small">과거 명단에서 배지를 받은 사람을 찾아 등록할 수 있어요. 기존 명단에 같은 이름이 있으면 생년월일을 확인해 먼저 선택해주세요. 새 등록은 내용 확인 후 저장해야 하며, 배지 이력은 따로 저장합니다.</p>
+        <div class="tools actionBar"><label class="field">활동연도 <input id="pastAwardYear" type="number" min="1900" max="2200" style="width:100px"></label><input id="pastAwardQuery" type="search" placeholder="과거 봉사자 이름" aria-label="과거 봉사자 이름" maxlength="80"><button id="findPastAwardPerson" type="button">과거 명단에서 찾기</button></div>
+        <p id="pastAwardNote" class="small" role="status"></p><div id="pastAwardRows" class="overflow"></div>
+      </details>
+      <form id="awardForm" class="form">
+        <label class="field">봉사자 *<select name="personId" class="personSelect" required></select></label>
+        <label class="field">구분<select name="type"><option>배지</option><option>포상</option><option>감사·인정</option></select></label>
+        <label class="field">배지·포상명 *<input name="name" required placeholder="예: 2026 자원봉사 어워드"></label>
+        <label class="field">진행상태<select name="status"><option>예정</option><option>추천 완료</option><option>선정</option><option>미선정</option><option>지급 완료</option><option>수상</option></select></label>
+        <label class="field">추천자<input name="recommendedBy"></label>
+        <label class="field">기준일<input name="date" type="date"></label>
+        <label class="field wide">메모<textarea name="note"></textarea></label>
+        <div><button class="primary" type="submit">인정·포상 기록 저장</button></div>
+      </form>
+    </div>
+    <div class="panel">
+      <details class="recordDisclosure" id="awardHistory"><summary id="awardHistoryTitle">인정·포상 기록 보기</summary>
+        <div class="tools"><input id="awardHistorySearch" type="search" aria-label="인정·포상 기록 검색" placeholder="이름 · 연도 · 배지명 검색"></div>
+        <div class="historyScroll" tabindex="0" role="region" aria-label="인정·포상 기록 목록"><table><thead><tr><th>날짜</th><th>봉사자</th><th>구분</th><th>명칭</th><th>상태</th></tr></thead><tbody id="awardRows"></tbody></table></div>
+      </details>
+    </div>
+  </section>
+
+  <section id="access" hidden>
+    <div class="panel">
+      <h2>권한 관리</h2>
+      <p class="muted">여기에 넣은 분은 <b>숫자만 보기</b>로 들어올 수 있어요 (대시보드 숫자·그래프, 연간 현황 표). 이름·연락처가 나오는 화면과 수정 기능은 담당자만 써요. <b>만료일</b>을 정해 두면 그날이 지나면 자동으로 권한이 빠져요. 같은 이메일로 다시 넣으면 기한이 새로 바뀌어요.</p>
+      <form id="accessForm" class="tools">
+        <input name="email" type="email" placeholder="기관 이메일" required style="min-width:220px">
+        <input name="name" placeholder="이름·역할 (예: 김○○ 팀장)">
+        <label class="small">만료일 <input name="until" type="date"></label>
+        <button class="primary" type="submit">권한 주기</button>
+      </form>
+    </div>
+    <div class="panel overflow"><h2>권한이 있는 분</h2><div id="accessRows"></div></div>
+  </section>
+</main>
+<dialog id="smsDialog" aria-labelledby="smsDialogTitle">
+  <div class="dialogHeader"><h2 id="smsDialogTitle">이번 달 문자 대상</h2><span id="smsCount2" class="pill"></span><button class="closeDialog" id="closeSms" aria-label="문자 대상 닫기" title="닫기">×</button></div>
+  <div class="dialogBody">
+    <p class="muted small" id="smsGuide"></p>
+    <div class="tools">
+      <input id="smsSearch" type="search" placeholder="이름 · 소속 검색" aria-label="문자 대상 검색">
+      <select id="smsView" aria-label="보기"><option value="checked">체크된 분만</option><option value="all">전체 명단에서 추가</option></select>
+      <button id="resetSms">자동 체크로 되돌리기</button>
+      <button id="copySms2" class="primary">엑셀용 복사</button>
+      <button id="printSms2">PDF 명단</button>
+    </div>
+    <p id="smsNote2" class="small" role="status"></p>
+    <div id="smsRows" class="overflow"></div>
+  </div>
+</dialog>
+<dialog id="personDialog" aria-labelledby="personDialogTitle">
+  <div class="dialogHeader"><h2 id="personDialogTitle">봉사자 상세</h2><button class="closeDialog" id="closePerson" aria-label="상세 닫기" title="닫기" autofocus>×</button></div>
+  <div id="personDetail" class="dialogBody" aria-live="polite"></div>
+</dialog>
+<dialog id="auditDialog" aria-labelledby="auditTitle">
+  <div class="dialogHeader"><h2 id="auditTitle">집계 근거</h2><button class="closeDialog" id="closeAudit" aria-label="집계 근거 닫기" title="닫기" autofocus>×</button></div>
+  <div class="dialogBody"><p id="auditNote"></p><div class="tools"><input id="auditSearch" type="search" aria-label="근거 명단 검색" placeholder="이름 · 출처 검색"><span id="auditCount" role="status"></span></div><div id="auditRows" class="overflow" aria-live="polite"></div></div>
+</dialog>
+<script>
+let returnToAwardAfterPerson=false;
+let db={people:[],activity:[],awards:[],contacts:[],jinwoo:[],history:[]};
+const isViewer=()=>db.role==='viewer';
+function applyRole(){const v=isViewer();document.body.classList.toggle('viewer',v);$('roleBadge').hidden=!v;if(v&&['people','personForm','import','records','awards','lunch'].includes((document.querySelector('nav button.selected')||{}).dataset?.tab))show('dashboard');}
+const $=id=>document.getElementById(id);
+$('organizeSheets').onclick=async()=>{
+ const button=$('organizeSheets');button.disabled=true;
+ try{const result=await api('organizeUnusedSheets');$('organizeResult').textContent=result.hidden.length?`${result.hidden.length}개 탭을 숨겼습니다. 데이터는 그대로 보관됩니다.`:'숨길 탭이 없습니다.';}catch(e){$('organizeResult').textContent=e.message;}finally{button.disabled=false;}
+};
+let personRequest=0,auditRequest=0,auditData=null;
+function closePerson(){personRequest++;$('personDialog').close();}
+$('closePerson').onclick=closePerson;
+$('closeAudit').onclick=()=>{auditRequest++;$('auditDialog').close();};
+$('personDialog').addEventListener('cancel',()=>personRequest++);
+$('auditDialog').addEventListener('cancel',()=>auditRequest++);
+function evidenceCard(label,value,metric){if(isViewer())metric=null;return `<div class="card"><div class="muted">${esc(label)}</div><div class="metric">${metric?`<button class="metricButton" data-metric="${esc(metric)}" title="${esc(label)} 근거 보기">${esc(value)}</button>`:esc(value)}</div></div>`;}
+function bindEvidenceCards(root){$(root).querySelectorAll('[data-metric]').forEach(b=>b.onclick=()=>openEvidence(b.dataset.metric));}
+$('auditExcluded').onclick=()=>openEvidence('excluded');
+async function openEvidence(metric){
+ if(isViewer())return;
+ const request=++auditRequest,year=Number($('year').value);auditData=null;
+ $('auditTitle').textContent=year+'년 집계 근거';$('auditRows').textContent='불러오는 중입니다.';$('auditNote').textContent='';$('auditSearch').value='';$('auditCount').textContent='';
+ if(!$('auditDialog').open)$('auditDialog').showModal();
+ try{const prepared=await prepareLookups(year);if(request!==auditRequest||!$('auditDialog').open)return;const result=prepared&&prepared.evidence[metric]||await api('getDashboardEvidence',{year,metric});if(request!==auditRequest||!$('auditDialog').open)return;auditData=result;$('auditTitle').textContent=year+'년 '+result.title;$('auditNote').textContent=result.note;renderEvidence();}
+ catch(e){if(request===auditRequest)$('auditRows').textContent=e.message;}
+}
+function renderEvidence(){
+ if(!auditData)return;
+ const q=$('auditSearch').value.trim().toLowerCase(),rows=auditData.rows.filter(r=>[r.name,r.sources,r.reason].join(' ').toLowerCase().includes(q));
+ $('auditCount').textContent=`${rows.length} / ${auditData.rows.length}개`;
+ $('auditRows').innerHTML=rows.length?`<table><thead><tr><th>이름</th><th>생년월일</th><th>참여 연도·날짜</th><th>출처</th><th>기록 수</th><th>시간</th><th>구분·사유</th><th>상세</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${esc(r.name)}</td><td>${esc(r.birthDate||'-')}</td><td>${esc(r.date||r.years)}</td><td>${esc(r.sources)}</td><td>${esc(r.records)}</td><td>${r.hours==null?'-':esc(r.hours)}</td><td>${esc(r.reason||'-')}</td><td>${r.personId?`<button class="auditPerson" data-id="${esc(r.personId)}">상세</button>`:'-'}</td></tr>`).join('')}</tbody></table>`:'<p>해당하는 기록이 없습니다.</p>';
+ $('auditRows').querySelectorAll('.auditPerson').forEach(b=>b.onclick=()=>detail(b.dataset.id));
+}
+$('auditSearch').addEventListener('input',renderEvidence);
+async function detail(id){
+ const request=++personRequest;
+ $('personDialogTitle').textContent='봉사자 상세';$('personDetail').textContent='이력을 불러오는 중입니다.';
+ if(!$('personDialog').open)$('personDialog').showModal();
+ try{
+    const result=await api('getPersonDetail',id);if(request!==personRequest||!$('personDialog').open)return;
+  renderPersonDetail(result);
+ }catch(e){if(request===personRequest)$('personDetail').textContent=e.message;}
+}
+function renderPersonDetail(data){
+ const p=data.person;$('personDialogTitle').textContent=p.name+' · '+(p.status||'상태 미입력');
+ const cached=db.people.findIndex(r=>String(r.id)===String(p.id));if(cached>=0)db.people[cached]=p;
+ const items=(rows,fn)=>rows.length?rows.map(fn).join(''):'<li>기록 없음</li>';
+ $('personDetail').innerHTML=`<div class="tools ownerOnly"><button id="editSelected" class="primary">정보 수정</button></div>
+ <div class="detailFacts"><p>생년월일: ${esc(p.birthDate||'미입력')}</p><p>연령: ${p.age==null||p.age===''?'미입력':esc(p.age)+'세'}</p><p>연락처: ${esc(p.phone||'미입력')}</p><p>소속: ${esc(p.affiliation||'미입력')}</p><p>등록일: ${esc(p.registrationDate||'미입력')}</p><p>VMS: ${esc(p.vmsId||'-')} / 1365: ${esc(p.vol1365Id||'-')}</p><p>등록된 최초 활동일: ${esc(p.firstActivityDate||'-')}</p><p>등록된 최근 활동일: ${esc(p.lastActivityDate||'-')}</p></div>
+ <p>재능: ${esc(p.talents||'미입력')} / 관심: ${esc(p.interests||'미입력')} / 가능 시간: ${esc(p.availability||'미입력')}</p><p>참고사항: ${esc(p.notes||'없음')}</p>
+ <div class="detail"><h3>참여 요약</h3><p>확인된 참여 연도: ${esc(data.participationYears.join(', ')||'없음')}</p><p>이력상 첫 기록일: ${esc(data.firstDate||'-')} / 최근 기록일: ${esc(data.lastDate||'-')}</p><p>집계 시간: ${esc(data.hours.toLocaleString(undefined,{maximumFractionDigits:2}))}시간</p><p>과거 실인원 명단: ${esc(data.rosterYears.join(', ')||'없음')} (참여 연도만 확인)</p></div>
+ ${data.uncertainJinwoo||data.uncertainHistory?`<p class="notice">이름은 같지만 구분이 필요한 진우 ${esc(data.uncertainJinwoo)}건, 과거 ${esc(data.uncertainHistory)}건은 이 사람의 이력에 포함하지 않았습니다. 생년월일과 A/B/C 표기를 확인해 주세요.</p>`:''}
+ <details class="recordDisclosure"><summary>활동·교육·연계 이력 (${data.entries.length}건)</summary>${data.entries.length?`<div class="historyScroll" tabindex="0" role="region" aria-label="개인 활동 이력"><table><thead><tr><th>날짜</th><th>출처</th><th>유형·내용</th><th>횟수</th><th>시간</th><th>집계</th></tr></thead><tbody>${data.entries.map(r=>`<tr><td>${esc(r.date)}</td><td>${esc(r.source)}</td><td>${esc(r.category)}<br>${esc(r.description)}${r.note?' / '+esc(r.note):''}</td><td>${esc(r.count)}</td><td>${esc(r.hours)}</td><td>${esc(r.excludedReason||'포함')}</td></tr>`).join('')}</tbody></table></div>`:'<p>이 사람으로 식별된 활동 기록이 없습니다.</p>'}</details>
+ <details class="recordDisclosure"><summary>인정·포상 (${data.awards.length}건)</summary><div class="historyScroll"><ul>${items(data.awards,a=>`<li>${esc(a.date)} · ${esc(a.type)} · ${esc(a.name)} (${esc(a.status)})</li>`)}</ul></div></details>
+ <details class="recordDisclosure"><summary>연락·관계 이력 (${data.contacts.length}건)</summary><div class="historyScroll"><ul>${items(data.contacts,c=>`<li>${esc(c.date)} · ${esc(c.type)} · ${esc(c.note)}</li>`)}</ul></div></details>`;
+ $('editSelected').onclick=()=>{closePerson();if($('auditDialog').open)$('auditDialog').close();editPerson(p.id);};
+}
+let historyPreview=null;
+const historyOptions=()=>({year:Number($('historyYear').value),kind:$('historyKind').value,sheetName:$('historySheet').value.trim(),range:$('historyRange').value.trim()});
+['historyYear','historyKind','historySheet','historyRange'].forEach(id=>$(id).addEventListener('input',()=>{historyPreview=null;$('saveHistory').disabled=true;}));
+$('previewHistory').onclick=async()=>{
+ const options=historyOptions();$('previewHistory').disabled=true;$('saveHistory').disabled=true;historyPreview=null;
+ try{const result=await api('previewHistoryImport',options);if(JSON.stringify(options)!==JSON.stringify(historyOptions()))return;historyPreview=options;$('historyResult').textContent=`${result.year}년 ${result.kind==='roster'?'실인원 명단':'연인원 활동'}: ${result.rows}행, 이름·생년월일 기준 ${result.people}명`+(result.kind==='activity'?`, ${result.hours}시간`:' (활동시간은 합산하지 않음)');$('saveHistory').disabled=false;}catch(e){$('historyResult').textContent=e.message;}finally{$('previewHistory').disabled=false;}
+};
+$('saveHistory').onclick=async()=>{
+ if(!historyPreview||JSON.stringify(historyPreview)!==JSON.stringify(historyOptions()))return;
+ const options={...historyPreview,confirmReplace:true};
+ if(!confirm(`${options.year}년의 같은 자료 종류로 이전에 가져온 과거 자료를 이번 원본 전체로 교체합니다. 계속할까요?`))return;
+ $('saveHistory').disabled=true;$('previewHistory').disabled=true;
+ try{const result=await api('importHistory',options);historyPreview=null;await reload();$('historyResult').textContent=`${result.year}년 과거 자료 ${result.rows}행 저장 완료`;}catch(e){$('historyResult').textContent=e.message;}finally{$('previewHistory').disabled=false;}
+};
+$('refreshPeopleAges').onclick=async()=>{
+ const button=$('refreshPeopleAges');button.disabled=true;
+ try{const result=await api('refreshPeopleAges');await reload();notice(`연령 ${result.updated}건을 갱신했습니다.`+(result.invalid?` 생년월일 확인 필요 ${result.invalid}건은 연령을 비웠습니다.`:''));}catch(e){notice(e.message,true);}finally{button.disabled=false;}
+};
+let statsRequest=0;
+function renderJinwooSummary(result){
+ const s=result.jinwooYear,d=result.diagnostics,summary=result.summary;
+ $('jinwooYearMetrics').innerHTML=evidenceCard('전체 참여 실인원',s.real+'명','jinwooNames')+evidenceCard('선택 연도 기록',s.rows+'건',null)+evidenceCard('선택 연도 시간',s.hours.toLocaleString(undefined,{maximumFractionDigits:2})+'시간',null);
+ bindEvidenceCards('jinwooYearMetrics');
+ const types=[['활동','service'],['교육','training'],['모집·연계','placement']];
+ $('jinwooTypes').innerHTML=`<table style="min-width:320px"><thead><tr><th>유형</th><th>실인원</th><th>기록 건수</th></tr></thead><tbody>${types.map(([type,metric])=>`<tr><td>${esc(type)}</td><td><button data-metric="${metric}" title="${esc(type)} 명단 보기">${s.byType[type]||0}명</button></td><td>${s.rowCounts[type]||0}건</td></tr>`).join('')}</tbody></table>`;bindEvidenceCards('jinwooTypes');
+ $('jinwooYearNote').textContent=`${result.year}년 진우 자료 기준입니다. 전체 실인원은 모든 유형의 이름을 합쳐 중복을 뺀 수입니다. 같은 사람이 여러 유형에 포함될 수 있어 항목별 인원을 더하지 않습니다.`+(d.unclassifiedRows?' 유형 미분류가 있어 항목별 실인원과 건수는 확인된 기록만 표시합니다.':'');
+ const checks=[];
+ if(s.nonService)checks.push(`<button data-metric="nonService">활동 기록 없는 참여자 ${s.nonService}명 확인</button>`);
+ if(d.unclassifiedRows)checks.push(`<button data-metric="unclassified">유형 미분류 ${d.unclassifiedRows}건 확인</button>`);
+ if(d.identifiedJinwoo!==s.real)checks.push(`<button data-metric="jinwooIdentified">통합 집계 식별 인원 ${d.identifiedJinwoo}명 확인</button>`);
+ if(s.unnamed)checks.push(`<span>이름 없는 ${s.unnamed}건은 인원에서 제외</span>`);
+ $('jinwooChecks').innerHTML=checks.join('');bindEvidenceCards('jinwooChecks');
+ $('jinwooMetrics').innerHTML=`<p>보관 기간: ${esc(summary.dateMin||'-')} ~ ${esc(summary.dateMax||'-')}</p><p>저장된 전체 기록: ${summary.rows}건</p><p>저장된 전체 시간: ${summary.hours.toLocaleString(undefined,{maximumFractionDigits:2})}시간</p><p>명단 이름 일치: ${summary.nameMatched}건 / 미일치·중복: ${summary.unresolved}건</p>`;
+}
+const dashboardResults=new Map();
+const lookupRequests=new Map();let lookupGeneration=0;
+function prepareLookups(year){
+ if(isViewer())return Promise.resolve(null);
+ if(lookupRequests.has(year))return lookupRequests.get(year);
+ const generation=lookupGeneration;
+ const pending=api('getLookupData',year).then(result=>{
+  if(generation!==lookupGeneration)return null;
+  console.info('Volunteer lookup server timing',result.timing);return result;
+ }).catch(error=>{if(generation===lookupGeneration)lookupRequests.delete(year);console.warn('Lookup preload failed; using individual queries',error);return null;});
+ lookupRequests.set(year,pending);return pending;
+}
+async function renderJinwooYear(){
+ const request=++statsRequest,year=Number($('year').value);
+ $('jinwooYearNote').textContent='선택 연도 집계 중입니다.';
+ try{
+  const result=dashboardResults.has(year)?dashboardResults.get(year):await api('getDashboardStats',year);if(request!==statsRequest)return;dashboardResults.set(year,result);prepareLookups(year);
+  const s=result.jinwooYear,c=result.combined,d=result.diagnostics;
+  const top=[['해당 연도 실인원',c.real+'명'],['전년도 실인원',c.prior+'명'],['전년 대비',(c.change>0?'+':'')+c.change+'명'],['전년도 미참여',c.notPrevious+'명'],['기록상 첫 참여',c.firstRecorded+'명'],['전년도 재참여',c.retained+'명'],['복귀 참여',c.returned+'명'],['현재 활동 중',c.activeStatus+'명'],['해당 연도 누적시간',c.hours.toLocaleString(undefined,{maximumFractionDigits:2})+'시간']];
+  const topKeys=['real','prior','change','notPrevious','firstRecorded','retained','returned','activeStatus','hours'];
+  $('metrics').innerHTML=top.map(([t,n],i)=>evidenceCard(t,n,topKeys[i])).join('');bindEvidenceCards('metrics');
+  $('auditExcluded').hidden=!d.excludedRows;
+  $('combinedNote').textContent=`기록상 첫 참여는 보유 자료 기준입니다. 과거 자료 ${result.historyRows}행 반영. 식별 불가 ${d.excludedRows}행(서로 다른 이름 ${d.excludedNames}개)은 인원에서 제외했습니다.`+(d.excludedRows?' 같은 이름의 생년월일이 여러 개이거나 명단에 동명이인이 중복되어 있는지 확인하세요. 제외 기록이 있어 신규·재참여·복귀 수치는 잠정입니다.':'')+` 출처·실적번호로 중복 확인된 기존 활동 ${result.duplicateManual}건은 제외했습니다.`+(result.suppressedHistory?` 진우와 같은 연도의 과거 활동 ${result.suppressedHistory}건은 참여 여부만 반영하고 시간은 진우를 사용합니다.`:'')+(result.possibleDuplicate?` 날짜·시간이 같은 중복 의심 ${result.possibleDuplicate}건은 확인 전까지 합산됩니다.`:'')+(c.priorRows?'':' 전년도 자료가 없어 전년 비교는 확인이 필요합니다.');
+  renderJinwooSummary(result);
+ }catch(e){if(request===statsRequest){$('metrics').innerHTML='';$('jinwooMetrics').innerHTML='';$('jinwooYearMetrics').innerHTML='';$('jinwooTypes').innerHTML='';$('jinwooChecks').innerHTML='';$('jinwooYearNote').textContent=e.message;}}
+}
+document.querySelector('[data-tab="dashboard"]').addEventListener('click',renderJinwooYear);
+$('assignPeopleIds').onclick=async()=>{
+ const button=$('assignPeopleIds');button.disabled=true;
+ try{const added=await api('assignMissingPeopleIds');await reload();notice(`빈 ID ${added}개를 채웠습니다.`);}catch(e){notice(e.message,true);}finally{button.disabled=false;}
+};
+const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function api(method,data){return new Promise((resolve,reject)=>{const runner=google.script.run.withSuccessHandler(resolve).withFailureHandler(e=>reject(Error(e.message||String(e))));if(data===undefined)runner[method]();else runner[method](data);});}
+function notice(msg,error=false){$('message').textContent=msg;$('message').style.color=error?'#a33131':'#08606a';}
+function show(id){document.querySelectorAll('main section').forEach(s=>s.hidden=s.id!==id);document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('selected',b.dataset.tab===id));}
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{returnToAwardAfterPerson=false;show(b.dataset.tab);if(b.dataset.tab==='access')loadAccess();});
+async function loadAccess(){$('accessRows').textContent='불러오는 중입니다.';
+  try{const list=await api('listAccess');
+    $('accessRows').innerHTML=list.length?`<table><thead><tr><th>이메일</th><th>이름·역할</th><th>부여일</th><th>만료일</th><th></th></tr></thead><tbody>${list.map(r=>`<tr${r.expired?' style="opacity:.5"':''}><td>${esc(r.email)}</td><td>${esc(r.name)}</td><td>${esc(r.date)}</td><td>${esc(r.until||'계속')}${r.expired?' <span class="pill">만료</span>':''}</td><td><button class="small accDel" data-email="${esc(r.email)}">권한 빼기</button></td></tr>`).join('')}</tbody></table>`:'<p class="muted">아직 권한을 준 분이 없어요.</p>';
+    $('accessRows').querySelectorAll('.accDel').forEach(b=>b.onclick=async()=>{if(!confirm(b.dataset.email+' 님의 권한을 뺄까요?'))return;
+      try{await api('removeAccess',b.dataset.email);notice('권한을 뺐어요.');loadAccess();}catch(e){notice(e.message,true);}});
+  }catch(e){$('accessRows').textContent=e.message;}}
+$('accessForm').addEventListener('submit',async e=>{e.preventDefault();const f=e.target,o={email:f.elements['email'].value,name:f.elements['name'].value,until:f.elements['until'].value};
+  try{const r=await api('addAccess',o);notice(r.replaced?'기존 권한을 새로 바꿨어요.':'권한을 줬어요. 그분은 같은 앱 주소로 들어오면 돼요.');f.reset();loadAccess();}catch(err){notice(err.message,true);}});
+function formData(form){return Object.fromEntries(new FormData(form).entries());}
+function filterPersonSelect(sel){
+ const old=sel.value,q=sel.personSearch.value.trim().toLocaleLowerCase('ko');
+ const people=db.people.filter(p=>[p.name,p.affiliation].join(' ').toLocaleLowerCase('ko').includes(q)).sort((a,b)=>String(a.name).localeCompare(String(b.name),'ko'));
+ sel.innerHTML=`<option value="">${people.length?'봉사자 선택 ('+people.length+'명)':'검색 결과 없음'}</option>`+people.map(p=>`<option value="${esc(p.id)}">${esc(p.name)} · ${esc(p.birthDate||'생년월일 없음')} · ${esc(p.affiliation||'소속 없음')}</option>`).join('');
+ sel.value=people.some(p=>String(p.id)===old)?old:'';
+}
+function fillSelects(){document.querySelectorAll('.personSelect').forEach((sel,index)=>{
+ if(!sel.personSearch){
+  const search=document.createElement('input');search.type='search';search.placeholder='이름 · 소속 검색';search.setAttribute('aria-label','봉사자 이름 또는 소속 검색');search.autocomplete='off';
+  sel.id=sel.id||'personSelect'+index;search.setAttribute('aria-controls',sel.id);
+  sel.before(search);sel.personSearch=search;search.addEventListener('input',()=>filterPersonSelect(sel));
+  if(sel.form)sel.form.addEventListener('reset',()=>setTimeout(()=>{search.value='';filterPersonSelect(sel);},0));
+ }
+ filterPersonSelect(sel);
+});}
+function updateYearOptions(){
+ const old=$('year').value,current=new Date().getFullYear();
+ const years=[...(db.years||[]),...(db.history||[]).map(r=>Number(r.year)),...(db.jinwoo||[]).map(r=>Number(String(r.date).slice(0,4))),...db.activity.map(r=>Number(String(r.date).slice(0,4)))].filter(y=>Number.isInteger(y)&&y>=1900&&y<=2200);
+ const min=Math.min(current-8,...years),max=Math.max(current+1,...years);
+ $('year').innerHTML='';for(let y=max;y>=min;y--){const o=document.createElement('option');o.value=y;o.textContent=y+'년';$('year').append(o);}
+ $('year').value=old||String(current);
+}
+function renderPeople(){const q=$('search').value.trim().toLowerCase(),status=$('statusFilter').value;const people=db.people.filter(p=>(!status||p.status===status)&&[p.name,p.affiliation,p.talents,p.interests,p.phone,p.vmsId,p.vol1365Id].join(' ').toLowerCase().includes(q));$('peopleRows').innerHTML=people.length?people.map(p=>`<tr><td>${esc(p.name)}</td><td><span class="pill">${esc(p.status)}</span></td><td>${esc(p.affiliation)}</td><td>${esc([p.talents,p.interests].filter(Boolean).join(' / '))}</td><td><button data-id="${esc(p.id)}" class="viewPerson">상세</button></td></tr>`).join(''):'<tr><td colspan="5">검색 결과가 없습니다.</td></tr>';$('peopleRows').querySelectorAll('.viewPerson').forEach(b=>b.onclick=()=>detail(b.dataset.id));}
+function editPerson(id){const p=db.people.find(x=>x.id===id);if(!p)return;resetPerson();const b=$('peopleForm').elements.namedItem('birthDate');const raw=String(p.birthDate||'');if(raw&&!validPersonBirthInput(raw)){b.type='text';$('birthWarning').textContent='기존 생년월일 형식 확인 필요: '+raw+'. 모르면 원래 값을 유지하세요. 연도를 추정하지 마세요.';}$('birthWarning').hidden=!(raw&&!validPersonBirthInput(raw));Object.keys(p).forEach(k=>{const el=$('peopleForm').elements.namedItem(k);if(el)el.value=p[k]||'';});$('formTitle').textContent='봉사자 정보 수정';show('personForm');}
+function selectAwardPerson(id){
+ const form=$('awardForm'),sel=form.elements.namedItem('personId');
+ if(sel.personSearch)sel.personSearch.value='';filterPersonSelect(sel);sel.value=id;
+ show('awards');form.scrollIntoView({block:'center'});
+ if(sel.value!==String(id))notice('명단은 저장됐지만 선택 목록을 갱신하지 못했어요. 새로고침 후 이름을 다시 찾아주세요.',true);
+}
+$('pastAwardYear').value=String(new Date().getFullYear()-1);
+$('findPastAwardPerson').onclick=async()=>{
+ const btn=$('findPastAwardPerson');btn.disabled=true;$('pastAwardRows').innerHTML='';$('pastAwardNote').textContent='과거 명단을 찾는 중입니다.';
+ try{
+  const d=await api('searchHistoricalAwardPeople',{year:Number($('pastAwardYear').value),query:$('pastAwardQuery').value});
+  $('pastAwardNote').textContent=d.total?`${d.year}년 명단에서 ${d.total}건 찾았어요.`+(d.total>50?' 앞의 50건만 표시해요. 이름을 더 입력해주세요.':''):'해당 연도 과거 명단에서 찾지 못했어요. 연도와 이름을 확인하거나 봉사자 등록에서 직접 등록해주세요.';
+  $('pastAwardRows').innerHTML=d.rows.length?`<table><thead><tr><th>이름</th><th>과거 생년월일</th><th>기존 명단 확인</th><th>새 등록</th></tr></thead><tbody>${d.rows.map((r,i)=>`<tr><td>${esc(r.name)}</td><td>${esc(r.birthDate||'미입력')}</td><td>${r.matches.length?r.matches.map((p,j)=>`<button type="button" class="small pastExisting" data-row="${i}" data-match="${j}">${esc(p.name)} · ${esc(p.birthDate||'생년월일 없음')} · ${esc(p.affiliation||'소속 없음')} 선택</button>`).join('<br>'):'같은 이름 없음'}</td><td><button type="button" class="small pastRegister" data-row="${i}">등록 내용 확인</button></td></tr>`).join('')}</tbody></table>`:'';
+  $('pastAwardRows').querySelectorAll('.pastExisting').forEach(b=>b.onclick=()=>{const r=d.rows[Number(b.dataset.row)],p=r.matches[Number(b.dataset.match)];if(!confirm(`${p.name} (${p.birthDate||'생년월일 없음'}) 님이 같은 사람인지 확인했나요?`))return;selectAwardPerson(p.id);});
+  $('pastAwardRows').querySelectorAll('.pastRegister').forEach(b=>b.onclick=()=>{
+   const r=d.rows[Number(b.dataset.row)];resetPerson();const form=$('peopleForm');form.elements.namedItem('name').value=r.name;
+   if(r.birthDate&&validPersonBirthInput(r.birthDate))form.elements.namedItem('birthDate').value=r.birthDate;
+   else if(r.birthDate){$('birthWarning').hidden=false;$('birthWarning').textContent='과거 생년월일 형식 확인 필요: '+r.birthDate+'. 정확히 모르면 비워두세요.';}
+   form.elements.namedItem('notes').value=`${d.year}년 과거 명단에서 배지·포상 이력 연결을 위해 등록`;
+   returnToAwardAfterPerson=true;$('formTitle').textContent='과거 봉사자 등록 · 저장 후 포상 화면으로 돌아가요';show('personForm');
+  });
+ }catch(e){$('pastAwardNote').textContent=e.message;}finally{btn.disabled=false;}
+};
+$('pastAwardQuery').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();if(!$('findPastAwardPerson').disabled)$('findPastAwardPerson').click();}});
+function resetPerson(){returnToAwardAfterPerson=false;$('peopleForm').reset();$('peopleForm').elements.namedItem('birthDate').type='date';$('birthWarning').hidden=true;$('peopleForm').elements.namedItem('id').value='';$('formTitle').textContent='봉사자 등록';}
+const AWARD_STATUS=['예정','추천 완료','선정','미선정','지급 완료','수상'];
+const BADGE_STATUS=['신청 중','수령 완료','미선정'];
+function renderAwards(){
+ const names=Object.fromEntries(db.people.map(p=>[p.id,p.name])),q=$('awardHistorySearch').value.trim().toLowerCase();
+ const rows=db.awards.filter(a=>!q||[a.date,names[a.personId],a.type,a.name,a.status].join(' ').toLowerCase().includes(q));
+ $('awardHistoryTitle').textContent=`인정·포상 기록 보기 (${db.awards.length}건)`;
+ $('awardRows').innerHTML=rows.slice().reverse().map(a=>{
+  const statuses=a.type==='배지'?BADGE_STATUS:AWARD_STATUS;const options=statuses.includes(a.status)?statuses:[a.status,...statuses];
+  return `<tr><td>${esc(a.date)}</td><td>${esc(names[a.personId]||'미확인')}</td><td>${esc(a.type)}</td><td>${esc(a.name)}</td><td><select class="awardStatus" ${isViewer()?'disabled':''} data-id="${esc(a.id)}" aria-label="${esc(names[a.personId]||'')} ${esc(a.name)} 진행상태">${options.map(s=>`<option ${s===a.status?'selected':''}>${esc(s)}</option>`).join('')}</select></td></tr>`;
+ }).join('')||'<tr><td colspan="5">해당하는 기록이 없습니다.</td></tr>';
+ $('awardRows').querySelectorAll('.awardStatus').forEach(sel=>sel.onchange=async()=>{
+  sel.disabled=true;
+  try{await api('updateAwardStatus',{id:sel.dataset.id,status:sel.value});const a=db.awards.find(x=>String(x.id)===sel.dataset.id);if(a)a.status=sel.value;notice('진행상태를 변경했습니다.');}
+  catch(e){notice(e.message,true);renderAwards();}
+  finally{sel.disabled=false;}
+ });
+}
+$('awardHistorySearch').addEventListener('input',renderAwards);
+/* ── 대시보드 홈 ── */
+let homeRequest=0,smsPeople=[],smsChecked=new Set();
+const fmtNum=n=>Number(n||0).toLocaleString(undefined,{maximumFractionDigits:1});
+const periodText=p=>`${p.m}월 ${p.from}~${p.to}일분`;
+async function renderHome(){
+ const request=++homeRequest,year=Number($('year').value);
+ $('syncBox').textContent='불러오는 중입니다.';$('reportCards').innerHTML='';$('recognitionStats').textContent='불러오는 중입니다.';
+ try{
+  const r=await api('getDashboardHome',year);if(request!==homeRequest)return;
+  renderSync(r.sync,r.today);renderReport(r.report,r.year,r.today);renderRecognitionSummary(r.recognition,r.year);if(!isViewer())renderRegistrationIssues(r.registrationIssues||[]);
+  if(!r.sms)return;
+  smsPeople=r.sms.people;smsChecked=new Set(smsPeople.filter(p=>p.reasons.length||p.pinned).map(p=>p.id));
+  $('smsGuide').textContent=`상태가 '활동 중'이거나 최근 ${r.sms.months}개월(${r.sms.cutoff} 이후) 안에 기록이 있는 분, 📌 고정한 분은 자동으로 체크됩니다. 체크는 이 화면에서만 바뀌고, 📌 고정만 저장됩니다.`;
+  renderSms();
+ }catch(e){if(request===homeRequest){$('syncBox').textContent=e.message;$('recognitionStats').textContent='현황을 불러오지 못했어요. 새로고침해주세요.';}}
+}
+function renderRecognitionSummary(s,year){
+ $('recognitionYear').textContent=`${year}년 배지·포상 현황`;
+ if(!s){$('recognitionStats').textContent='현황을 불러오지 못했어요. 새 버전 배포 후 새로고침해주세요.';return;}
+ $('recognitionStats').innerHTML=[['배지 수령',s.badgeReceived],['배지 신청 중',s.badgePending],['포상 수령',s.prizeReceived]].map(([label,n])=>`<span>${label} <b>${esc(n)}명</b></span>`).join('');
+}
+function renderSync(s,today){
+ if(!s){$('syncBox').textContent='진우 자료가 아직 없습니다. 명단 가져오기에서 진우 자료를 가져와 주세요.';return;}
+ $('syncBox').innerHTML=`<p class="syncLine">마지막 활동 기록일: <b>${esc(s.lastDate)}</b></p><p>마지막 가져오기: ${esc(s.lastImported||'확인되지 않음')}</p><p class="muted">활동 기록일만으로 입력 완료 여부를 확인할 수는 없어요.</p>`;
+}
+function renderRegistrationIssues(rows){
+ $('registrationNote').textContent=rows.length?'선택 연도 진우 자료 중 명단 등록·이름 연결 확인이 필요한 '+rows.length+'명입니다. 통계 식별 불가 인원과는 다른 기준이에요.':'선택 연도 진우 자료에서 명단 등록·이름 연결 확인이 필요한 사람이 없습니다.';
+ $('registrationRows').innerHTML=rows.length?`<table><thead><tr><th>이름</th><th>확인사항</th><th>첫 참여 기록</th><th>최근 참여 기록</th><th>주요 활동</th><th>등록·찾기</th></tr></thead><tbody>${rows.map((r,i)=>`<tr><td>${esc(r.name)}</td><td>${esc(r.reason)}</td><td>${esc(r.firstDate)}</td><td>${esc(r.lastDate)}</td><td>${esc(r.activities.join(' / '))}</td><td><button data-issue="${i}">${r.reason==='명단 등록 필요'?'등록하기':'명단 찾기'}</button></td></tr>`).join('')}</tbody></table>`:'';
+ $('registrationRows').querySelectorAll('[data-issue]').forEach(b=>b.onclick=()=>{const r=rows[Number(b.dataset.issue)];if(r.reason==='명단 등록 필요'){resetPerson();$('peopleForm').elements.namedItem('name').value=r.name;show('personForm');}else{$('search').value=r.name;$('statusFilter').value='';renderPeople();show('people');}});
+}
+
+function renderReport(r,year,today){
+ const cards=[['실인원',r.real+'명'],['연인원',fmtNum(r.count)+'명'],['누적시간',Math.round(r.hours).toLocaleString()+'시간'],['기록상 첫 참여',r.firstRecorded+'명'],['전년도 재참여',r.retained+'명'],['복귀 참여',r.returned+'명']];
+ $('reportCards').innerHTML=cards.map(([t,v])=>`<div class="card"><div class="muted">${esc(t)}</div><div class="metric">${esc(v)}</div></div>`).join('');
+ const sep=r.separate.map(x=>`${x.type} ${x.count}건(${x.real}명)`).join(' · ');
+ $('reportNote').textContent=`${year}년 활동 실적 기준 · 연인원은 활동 기록 1건을 1명으로 셉니다. 별도 집계: ${sep}.`+(r.unidentified?` 이름으로 식별되지 않은 ${r.unidentified}건은 실인원에서 빠지고 연인원·시간에는 들어가요.`:'');
+ const thisMonth=String(year)===today.slice(0,4)?Number(today.slice(5,7)):0;
+ barChart('monthChart',r.months,{label:m=>m.month+'월',value:m=>m.count,sub:m=>m.count?'실 '+m.real+'명':'',title:m=>m.count?`${m.month}월 · 연인원 ${m.count}명 · 실인원 ${m.real}명 · ${fmtNum(m.hours)}시간`:'',current:m=>m.month===thisMonth});
+ barChart('yearChart',r.trend.slice(-8),{label:t=>String(t.year),value:t=>t.real,sub:t=>t.count?'연 '+fmtNum(t.count):'명단만',current:t=>t.year===year});
+}
+function barChart(id,items,o){
+ if(!items.length){$(id).innerHTML='<p class="muted">자료가 없습니다.</p>';return;}
+ const max=Math.max(1,...items.map(o.value));
+ $(id).innerHTML=`<div class="bars">${items.map(it=>{const v=o.value(it);return `<div class="bar${o.current(it)?' current':''}"${o.title&&o.title(it)?` title="${esc(o.title(it))}"`:''}><div class="barTrack"><span class="barVal">${v?fmtNum(v):''}</span><div class="barFill" style="height:${v/max*82}%"></div></div><span class="barLabel">${esc(o.label(it))}</span><span class="barSub">${esc(o.sub(it))}</span></div>`;}).join('')}</div>`;
+}
+function renderSms(){
+ const q=$('smsSearch').value.trim().toLocaleLowerCase('ko'),view=$('smsView').value;
+ const checked=smsPeople.filter(p=>smsChecked.has(p.id)),noPhone=checked.filter(p=>!String(p.phone||'').replace(/\D/g,'')).length;
+ $('smsCount').textContent=$('smsCount2').textContent=`체크 ${checked.length}명`+(noPhone?` · 연락처 없음 ${noPhone}명`:'');
+ const rows=smsPeople.filter(p=>(view==='all'||smsChecked.has(p.id))&&[p.name,p.affiliation].join(' ').toLocaleLowerCase('ko').includes(q));
+ $('smsRows').innerHTML=rows.length?`<table><thead><tr><th>보내기</th><th>이름</th><th>연락처</th><th>상태</th><th>최근 참여 기록</th><th>올해 / 누적</th><th>체크 이유</th><th>고정</th></tr></thead><tbody>${rows.map(p=>`<tr>
+  <td><input type="checkbox" class="smsCheck" data-id="${esc(p.id)}" ${smsChecked.has(p.id)?'checked':''} style="width:auto" aria-label="${esc(p.name)} 문자 대상"></td>
+  <td>${esc(p.name)} <button class="smsDetail small" data-id="${esc(p.id)}" title="활동 내역 보기">활동 보기</button>${p.affiliation?`<br><span class="small muted">${esc(p.affiliation)}</span>`:''}</td>
+  <td>${String(p.phone||'').replace(/\D/g,'')?esc(p.phone):'<span class="noPhone">연락처 없음</span>'}</td>
+  <td><span class="pill">${esc(p.status||'-')}</span></td><td>${esc(p.lastDate||'-')}</td><td>${esc(p.yearCount||0)}회 / ${esc(p.totalCount||0)}회</td>
+  <td>${[...p.reasons,p.pinned?'📌 고정':''].filter(Boolean).map(x=>`<span class="pill">${esc(x)}</span>`).join(' ')||'<span class="muted small">직접 선택</span>'}</td>
+  <td><button class="smsPin" data-id="${esc(p.id)}">${p.pinned?'고정 해제':'📌 고정'}</button></td></tr>`).join('')}</tbody></table>`
+  :`<p class="placeholder">${view==='checked'?'체크된 분이 없습니다. 「전체 명단에서 추가」로 골라 주세요.':'검색 결과가 없습니다.'}</p>`;
+ $('smsRows').querySelectorAll('.smsDetail').forEach(b=>b.onclick=()=>detail(b.dataset.id));
+ $('smsRows').querySelectorAll('.smsCheck').forEach(c=>c.onchange=()=>{c.checked?smsChecked.add(c.dataset.id):smsChecked.delete(c.dataset.id);renderSms();});
+ $('smsRows').querySelectorAll('.smsPin').forEach(b=>b.onclick=async()=>{
+  const p=smsPeople.find(x=>x.id===b.dataset.id);if(!p)return;b.disabled=true;
+  try{await api('setSmsPin',{personId:p.id,pinned:!p.pinned});p.pinned=!p.pinned;if(p.pinned)smsChecked.add(p.id);smsMsg(`${p.name}님을 ${p.pinned?'고정했어요. 다음 달에도 자동 체크됩니다.':'고정 해제했어요.'}`);renderSms();}
+  catch(e){smsMsg(e.message);b.disabled=false;}
+ });
+}
+const phoneText=v=>{const d=String(v||'').replace(/\D/g,'');return d.length===11?d.replace(/(\d{3})(\d{4})(\d{4})/,'$1-$2-$3'):d.length===10?d.replace(/(\d{2,3})(\d{3,4})(\d{4})/,'$1-$2-$3'):String(v||'').trim();};
+async function copyText(text){
+ try{await navigator.clipboard.writeText(text);return true;}catch(e){}
+ const t=document.createElement('textarea');t.value=text;t.style.position='fixed';t.style.opacity='0';document.body.appendChild(t);t.select();
+ let ok=false;try{ok=document.execCommand('copy');}catch(e){}t.remove();return ok;
+}
+$('smsSearch').addEventListener('input',renderSms);$('smsView').onchange=renderSms;
+$('resetSms').onclick=()=>{smsChecked=new Set(smsPeople.filter(p=>p.reasons.length||p.pinned).map(p=>p.id));smsMsg('자동 체크 상태로 되돌렸어요.');renderSms();};
+$('openSms').onclick=()=>{renderSms();$('smsDialog').showModal();};
+$('closeSms').onclick=()=>$('smsDialog').close();
+$('copySms2').onclick=()=>$('copySms').onclick();
+const smsMsg=t=>{$('smsNote').textContent=$('smsNote2').textContent=t;};
+$('copySms').onclick=async()=>{
+ const list=smsPeople.filter(p=>smsChecked.has(p.id)&&String(p.phone||'').replace(/\D/g,''));
+ if(!list.length){smsMsg('복사할 연락처가 없습니다.');return;}
+ const ok=await copyText(['이름\t연락처',...list.map(p=>`${String(p.name).replace(/\s+/g,' ')}\t${phoneText(p.phone)}`)].join('\n'));
+ const skipped=smsChecked.size-list.length;
+ smsMsg(ok?`${list.length}명을 복사했어요. 엑셀 A1칸에 붙여넣으세요.`+(skipped?` (연락처 없는 ${skipped}명 제외)`:''):'복사가 막혔어요. 브라우저 주소창 옆 권한을 확인하거나 다른 브라우저로 열어 주세요.');
+};
+async function reload(force=true){notice('자료를 불러오는 중입니다.');++statsRequest;++auditRequest;++personRequest;++lookupGeneration;lookupRequests.clear();dashboardResults.clear();try{db=await api(force?'refreshAppData':'getAppData',Number($('year').value)||new Date().getFullYear());dashboardResults.set(db.initialYear,db.initialStats);applyRole();updateYearOptions();fillSelects();renderPeople();renderAwards();renderHome();await renderJinwooYear();notice(`불러오기 완료: 봉사자 ${db.people.length}명`);}catch(e){notice(e.message,true);}}
+function bindForm(id,method,after){$(id).addEventListener('submit',async ev=>{ev.preventDefault();const form=ev.currentTarget,btn=form.querySelector('[type=submit]');btn.disabled=true;try{const result=await api(method,formData(form));form.reset();notice('저장되었습니다.');await reload();if(after)after(result);}catch(e){notice(e.message,true);}finally{btn.disabled=false;}});}
+bindForm('peopleForm','upsertPerson',result=>{if(returnToAwardAfterPerson){returnToAwardAfterPerson=false;selectAwardPerson(result.id);notice('명단을 등록했어요. 배지명·수령상태·실제 수령일을 확인하고 이력을 저장해주세요.');}else show('people');});bindForm('activityForm','addActivity');bindForm('awardForm','addAward');bindForm('contactForm','addContact');
+function exportPeople(){const heads=['ID','이름','생년월일','연령','연락처','VMS ID','1365 ID','소속','구분','등록일','상태','최초활동일','최근활동일','재능','관심활동','참여가능시간','참고사항','최종수정일'];const fields=['id','name','birthDate','age','phone','vmsId','vol1365Id','affiliation','kind','registrationDate','status','firstActivityDate','lastActivityDate','talents','interests','availability','notes','updatedAt'];const vals=db.people.map(p=>fields.map(f=>p[f]));const csv=[heads,...vals].map(row=>row.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(',')).join('\r\n');const blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='자원봉사자_명단.csv';document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);}
+
+let pendingCsv=[];
+function parseCSV(text){const rows=[],row=[];let val='',quoted=false;for(let i=0;i<text.length;i++){const c=text[i];if(c==='"'){if(quoted&&text[i+1]==='"'){val+='"';i++;}else quoted=!quoted;}else if(c===','&&!quoted){row.push(val);val='';}else if((c==='\n'||c==='\r')&&!quoted){if(c==='\r'&&text[i+1]==='\n')i++;row.push(val);rows.push(row.slice());row.length=0;val='';}else val+=c;}if(val||row.length){row.push(val);rows.push(row);}return rows;}
+$('csvFile').addEventListener('change',async e=>{pendingCsv=[];$('runImport').disabled=true;const f=e.target.files[0];if(!f)return;try{const rows=parseCSV((await f.text()).replace(/^﻿/,''));if(rows.length<2)throw Error('헤더와 데이터 행이 필요합니다.');const keys={'이름':'name','생년월일':'birthDate','연령':'age','연락처':'phone','VMS ID':'vmsId','VMSID':'vmsId','1365 ID':'vol1365Id','1365ID':'vol1365Id','소속':'affiliation','구분':'kind','등록일':'registrationDate','재능':'talents','관심활동':'interests','참여가능시간':'availability','비고':'notes','참고사항':'notes'};const head=rows[0].map(x=>x.trim());if(!head.includes('이름'))throw Error('이름 열을 찾지 못했습니다.');pendingCsv=rows.slice(1).filter(r=>r.some(v=>v.trim())).map(r=>{const obj={};head.forEach((col,i)=>{if(keys[col])obj[keys[col]]=r[i]||'';});return obj;});$('importPreview').textContent=`${pendingCsv.length}명 확인됨. 첫 3명: `+pendingCsv.slice(0,3).map(p=>p.name).join(', ')+' / 중복은 저장 시 건너뜁니다.';$('runImport').disabled=!pendingCsv.length;}catch(err){$('importPreview').textContent=err.message;}});
+$('runImport').onclick=async()=>{if(!pendingCsv.length||!confirm(`${pendingCsv.length}명을 가져오겠습니까? 기존 중복 의심 인원은 건너뜁니다.`))return;$('runImport').disabled=true;try{const result=await api('importPeople',pendingCsv);$('importResult').textContent=`신규 등록 ${result.added}명 / 검토 필요 ${result.skipped.length}명. `+result.skipped.slice(0,25).map(s=>`${s.line}행 ${s.name}: ${s.reason}`).join(' ; ');await reload();}catch(e){$('importResult').textContent=e.message;}finally{$('runImport').disabled=false;}};
+$('runJinwooImport').onclick=async()=>{const raw=$('jinwooRawSheet').value.trim()||'JinwooRaw';if(!confirm(`${raw} 탭의 진우 자료를 가져올까요? 기존 People/Activity/Awards는 바꾸지 않습니다.`))return;$('runJinwooImport').disabled=true;$('jinwooImportResult').textContent='진우 자료를 가져오는 중입니다.';try{const result=await api('importJinwooFromRawSheet',raw);$('jinwooImportResult').textContent=`원본 ${result.sourceRows}행 확인, 신규 ${result.inserted}행, 갱신 ${result.updated}행. 기간 ${result.dateMin||'-'} ~ ${result.dateMax||'-'}, 총 ${(result.totalMinutes/60).toLocaleString(undefined,{maximumFractionDigits:1})}시간.`;await reload();}catch(e){$('jinwooImportResult').textContent=e.message;}finally{$('runJinwooImport').disabled=false;}};
+$('peopleForm').elements.namedItem('birthDate').addEventListener('change',e=>{const date=e.target.value;if(!validPersonBirthInput(date)){$('peopleForm').elements.namedItem('age').value='';return;}const b=new Date(date+'T00:00:00'),now=new Date();$('peopleForm').elements.namedItem('age').value=now.getFullYear()-b.getFullYear()-(now.getMonth()<b.getMonth()||(now.getMonth()===b.getMonth()&&now.getDate()<b.getDate())?1:0);});
+
+let annualData=null,badgeData=null;
+(()=>{const y0=new Date().getFullYear();for(let y=y0;y>=y0-8;y--){const o=document.createElement('option');o.value=y;o.textContent=y+'년';$('annualYear').append(o);$('badgeYear').append(o.cloneNode(true));}})();
+const hrs=n=>Number(n||0).toLocaleString(undefined,{maximumFractionDigits:1});
+const annualTable=d=>[['구분','실인원','신규','봉사횟수(연인원)','총봉사시간'],['전체',d.summary.all],['개인',d.summary.individual],['단체',d.summary.group]].map((r,i)=>i?[r[0],r[1].real,r[1].newCount,r[1].count,hrs(r[1].hours)]:r);
+$('loadAnnual').onclick=async()=>{
+ const btn=$('loadAnnual');btn.disabled=true;$('copyAnnual').disabled=true;$('exportAnnual').disabled=true;annualData=null;
+ $('annualNote').textContent='집계하는 중입니다.';$('annualSummary').innerHTML='';$('annualGroups').innerHTML='';$('annualIndividuals').innerHTML='';
+ try{
+  const d=await api('getAnnualReport',Number($('annualYear').value));annualData=d;
+  const t=annualTable(d);
+  $('annualSummary').innerHTML=`<table style="min-width:420px"><thead><tr>${t[0].map(h=>`<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>${t.slice(1).map(r=>`<tr>${r.map((v,i)=>`<td>${i?esc(typeof v==='number'?v.toLocaleString():v):`<b>${esc(v)}</b>`}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+  $('annualNote').textContent=`${d.year}년 · 단체 ${d.summary.orgCount}곳`+(d.unidentified.length||d.unidentifiedCount?` · 동명이인 등으로 식별이 안 된 ${d.unidentified.length||d.unidentifiedCount}명${d.unidentified.length?`(${d.unidentified.join(', ')})`:''}은 실인원·신규에서 빠지고 횟수·시간에는 들어가요.`:'');
+  $('annualGroups').innerHTML=`<details class="recordDisclosure"><summary><b>단체 소속 봉사자 (${d.groups.length}곳)</b></summary><div class="historyScroll">`+(d.groups.length?d.groups.map(g=>`<div class="orgBlock"><p><b>${esc(g.org)}</b> <span class="muted small">${g.real}명 · ${g.count}회 · ${hrs(g.hours)}시간</span></p>${g.people?`<p class="small">${g.people.map(p=>`${esc(p.name)}(${p.count}회${p.affiliation&&p.affiliation!==g.org?', '+esc(p.affiliation):''})`).join(', ')}</p>`:''}</div>`).join(''):'<p class="muted">단체 봉사자가 없습니다.</p>')+'</div></details>';
+  if(d.viewer){$('annualIndividuals').innerHTML='';}else $('annualIndividuals').innerHTML=(d.notGroup&&d.notGroup.length?`<details><summary><b>소속이 있지만 개인으로 센 경우 (${d.notGroup.length}곳)</b> <span class="muted small">— 단체여야 하면 알려주세요</span></summary><p class="small">${d.notGroup.map(x=>`${esc(x.org)} <span class="muted">(${esc(x.reason)})</span>`).join(' · ')}</p></details>`:'')+`<details class="recordDisclosure"><summary><b>개인 봉사자 명단 (${d.individuals.length}명)</b></summary><div class="historyScroll" tabindex="0" role="region" aria-label="개인 봉사자 명단"><table style="min-width:420px"><thead><tr><th>이름</th><th>소속</th><th>횟수</th><th>시간</th><th>신규</th></tr></thead><tbody>${d.individuals.map(p=>`<tr><td>${esc(p.name)}</td><td>${esc(p.affiliation)}</td><td>${p.count}회</td><td>${hrs(p.hours)}</td><td>${p.isNew?'신규':''}</td></tr>`).join('')}</tbody></table></div></details>`;
+  $('copyAnnual').disabled=false;$('exportAnnual').disabled=false;
+ }catch(e){$('annualNote').textContent=e.message;}finally{btn.disabled=false;}
+};
+$('copyAnnual').onclick=async()=>{if(!annualData)return;const ok=await copyText(annualTable(annualData).map(r=>r.join('\t')).join('\n'));$('annualNote').textContent=ok?'표를 복사했어요. 엑셀이나 한글 표에 붙여넣으세요.':'복사가 막혔어요. 다른 브라우저로 열어 주세요.';};
+function downloadCsv(name,rows){const csv=rows.map(r=>r.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(',')).join('\r\n');const url=URL.createObjectURL(new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'})),a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);}
+$('exportAnnual').onclick=()=>{if(!annualData)return;const d=annualData;downloadCsv(d.year+'_자원봉사_연간현황.csv',[...annualTable(d),[],['구분','소속','이름','횟수','시간','신규','단체 판단 근거'],...d.groups.flatMap(g=>g.people.map(p=>['단체',g.org,p.name,p.count,p.hours,p.isNew?'신규':'',p.kindReason])),...d.individuals.map(p=>['개인',p.affiliation,p.name,p.count,p.hours,p.isNew?'신규':'',''])]);};
+async function loadBadges(){
+ const btn=$('loadBadges');btn.disabled=true;$('badgeYear').disabled=true;$('exportBadges').disabled=true;$('badgeNote').textContent='집계하는 중입니다.';$('badgeRows').innerHTML='';badgeData=null;
+ try{
+  const d=await api('getBadgeList',{year:Number($('badgeYear').value)});badgeData=d;const due=d.rows.filter(r=>r.status==='신청 대상'),soon=d.rows.filter(r=>r.status==='곧 도달'),pending=d.rows.filter(r=>r.status==='신청 중');
+  $('badgeNote').textContent=`${d.year}년 활동자 · ${d.year}년까지 누적시간 기준 · 신청 후보 ${due.length}명 · 신청 중 ${pending.length}명 · ${d.soonHours}시간 안에 다음 배지 ${soon.length}명`;
+  $('badgeRows').innerHTML=d.rows.length?`<table><thead><tr><th>상태</th><th>이름</th><th>소속</th><th>누적시간</th><th>달성</th><th>받은 배지</th><th>신청 중 배지</th><th>다음 배지</th><th class="ownerOnly">기록</th></tr></thead><tbody>${d.rows.map(r=>`<tr><td><span class="pill">${esc(r.status)}</span></td><td>${esc(r.name)}${r.personId?` <button class="small badgeDetail" data-id="${esc(r.personId)}">활동 보기</button>`:''}</td><td>${esc(r.affiliation)}</td><td>${hrs(r.hours)}시간</td><td>${esc(r.reachedBadge||'-')}</td><td>${esc(r.receivedBadge||'-')}</td><td>${esc(r.pendingBadge||'-')}</td><td>${r.nextBadge?`${esc(r.nextBadge)} (${hrs(r.remain)}시간 남음)`:'-'}</td><td class="ownerOnly">${r.status==='신청 중'&&r.pendingAwardId?`<button class="small completeBadge" data-award="${esc(r.pendingAwardId)}">수령 완료</button>`:r.status==='신청 대상'&&r.personId?`<button class="small recordBadge" data-id="${esc(r.personId)}" data-badge="${esc(r.reachedBadge)}">${esc(r.reachedBadge)} 신청 기록</button>`:''}</td></tr>`).join('')}</tbody></table>`:'<p class="placeholder">선택한 조건에 맞는 신청 후보·신청 중·곧 도달 대상이 없어요. 이전 수령 기록은 아래에서 확인할 수 있어요.</p>';
+  $('badgeRows').querySelectorAll('.badgeDetail').forEach(b=>b.onclick=()=>detail(b.dataset.id));
+  $('badgeRows').querySelectorAll('.completeBadge').forEach(b=>b.onclick=async()=>{if(!confirm('봉사자에게 배지를 전달했나요? 수령 완료로 기록합니다.'))return;b.disabled=true;try{await api('updateAwardStatus',{id:b.dataset.award,status:'수령 완료'});const a=db.awards.find(x=>String(x.id)===b.dataset.award);if(a)a.status='수령 완료';renderAwards();await loadBadges();}catch(e){$('badgeNote').textContent=e.message;b.disabled=false;}});
+ $('badgeRows').querySelectorAll('.recordBadge').forEach(b=>b.onclick=async()=>{if(!confirm('VMS 누적시간을 확인하고 실제 배지를 신청했나요? 신청 중으로 기록합니다.'))return;b.disabled=true;try{await api('recordBadge',{personId:b.dataset.id,badge:b.dataset.badge});$('badgeNote').textContent=`${b.dataset.badge} 배지 신청을 인정·포상에 기록했어요.`;db=await api('getAppData',Number($('year').value));applyRole();renderAwards();await loadBadges();}catch(e){$('badgeNote').textContent=e.message;b.disabled=false;}});
+  $('exportBadges').disabled=!d.rows.length;
+ }catch(e){$('badgeNote').textContent=e.message;}finally{btn.disabled=false;$('badgeYear').disabled=false;}
+}
+$('loadBadges').onclick=loadBadges;
+$('badgeYear').onchange=loadBadges;
+$('exportBadges').onclick=()=>{if(!badgeData)return;downloadCsv(badgeData.year+'_배지_신청대상.csv',[['상태','이름','소속','누적시간','달성 배지','받은 배지','신청 중 배지','다음 배지','남은 시간'],...badgeData.rows.map(r=>[r.status,r.name,r.affiliation,r.hours,r.reachedBadge,r.receivedBadge,r.pendingBadge,r.nextBadge,r.remain??''])]);};
+let thanksData=null;
+(()=>{const y0=new Date().getFullYear();for(let y=y0;y>=y0-8;y--){const o=document.createElement('option');o.value=y;o.textContent=y+'년';$('thanksYear').append(o);}})();
+let thanksSel=new Set();
+const thanksPicked=()=>thanksData?thanksData.list.filter(p=>thanksSel.has(p.rank)):[];
+function showThanksCandidates(){
+ if(!thanksData)return;$('thanksWorkspace').hidden=false;$('thanksCandidates').open=true;
+ $('thanksSelected').hidden=true;$('thanksSelected').open=false;$('thanksRecord').hidden=true;$('exportThanks').disabled=true;
+}
+function finishThanksSelection(){
+ if(!thanksData||!thanksPicked().length)return;
+ renderThanks();$('thanksCandidates').open=false;$('thanksSelected').hidden=false;$('thanksSelected').open=true;
+ $('thanksRecord').hidden=false;$('exportThanks').disabled=false;$('thanksSelected').scrollIntoView({block:'nearest'});
+}
+$('finishThanksSelection').onclick=finishThanksSelection;
+$('editThanksSelection').onclick=showThanksCandidates;
+function renderThanks(){
+ const r=thanksData;if(!r)return;const name=$('thanksAwardName').value.trim(),picked=thanksPicked();
+ $('thanksCandidatesTitle').textContent=`감사명단 후보 선택 (${r.list.length}명 · 선택 ${picked.length}명)`;
+ $('thanksSelectedTitle').textContent=`${r.year}년 선정 명단 (${picked.length}명)`;
+ $('finishThanksSelection').disabled=!picked.length;
+ $('thanksSelectedRows').innerHTML=picked.length?`<table><thead><tr><th>이름</th><th>소속</th><th>횟수</th><th>시간</th><th>기록</th></tr></thead><tbody>${picked.map(p=>`<tr><td>${esc(p.name)}</td><td>${esc(p.affiliation)}</td><td>${p.count}회</td><td>${esc(p.hours)}시간</td><td>${name&&p.packages.includes(name)?'기록됨':'미기록'}</td></tr>`).join('')}</tbody></table>`:'<p>선정한 사람이 없습니다.</p>';
+ $('thanksCount').textContent=`선택 ${picked.length} / ${r.limit}명`;$('thanksCount').style.background=picked.length===r.limit?'#d9ecee':'#fff3d6';
+ $('thanksRows').innerHTML=r.list.length?`<table><thead><tr><th>선택</th><th>순위</th><th>이름</th><th>소속</th><th>횟수</th><th>시간</th><th>추천</th><th>기록</th></tr></thead><tbody>${r.list.map(p=>{const done=name&&p.packages.includes(name);return `<tr style="${thanksSel.has(p.rank)?'':'opacity:.55'}${p.rank===r.limit?';border-bottom:3px solid #e0a339':''}"><td><input type="checkbox" class="thanksCheck" data-rank="${p.rank}" ${thanksSel.has(p.rank)?'checked':''} ${p.personId?'':'disabled'} style="width:auto" aria-label="${esc(p.name)} 선택"></td><td>${p.rank}</td><td>${esc(p.name)} ${p.personId?`<button class="small thanksPerson" data-id="${esc(p.personId)}">활동 보기</button>`:''}${p.check?`<br><span class="small muted">${esc(p.check)}</span>`:''}</td><td>${esc(p.affiliation)}</td><td>${p.count}회</td><td>${esc(p.hours)}시간</td><td>${p.recommended?`<span title="${esc(p.awardText)}">💌</span>`:''}</td><td>${done?'<span class="pill">기록됨</span>':''}</td></tr>`;}).join('')}</tbody></table>`:'<p class="placeholder">기준에 맞는 봉사자가 없습니다.</p>';
+ $('thanksRows').querySelectorAll('.thanksCheck').forEach(c=>c.onchange=()=>{const k=Number(c.dataset.rank);c.checked?thanksSel.add(k):thanksSel.delete(k);renderThanks();});
+ $('thanksRows').querySelectorAll('.thanksPerson').forEach(b=>b.onclick=()=>detail(b.dataset.id));
+}
+const resetThanks=()=>{thanksSel=new Set(thanksData.list.filter(p=>p.rank<=thanksData.limit&&p.personId).map(p=>p.rank));};
+$('loadThanks').onclick=async()=>{
+ const btn=$('loadThanks'),year=Number($('thanksYear').value);btn.disabled=true;$('exportThanks').disabled=true;thanksData=null;$('thanksWorkspace').hidden=true;$('thanksRecord').hidden=true;
+ $('thanksNote').textContent='감사명단을 집계하는 중입니다.';$('thanksRows').innerHTML='';$('thanksRecordNote').textContent='';
+ try{
+  const r=await api('getThankList',year);thanksData=r;resetThanks();
+  if(!$('thanksAwardName').value||/^\d{4} 자원봉사자 감사패키지$/.test($('thanksAwardName').value))$('thanksAwardName').value=r.defaultName;
+  const rec=r.list.filter(p=>p.rank<=r.limit&&p.recommended).length;
+  $('thanksNote').textContent=`${r.year}년 ${r.minCount}회 이상 ${r.eligible}명`+(rec?` · 상위 ${r.limit}명 중 💌 추천 카드 ${rec}명`:'')+(r.eligible>r.limit?' · 주황 선 아래는 31위부터예요':'');
+  renderThanks();showThanksCandidates();
+ }catch(e){$('thanksNote').textContent=e.message;}finally{btn.disabled=false;}
+};
+$('thanksAwardName').addEventListener('input',renderThanks);
+$('resetThanks').onclick=()=>{if(!thanksData)return;resetThanks();renderThanks();showThanksCandidates();$('thanksRecordNote').textContent='상위 30명으로 되돌렸어요.';};
+$('recordThanks').onclick=async()=>{
+ const picked=thanksPicked().filter(p=>p.personId),name=$('thanksAwardName').value.trim(),status=$('thanksAwardStatus').value;
+ if(!picked.length){$('thanksRecordNote').textContent='선택한 분이 없어요.';return;}
+ if(!name){$('thanksRecordNote').textContent='포상 이름을 입력해 주세요.';return;}
+ if(!confirm(`${picked.length}명을 인정·포상에 「${name}」(${status})으로 기록할까요?\n같은 이름으로 이미 기록된 분은 건너뜁니다.`))return;
+ const btn=$('recordThanks');btn.disabled=true;$('thanksRecordNote').textContent='기록하는 중입니다.';
+ try{
+  const res=await api('recordThankAwards',{year:thanksData.year,name,status,personIds:picked.map(p=>p.personId)});
+  picked.forEach(p=>{if(!p.packages.includes(name))p.packages.push(name);});renderThanks();
+  $('thanksRecordNote').textContent=`${res.added}명을 기록했어요.`+(res.skipped.length?` 건너뛴 ${res.skipped.length}명: 이미 기록됐거나 명단에 없는 분이에요.`:'')+' 아래 인정·포상 기록은 새로고침하면 보여요.';
+ }catch(e){$('thanksRecordNote').textContent=e.message;}finally{btn.disabled=false;}
+};
+$('exportThanks').onclick=()=>{
+ if(!thanksData)return;const picked=thanksPicked();
+ downloadCsv(thanksData.year+'_자원봉사_감사명단.csv',[['순위','이름','소속','횟수','시간','추천 카드','추천·인정 내역','확인사항'],...picked.map(p=>[p.rank,p.name,p.affiliation,p.count,p.hours,p.recommended?'O':'',p.awardText,p.check])]);
+};
+const now=new Date().getFullYear();for(let y=now+1;y>=now-8;y--){const o=document.createElement('option');o.value=y;o.textContent=y+'년';$('year').append(o);}$('year').value=String(now);$('year').onchange=()=>{renderJinwooYear();renderHome();};reload(false);
+</script>
+
+<script>
+function validPersonBirthInput(v){if(!/^\d{4}-\d{2}-\d{2}$/.test(v))return false;const a=v.split('-').map(Number),d=new Date(a[0],a[1]-1,a[2]);return d.getFullYear()===a[0]&&d.getMonth()===a[1]-1&&d.getDate()===a[2];}
+function initBadgeStatusOptions(){const form=$('awardForm'),type=form.elements.namedItem('type'),status=form.elements.namedItem('status');const update=()=>{const opts=type.value==='배지'?BADGE_STATUS:AWARD_STATUS;status.replaceChildren(...opts.map(v=>{const o=document.createElement('option');o.value=v;o.textContent=v;return o;}));};type.addEventListener('change',update);form.addEventListener('reset',()=>setTimeout(update,0));update();}
+initBadgeStatusOptions();
+</script>
+
+<script>
+/* ── 문자 발송 명단 PDF (기안 첨부용) ──
+   체크된 분 중 연락처가 있는 분만 넣습니다(엑셀용 복사와 같은 기준).
+   인쇄 창에서 대상(프린터)을 「PDF로 저장」으로 고르면 PDF 파일이 됩니다. */
+const dotDate=d=>d?String(d).replace(/-/g,'.'):'';
+function smsPrintHtml(list,info){
+ const t=new Date(),y=t.getFullYear(),m=t.getMonth()+1,made=`${y}.${String(m).padStart(2,'0')}.${String(t.getDate()).padStart(2,'0')}`;
+ const rows=list.map((p,i)=>{const r=info[p.id]||{},period=r.firstDate?(r.firstDate===r.lastDate?dotDate(r.firstDate):`${dotDate(r.firstDate)} ~ ${dotDate(r.lastDate)}`):'기록 없음';
+  return `<tr><td class="c">${i+1}</td><td class="c">${esc(p.name)}</td><td class="c">${esc(phoneText(p.phone))}</td><td class="c">${esc(period)}</td><td>${esc((r.activities||[]).join(', ')||'-')}</td></tr>`;}).join('');
+ return `<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>${y}년 ${m}월 자원봉사자 문자 발송 명단</title><style>
+ @page{size:A4 portrait;margin:15mm 12mm}
+ body{font-family:'Malgun Gothic','맑은 고딕','Apple SD Gothic Neo',sans-serif;color:#111;margin:0}
+ h1{font-size:18pt;text-align:center;margin:0 0 6mm}
+ .meta{display:flex;justify-content:space-between;font-size:10pt;margin-bottom:3mm}
+ table{width:100%;border-collapse:collapse;font-size:9.5pt}
+ th,td{border:1px solid #444;padding:5px 6px;vertical-align:middle;word-break:keep-all;overflow-wrap:anywhere}
+ th{background:#e8e8e8;font-weight:700}
+ thead{display:table-header-group}tr{page-break-inside:avoid}
+ .c{text-align:center;white-space:nowrap}
+ .note{font-size:8.5pt;color:#444;margin-top:3mm;line-height:1.6}
+ .tip{font:14px sans-serif;background:#fff6dc;border:1px solid #e6cf8c;padding:10px 14px;margin:0 0 16px}
+ @media print{.tip{display:none}}
+ </style></head><body>
+ <p class="tip">인쇄 창의 <b>대상</b>에서 <b>PDF로 저장</b>을 고르면 PDF 파일로 저장돼요. 인쇄 창이 안 뜨면 Ctrl+P를 눌러 주세요. (이 안내는 PDF에 나오지 않아요)</p>
+ <h1>${y}년 ${m}월 자원봉사자 문자 발송 명단</h1>
+ <div class="meta"><span>종로장애인복지관</span><span>작성일 ${made} · 총 ${list.length}명</span></div>
+ <table><colgroup><col style="width:7%"><col style="width:13%"><col style="width:17%"><col style="width:25%"><col></colgroup>
+ <thead><tr><th>연번</th><th>이름</th><th>연락처</th><th>활동기간</th><th>활동 내용</th></tr></thead><tbody>${rows}</tbody></table>
+ <p class="note">※ 활동기간: 기관 기록상 첫 활동일 ~ 최근 활동일 (교육·모집연계 제외)<br>※ 활동 내용: 활동 기록이 많은 순으로 최대 3개<br>※ 개인정보가 포함된 문서이므로 업무 목적 외 사용·외부 유출을 금합니다.</p>
+ </body></html>`;
+}
+async function printSmsList(){
+ const list=smsPeople.filter(p=>smsChecked.has(p.id)&&String(p.phone||'').replace(/\D/g,'')).sort((a,b)=>String(a.name).localeCompare(String(b.name),'ko'));
+ if(!list.length){smsMsg('명단에 넣을 분이 없어요. 체크와 연락처를 확인해 주세요.');return;}
+ const skipped=smsChecked.size-list.length;
+ const win=window.open('','_blank');
+ if(win)try{win.document.write('<p style="font-family:sans-serif;padding:24px">명단을 만드는 중입니다…</p>');}catch(e){}
+ ['printSms','printSms2'].forEach(id=>$(id).disabled=true);smsMsg('PDF 명단을 만드는 중입니다.');
+ try{
+  const info=await api('getSmsPrintData',list.map(p=>p.id)),html=smsPrintHtml(list,info);
+  let opened=false;
+  if(win&&!win.closed)try{win.document.open();win.document.write(html);win.document.close();win.focus();setTimeout(()=>win.print(),400);opened=true;}catch(e){}
+  if(!opened){
+   const f=document.createElement('iframe');f.style.cssText='position:fixed;width:0;height:0;border:0;right:0;bottom:0';document.body.appendChild(f);
+   f.contentDocument.open();f.contentDocument.write(html);f.contentDocument.close();
+   setTimeout(()=>{f.contentWindow.focus();f.contentWindow.print();setTimeout(()=>f.remove(),60000);},400);
+  }
+  smsMsg(`${list.length}명 명단을 만들었어요. 인쇄 창에서 「PDF로 저장」을 고르세요.`+(skipped?` (연락처 없는 ${skipped}명 제외)`:''));
+ }catch(e){if(win&&!win.closed)win.close();smsMsg(e.message);}
+ finally{['printSms','printSms2'].forEach(id=>$(id).disabled=false);}
+}
+$('printSms').onclick=printSmsList;$('printSms2').onclick=printSmsList;
+</script>
+
+<script>
+/* ── 중식비 ── */
+let lunchData=null;
+const WD=['일','월','화','수','목','금','토'];
+const lunchDay=d=>{const [y,m,dd]=String(d).split('-').map(Number);return `${y}년 ${m}월 ${dd}일 ${WD[new Date(y,m-1,dd).getDay()]}요일`;};
+const won=n=>Number(n||0).toLocaleString('ko-KR');
+(()=>{const t=new Date(),y0=t.getFullYear();for(let y=y0+1;y>=y0-3;y--){const o=document.createElement('option');o.value=y;o.textContent=y+'년';$('lunchYear').append(o);}
+ for(let m=1;m<=12;m++){const o=document.createElement('option');o.value=m;o.textContent=m+'월';$('lunchMonth').append(o);}
+ const prev=new Date(y0,t.getMonth()-1,1);$('lunchYear').value=String(prev.getFullYear());$('lunchMonth').value=String(prev.getMonth()+1);})();
+function fillLunchPeople(){$('lunchPeople').innerHTML=db.people.map(p=>`<option value="${esc(p.name)}">${esc(p.affiliation||'')}</option>`).join('');}
+$('lunchPick').addEventListener('change',()=>{const v=$('lunchPick').value.trim();if(!v)return;const ta=$('lunchForm').elements.namedItem('names');const cur=ta.value.split(/[\n,;]+/).map(s=>s.trim()).filter(Boolean);if(!cur.includes(v))ta.value=(ta.value.trim()?ta.value.trim()+'\n':'')+v;$('lunchPick').value='';});
+async function loadLunch(){
+ const btn=$('loadLunch');btn.disabled=true;$('printLunch').disabled=true;$('xlsxLunch').disabled=true;$('lunchNote').textContent='불러오는 중입니다.';
+ try{
+  const d=await api('getLunchMonth',{year:Number($('lunchYear').value),month:Number($('lunchMonth').value)});lunchData=d;
+  $('lunchTitle').textContent=`${d.year}년 ${d.month}월 자원봉사자 중식비 명단`;
+  $('lunchNote').innerHTML=d.rows.length?`<b>${d.rows.length}건 · 중식비 합계 ${won(d.total)}원</b>`:'이 달에 입력된 중식비 기록이 없어요.'+(d.months.length?` 기록이 있는 달: ${d.months.slice(0,6).map(esc).join(', ')}`:'');
+  $('lunchRows').innerHTML=d.rows.length?`<table><thead><tr><th>구분</th><th>일자</th><th>성명</th><th>비고</th><th>프로그램명</th><th>시작</th><th>종료</th><th>총 시간</th><th>금액</th><th></th></tr></thead><tbody>${d.rows.map((r,i)=>`<tr><td>${i+1}</td><td class="nw">${esc(lunchDay(r.date))}</td><td>${esc(r.name)}</td><td>${esc(r.note)}</td><td>${esc(r.program)}</td><td>${esc(r.start)}</td><td>${esc(r.end)}</td><td>${Number(r.hours).toFixed(1)}</td><td>${won(r.amount)}</td><td><button class="small lunchDel" data-id="${esc(r.id)}">삭제</button></td></tr>`).join('')}</tbody></table>`:'';
+  $('lunchRows').querySelectorAll('.lunchDel').forEach(b=>b.onclick=async()=>{const r=d.rows.find(x=>x.id===b.dataset.id);if(!confirm(`${r.name} 님 ${lunchDay(r.date)} 기록을 지울까요?`))return;b.disabled=true;try{await api('deleteLunch',r.id);await loadLunch();}catch(e){$('lunchNote').textContent=e.message;b.disabled=false;}});
+  $('lunchPrograms').innerHTML=Array.from(new Set(d.rows.map(r=>r.program))).map(p=>`<option value="${esc(p)}">`).join('');
+  $('printLunch').disabled=$('xlsxLunch').disabled=!d.rows.length;
+ }catch(e){$('lunchNote').textContent=e.message;}finally{btn.disabled=false;}
+}
+$('loadLunch').onclick=loadLunch;$('lunchYear').onchange=loadLunch;$('lunchMonth').onchange=loadLunch;
+document.querySelector('[data-tab="lunch"]').addEventListener('click',()=>{fillLunchPeople();if(!lunchData)loadLunch();});
+$('lunchForm').addEventListener('submit',async ev=>{
+ ev.preventDefault();const f=ev.currentTarget,btn=f.querySelector('[type=submit]'),o=formData(f);btn.disabled=true;$('lunchFormNote').textContent='저장하는 중입니다.';
+ try{
+  const r=await api('addLunch',o);
+  $('lunchFormNote').textContent=`${r.added}명 저장했어요.`+(r.skipped.length?` 이미 있는 ${r.skipped.join(', ')} 님은 건너뛰었어요.`:'');
+  f.elements.namedItem('names').value='';
+  const [y,m]=o.date.split('-').map(Number);$('lunchYear').value=String(y);$('lunchMonth').value=String(m);await loadLunch();
+ }catch(e){$('lunchFormNote').textContent=e.message;}finally{btn.disabled=false;}
+});
+$('runLunchImport').onclick=async()=>{
+ const url=$('lunchImportUrl').value.trim();if(!url){$('lunchImportNote').textContent='시트 주소를 붙여넣어 주세요.';return;}
+ if(!confirm('기존 중식비 시트의 기록을 가져올까요? 이미 있는 기록은 건너뜁니다.'))return;
+ const btn=$('runLunchImport');btn.disabled=true;$('lunchImportNote').textContent='가져오는 중입니다. 1분 정도 걸릴 수 있어요.';
+ try{const r=await api('importLunchSheet',url);$('lunchImportNote').textContent=`${r.added}건을 가져왔어요.`+(r.sources.length?` (${r.sources.join(' · ')})`:'')+(r.skipped?` 이미 있던 ${r.skipped}건은 건너뛰었어요.`:'')+(r.bad?` 날짜·시간을 읽지 못한 ${r.bad}건은 빠졌어요.`:'');await loadLunch();}
+ catch(e){$('lunchImportNote').textContent=e.message;}finally{btn.disabled=false;}
+};
+function lunchPrintHtml(d){
+ const rows=d.rows.map((r,i)=>`<tr><td>${i+1}</td><td class="nw">${esc(lunchDay(r.date))}</td><td>${esc(r.name)}</td><td>${esc(r.note)}</td><td class="l">${esc(r.program)}</td><td>${esc(r.start)}</td><td>${esc(r.end)}</td><td>${Number(r.hours).toFixed(1)}</td><td class="r">${won(r.amount)}</td></tr>`).join('');
+ return `<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>${d.year}년 ${d.month}월 자원봉사자 중식비 명단 및 내역</title><style>
+ @page{size:A4 portrait;margin:14mm 10mm}
+ body{font-family:'Malgun Gothic','맑은 고딕','Apple SD Gothic Neo',sans-serif;color:#111;margin:0}
+ h1{font-size:15pt;text-align:center;margin:0 0 5mm}
+ .meta{display:flex;justify-content:space-between;align-items:center;font-size:10pt;margin-bottom:2mm}
+ .sum{font-weight:700;background:#fff36b;padding:2px 8px}
+ table{width:100%;border-collapse:collapse;font-size:8.8pt}
+ th,td{border:1px solid #333;padding:3px 4px;text-align:center;vertical-align:middle;word-break:keep-all;overflow-wrap:anywhere}
+ th{background:#e8e8e8}.l{text-align:left}.r{text-align:right;white-space:nowrap}.nw{white-space:nowrap}
+ thead{display:table-header-group}tr{page-break-inside:avoid}
+ .total td{font-weight:700;background:#f4f4f4}
+ .tip{font:14px sans-serif;background:#fff6dc;border:1px solid #e6cf8c;padding:10px 14px;margin:0 0 16px}
+ @media print{.tip{display:none}}
+ </style></head><body>
+ <p class="tip">인쇄 창의 <b>대상</b>에서 <b>PDF로 저장</b>을 고르면 PDF 파일로 저장돼요. (이 안내는 PDF에 나오지 않아요)</p>
+ <h1>${d.year}년 ${d.month}월 자원봉사자 중식비 명단 및 내역</h1>
+ <div class="meta"><span>종로장애인복지관 · ${d.rows.length}건</span><span class="sum">중식비 합계: ${won(d.total)}원</span></div>
+ <table><colgroup><col style="width:5%"><col style="width:22%"><col style="width:13%"><col style="width:8%"><col><col style="width:6%"><col style="width:6%"><col style="width:6%"><col style="width:8%"></colgroup>
+ <thead><tr><th rowspan="2">구분</th><th rowspan="2">일자</th><th rowspan="2">성명</th><th rowspan="2">비고</th><th rowspan="2">프로그램명</th><th colspan="3">활동시간</th><th rowspan="2">금액</th></tr><tr><th>시작</th><th>종료</th><th>총 시간</th></tr></thead>
+ <tbody>${rows}<tr class="total"><td colspan="8">합계</td><td class="r">${won(d.total)}</td></tr></tbody></table>
+ </body></html>`;
+}
+$('printLunch').onclick=()=>{
+ if(!lunchData||!lunchData.rows.length)return;const html=lunchPrintHtml(lunchData),win=window.open('','_blank');
+ try{if(!win)throw 0;win.document.open();win.document.write(html);win.document.close();win.focus();setTimeout(()=>win.print(),400);}
+ catch(e){const f=document.createElement('iframe');f.style.cssText='position:fixed;width:0;height:0;border:0';document.body.appendChild(f);f.contentDocument.open();f.contentDocument.write(html);f.contentDocument.close();setTimeout(()=>{f.contentWindow.focus();f.contentWindow.print();setTimeout(()=>f.remove(),60000);},400);}
+};
+$('xlsxLunch').onclick=async()=>{
+ if(!lunchData)return;const btn=$('xlsxLunch');btn.disabled=true;$('lunchNote').textContent='엑셀 파일을 만드는 중입니다.';
+ try{const r=await api('getLunchXlsx',{year:lunchData.year,month:lunchData.month});const bin=atob(r.base64),bytes=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);
+  const url=URL.createObjectURL(new Blob([bytes],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'})),a=document.createElement('a');a.href=url;a.download=r.name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),5000);
+  $('lunchNote').innerHTML=`<b>${lunchData.rows.length}건 · 중식비 합계 ${won(lunchData.total)}원</b> · 엑셀을 내려받았어요.`;}
+ catch(e){$('lunchNote').textContent=e.message;}finally{btn.disabled=false;}
+};
+</script>
+
+</body>
+</html>

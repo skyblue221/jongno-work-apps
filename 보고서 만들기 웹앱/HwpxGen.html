@@ -1,0 +1,382 @@
+<script>
+/* 보고서 HWPX 생성기 — 활동계획서 / 결과보고서
+ * 브라우저(Apps Script 웹앱)와 Node 테스트에서 같이 씀.
+ *   HwpxGen.buildZip(zip, data, images) → zip 안의 section0.xml·header.xml·사진을 바꿈 (Promise)
+ *     images: { fileId: { b64, w, h } }  (JPEG, w/h 는 픽셀)
+ * (단위: HWPUNIT, 1pt = 100)
+ */
+var HwpxGen = (function () {
+  // ── 스타일 번호 (원본 양식 header.xml 기준) ──  sp: 줄 간격(%)
+  var P = {
+    center: { id: 6, sp: 160 }, value: { id: 11, sp: 160 }, goal: { id: 21, sp: 160, ind: 1000 },
+    heading: { id: 0, sp: 160 }, line: { id: 13, sp: 150 }, dash: { id: 14, sp: 150, ind: 1000 }, sub: { id: 19, sp: 150, ind: 1000 },
+    cellCenter: { id: 9, sp: 140 }, cellLine: { id: 15, sp: 140 }, cellDash: { id: 12, sp: 140, ind: 1000 }, cellSub: { id: 18, sp: 140, ind: 1000 },
+    right: { id: 7, sp: 160 }
+  };
+  var C = { normal: 5, bold: 6, title: 10, budgetName: 11, budget: 8 };
+  var OUT_W = [9237, 6000, 14195, 6213, 7699, 7098];   // 바깥 표 열 너비 (합 50442)
+  var FULL_W = 50442;
+  var CELL_PAD = 1020, CELL_VPAD = 282;
+  var PAGE_BREAK = 'CELL';   // 한글: 나눔 (셀 내부의 내용도 쪽 경계에서 이어짐)
+  // 내용 칸을 여러 줄로 나눌 때 쓰는 테두리 (header.xml 에 추가)
+  var BF_CONTENT_FIRST = 35, BF_CONTENT_MID = 36, BF_CONTENT_LAST = 37;
+
+  var PRESETS = {
+    schedule:  { cols: ['시간', '내용', '비고'], w: [8785, 22694, 8121], align: ['c', 'l', 'c'] },
+    roles:     { cols: ['연번', '이름', '업무분장', '비고'], w: [3125, 8905, 16546, 11024], align: ['c', 'c', 'l', 'c'] },
+    lecturers: { cols: ['연번', '이름', '생년월일', '성별', '장애유형', '비고'], w: [3125, 6500, 7500, 4500, 7500, 10475], align: ['c', 'c', 'c', 'c', 'c', 'c'] },
+    campaign:  { cols: ['구분', '내용', '준비사항'], w: [7000, 21000, 11600], align: ['c', 'l', 'l'] }
+  };
+
+  var seq = 0;
+  function nid() { seq++; return 1100000000 + seq; }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+  function textUnits(s) {
+    var u = 0;
+    for (var i = 0; i < s.length; i++) u += s.charCodeAt(i) > 0x2E7F ? 1000 : 550;
+    return u;
+  }
+  function pOpen(st, pageBreak) {
+    return '<hp:p id="2147483648" paraPrIDRef="' + st.id + '" styleIDRef="0" pageBreak="' + (pageBreak ? 1 : 0) + '" columnBreak="0" merged="0">';
+  }
+  // 문단 하나: {x: xml, h: 높이}
+  function para(st, text, width, charId, boldId) {
+    text = String(text == null ? '' : text);
+    var cId = charId == null ? C.normal : charId, bId = boldId == null ? C.bold : boldId;
+    var out = '', plain = '';
+    text.split(/(\*\*[^*]+\*\*)/).forEach(function (pt) {
+      if (!pt) return;
+      var bold = /^\*\*[^*]+\*\*$/.test(pt), t = bold ? pt.slice(2, -2) : pt;
+      plain += t;
+      out += '<hp:run charPrIDRef="' + (bold ? bId : cId) + '"><hp:t>' + esc(t) + '</hp:t></hp:run>';
+    });
+    if (!out) out = '<hp:run charPrIDRef="' + cId + '"/>';
+    var avail = Math.max(2000, (width || 30000) - (st.ind || 0));
+    var nLines = Math.max(1, Math.ceil(textUnits(plain) * 1.04 / avail));
+    return { x: pOpen(st) + out + '</hp:p>', h: Math.round(nLines * 10 * st.sp) };
+  }
+  function join(list) { return { x: list.map(function (p) { return p.x; }).join(''), h: list.reduce(function (s, p) { return s + p.h; }, 0) }; }
+  function lineSt(ln, plainSt, dashSt, subSt) {
+    var m;
+    if ((m = ln.match(/^\s*-\s+(.*)$/)) || (m = ln.match(/^\s*-$/))) return { st: dashSt, t: m[1] || '' };
+    if ((m = ln.match(/^\s*[*•·]\s+(.*)$/))) return { st: subSt, t: m[1] };
+    return { st: plainSt, t: ln };
+  }
+  // 줄 문법: "- " 대시 글머리, "* " 작은 글머리, 나머지 일반
+  function lines(text, width, plainSt, dashSt, subSt) {
+    var arr = String(text == null ? '' : text).replace(/\r/g, '').split('\n');
+    return join(arr.map(function (ln) { var o = lineSt(ln, plainSt, dashSt, subSt); return para(o.st, o.t, width); }));
+  }
+  function simpleLines(text, width, st, charId) {
+    return join(String(text == null ? '' : text).replace(/\r/g, '').split('\n').map(function (l) { return para(st, l, width, charId); }));
+  }
+  function cell(o) { // o: {r,c,rs,cs,w,h,bf,body(xml),valign}
+    return '<hp:tc header="0" hasMargin="0" protect="0" editable="0" dirty="0" borderFillIDRef="' + o.bf + '">' +
+      '<hp:subList id="" textDirection="HORIZONTAL" lineWrap="BREAK" vertAlign="' + (o.valign || 'CENTER') + '" linkListIDRef="0" linkListNextIDRef="0" textWidth="' + (o.w - CELL_PAD) + '" textHeight="0" hasTextRef="0" hasNumRef="0">' +
+      o.body + '</hp:subList><hp:cellAddr colAddr="' + o.c + '" rowAddr="' + o.r + '"/><hp:cellSpan colSpan="' + (o.cs || 1) + '" rowSpan="' + (o.rs || 1) + '"/>' +
+      '<hp:cellSz width="' + o.w + '" height="' + Math.round(o.h) + '"/><hp:cellMargin left="510" right="510" top="141" bottom="141"/></hp:tc>';
+  }
+  function tblOpen(id, rows, cols, width, height, z, vOff, inline) {
+    return '<hp:tbl id="' + id + '" zOrder="' + z + '" numberingType="TABLE" textWrap="TOP_AND_BOTTOM" textFlow="BOTH_SIDES" lock="0" dropcapstyle="None" pageBreak="' + PAGE_BREAK + '" repeatHeader="1" rowCnt="' + rows + '" colCnt="' + cols + '" cellSpacing="0" borderFillIDRef="2" noAdjust="0">' +
+      '<hp:sz width="' + width + '" widthRelTo="ABSOLUTE" height="' + Math.round(height) + '" heightRelTo="ABSOLUTE" protect="0"/>' +
+      '<hp:pos treatAsChar="' + (inline ? 1 : 0) + '" affectLSpacing="0" flowWithText="1" allowOverlap="0" holdAnchorAndSO="0" vertRelTo="PARA" horzRelTo="PARA" vertAlign="TOP" horzAlign="LEFT" vertOffset="' + (vOff || 0) + '" horzOffset="0"/>' +
+      '<hp:outMargin left="283" right="283" top="283" bottom="283"/><hp:inMargin left="510" right="510" top="141" bottom="141"/>';
+  }
+  function sum(a, i, n) { var s = 0; for (var k = i; k < i + n; k++) s += a[k]; return s; }
+
+  // ── 그림 ──
+  var picList = [];   // 이번 문서에 들어가는 그림 {binId, fileId}
+  function picPara(img, fileId, maxW, maxH, align) {
+    if (!img || !img.w) return null;
+    var w = maxW, h = Math.round(maxW * img.h / img.w);
+    if (h > maxH) { h = maxH; w = Math.round(maxH * img.w / img.h); }
+    var found = picList.filter(function (q) { return q.fileId === fileId; })[0];
+    var binId = found ? found.binId : 'image' + (picList.length + 1);
+    if (!found) picList.push({ binId: binId, fileId: fileId });
+    var dw = img.w * 75, dh = img.h * 75;
+    var x = '<hp:pic id="' + nid() + '" zOrder="' + (10 + seq) + '" numberingType="PICTURE" textWrap="TOP_AND_BOTTOM" textFlow="BOTH_SIDES" lock="0" dropcapstyle="None" href="" groupLevel="0" instid="' + nid() + '" reverse="0">' +
+      '<hp:offset x="0" y="0"/><hp:orgSz width="' + w + '" height="' + h + '"/><hp:curSz width="' + w + '" height="' + h + '"/><hp:flip horizontal="0" vertical="0"/>' +
+      '<hp:rotationInfo angle="0" centerX="' + Math.round(w / 2) + '" centerY="' + Math.round(h / 2) + '" rotateimage="1"/>' +
+      '<hp:renderingInfo><hc:transMatrix e1="1" e2="0" e3="0" e4="0" e5="1" e6="0"/><hc:scaMatrix e1="1" e2="0" e3="0" e4="0" e5="1" e6="0"/><hc:rotMatrix e1="1" e2="0" e3="0" e4="0" e5="1" e6="0"/></hp:renderingInfo>' +
+      '<hp:imgRect><hc:pt0 x="0" y="0"/><hc:pt1 x="' + w + '" y="0"/><hc:pt2 x="' + w + '" y="' + h + '"/><hc:pt3 x="0" y="' + h + '"/></hp:imgRect>' +
+      '<hp:imgClip left="0" right="' + dw + '" top="0" bottom="' + dh + '"/><hp:inMargin left="0" right="0" top="0" bottom="0"/><hp:imgDim dimwidth="' + dw + '" dimheight="' + dh + '"/>' +
+      '<hc:img binaryItemIDRef="' + binId + '" bright="0" contrast="0" effect="REAL_PIC" alpha="0"/><hp:effects/>' +
+      '<hp:sz width="' + w + '" widthRelTo="ABSOLUTE" height="' + h + '" heightRelTo="ABSOLUTE" protect="0"/>' +
+      '<hp:pos treatAsChar="1" affectLSpacing="0" flowWithText="1" allowOverlap="0" holdAnchorAndSO="0" vertRelTo="PARA" horzRelTo="COLUMN" vertAlign="TOP" horzAlign="LEFT" vertOffset="0" horzOffset="0"/>' +
+      '<hp:outMargin left="0" right="0" top="0" bottom="0"/><hp:shapeComment>그림입니다.</hp:shapeComment></hp:pic>';
+    return { x: pOpen(align === 'l' ? P.line : P.center) + '<hp:run charPrIDRef="5">' + x + '<hp:t/></hp:run></hp:p>', h: h + 300 };
+  }
+
+  // ── 안쪽 표 (일정표, 업무분장 등) → {x, h} ──
+  function innerTable(block) {
+    var pre = PRESETS[block.preset] || PRESETS.schedule;
+    var cols = (block.cols && block.cols.length === pre.cols.length) ? block.cols : pre.cols, n = cols.length, w = pre.w;
+    var rows = (block.rows || []).filter(function (r) { return r && r.some(function (x) { return String(x || '').trim(); }); });
+    var total = rows.length + 1, trs = '', H = 0;
+    function bf(rowIdx, c) {
+      var last = c === n - 1, first = c === 0;
+      if (rowIdx === 0) return first ? 13 : last ? 14 : 12;
+      if (rowIdx === total - 1) return first ? 7 : last ? 8 : 11;
+      return first ? 9 : last ? 10 : 6;
+    }
+    function row(ri, contents) {
+      var rh = Math.max(1300, Math.max.apply(null, contents.map(function (b) { return b.h; })) + CELL_VPAD + 100);
+      H += rh;
+      return '<hp:tr>' + contents.map(function (b, c) {
+        return cell({ r: ri, c: c, w: w[c], h: rh, bf: bf(ri, c), body: b.x });
+      }).join('') + '</hp:tr>';
+    }
+    trs += row(0, cols.map(function (t, c) { return para(P.cellCenter, t, w[c] - CELL_PAD); }));
+    rows.forEach(function (r, ri) {
+      trs += row(ri + 1, cols.map(function (_, c) {
+        var v = r[c] == null ? '' : r[c], tw = w[c] - CELL_PAD;
+        return pre.align[c] === 'l' ? lines(v, tw, P.cellLine, P.cellDash, P.cellSub) : simpleLines(v, tw, P.cellCenter);
+      }));
+    });
+    return {
+      x: pOpen(P.line) + '<hp:run charPrIDRef="5">' + tblOpen(nid(), total, n, sum(w, 0, n), H, 3, 0, false) + trs + '</hp:tbl><hp:t/></hp:run></hp:p>',
+      h: H + 566 + 400
+    };
+  }
+
+  // ── 날짜 ──
+  var WD = ['일', '월', '화', '수', '목', '금', '토'];
+  function fmtDate(iso) {
+    if (!iso) return '';
+    var p = String(iso).split('-').map(Number), d = new Date(p[0], p[1] - 1, p[2]);
+    return p[0] + '. ' + p[1] + '. ' + p[2] + '.(' + WD[d.getDay()] + ')';
+  }
+  function dateText(d) {
+    if (d.dateText) return d.dateText;
+    var s = fmtDate(d.date);
+    var t = (d.timeStart || '') + (d.timeEnd ? '~' + d.timeEnd : '');
+    if (d.dateEnd && d.dateEnd !== d.date) return s + (t ? ' ' + t : '') + ' ~ ' + fmtDate(d.dateEnd);
+    return s + (t ? ' ' + t : '');
+  }
+
+  // ── 예산 ──
+  function won(n) { return Math.round(Number(n || 0)).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',') + '원'; }
+  function itemAmount(it) { return Math.round(Number(it.price || 0) * Number(it.qty || 0)); }
+  function budgetCalc(budget) {
+    var cats = (budget || []).map(function (cat) {
+      var items = (cat.items || []).filter(function (it) { return it.name || Number(it.price); });
+      var total = items.reduce(function (s, it) { return s + itemAmount(it); }, 0);
+      return { category: cat.category || '', items: items, total: total };
+    }).filter(function (c) { return c.category || c.items.length; });
+    return { cats: cats, total: cats.reduce(function (s, c) { return s + c.total; }, 0) };
+  }
+  function itemRest(it) {
+    return ' ' + won(it.price).replace('원', '') + '원×' + (it.qty || 0) + (it.unit || '') + '=' + won(itemAmount(it));
+  }
+
+  // 내용 블록을 여러 덩어리로 나눔 (쪽이 바뀔 때 자연스럽게 나뉘도록)
+  // 소제목은 바로 뒤 덩어리와 붙이고, 긴 글은 빈 줄 기준으로 나눔
+  function contentChunks(blocks, cw) {
+    var chunks = [], pending = null;
+    function push(part) {
+      if (pending) { part = join([pending, part]); pending = null; }
+      chunks.push(part);
+    }
+    (blocks || []).forEach(function (b) {
+      if (b.kind === 'heading') { var hp = para(P.heading, '▪' + (b.text || ''), cw); pending = pending ? join([pending, hp]) : hp; return; }
+      if (b.kind === 'table') { push(innerTable(b)); return; }
+      var groups = [], cur = [];
+      String(b.text == null ? '' : b.text).replace(/\r/g, '').split('\n').forEach(function (ln) {
+        cur.push(ln);
+        if (!ln.trim() && cur.length > 1) { groups.push(cur); cur = []; }
+      });
+      if (cur.length) groups.push(cur);
+      groups.forEach(function (g) { push(lines(g.join('\n'), cw, P.line, P.dash, P.sub)); });
+    });
+    if (pending) chunks.push(pending);
+    if (!chunks.length) chunks.push(para(P.line, '', cw));
+    return chunks;
+  }
+
+  // ── 바깥 큰 표 ──
+  function outerTable(d, images) {
+    var isResult = d.type === 'result';
+    var W = OUT_W, r = 0, xml = '', H = 0;
+    function tr(cells, rh) { H += rh || 0; return '<hp:tr>' + cells.join('') + '</hp:tr>'; }
+    function lab(text) { return para(P.center, text, W[0], C.bold); }
+    function rowH() { var m = 0; for (var i = 0; i < arguments.length; i++) m = Math.max(m, arguments[i].h); return Math.max(2400, m + CELL_VPAD + 200); }
+
+    // 0 프로그램명
+    var v0 = simpleLines(d.programName, sum(W, 1, 5) - CELL_PAD, P.value), h0 = rowH(v0);
+    xml += tr([cell({ r: 0, c: 0, w: W[0], h: h0, bf: 22, body: lab('프로그램명').x }),
+      cell({ r: 0, c: 1, cs: 5, w: sum(W, 1, 5), h: h0, bf: 21, body: v0.x })], h0);
+    // 1 일시 / 장소
+    var v1 = simpleLines(dateText(d), sum(W, 1, 2) - CELL_PAD, P.value), v1b = simpleLines(d.place, sum(W, 4, 2) - CELL_PAD, P.value), h1 = rowH(v1, v1b);
+    xml += tr([cell({ r: 1, c: 0, w: W[0], h: h1, bf: 23, body: lab('일      시').x }),
+      cell({ r: 1, c: 1, cs: 2, w: sum(W, 1, 2), h: h1, bf: 19, body: v1.x }),
+      cell({ r: 1, c: 3, w: W[3], h: h1, bf: 24, body: lab('장      소').x }),
+      cell({ r: 1, c: 4, cs: 2, w: sum(W, 4, 2), h: h1, bf: 20, body: v1b.x })], h1);
+    // 2 참여인원 / 담당자
+    var v2 = simpleLines(d.participants, sum(W, 1, 2) - CELL_PAD, P.value), v2b = simpleLines(d.manager, sum(W, 4, 2) - CELL_PAD, P.value), h2 = rowH(v2, v2b);
+    xml += tr([cell({ r: 2, c: 0, w: W[0], h: h2, bf: 23, body: lab('참 여 인 원').x }),
+      cell({ r: 2, c: 1, cs: 2, w: sum(W, 1, 2), h: h2, bf: 19, body: v2.x }),
+      cell({ r: 2, c: 3, w: W[3], h: h2, bf: 24, body: lab('담  당  자').x }),
+      cell({ r: 2, c: 4, cs: 2, w: sum(W, 4, 2), h: h2, bf: 20, body: v2b.x })], h2);
+    r = 3;
+    // 3 목표
+    var goals = String(d.goal || '').split('\n').filter(function (l) { return l.trim(); });
+    if (goals.length) {
+      var g = join(goals.map(function (l) { return para(P.goal, l.replace(/^\s*-\s+/, ''), sum(W, 1, 5) - CELL_PAD); })), hg = rowH(g);
+      xml += tr([cell({ r: r, c: 0, w: W[0], h: hg, bf: 23, body: lab('프로그램 목표').x }),
+        cell({ r: r, c: 1, cs: 5, w: sum(W, 1, 5), h: hg, bf: 20, body: g.x })], hg);
+      r++;
+    }
+    // 내용 — 덩어리마다 한 줄(행), 왼쪽 「내용」 칸은 세로로 합침
+    var cw = sum(W, 1, 5) - CELL_PAD;
+    var chunks = contentChunks(d.blocks, cw), n = chunks.length;
+    var hs = chunks.map(function (c) { return c.h + CELL_VPAD + 150; });
+    var labH = hs.reduce(function (s, x) { return s + x; }, 0);
+    chunks.forEach(function (c, k) {
+      var bf = n === 1 ? 31 : k === 0 ? BF_CONTENT_FIRST : k === n - 1 ? BF_CONTENT_LAST : BF_CONTENT_MID;
+      var cells = [];
+      if (k === 0) cells.push(cell({ r: r, c: 0, rs: n, w: W[0], h: 0, bf: 28, body: lab('내용').x }));
+      cells.push(cell({ r: r + k, c: 1, cs: 5, w: sum(W, 1, 5), h: c.x.indexOf('<hp:tbl ') >= 0 ? hs[k] : 0, bf: bf, valign: 'TOP', body: c.x }));
+      xml += tr(cells, hs[k]);
+    });
+    r += n;
+    // 예산 / 결산
+    var B = budgetCalc(d.budget);
+    if (B.cats.length) {
+      var rowsX = [], heights = [], hh = 1700;
+      rowsX.push([
+        cell({ r: r, c: 1, w: W[1], h: hh, bf: 29, body: lab('구분').x }),
+        cell({ r: r, c: 2, cs: 3, w: sum(W, 2, 3), h: hh, bf: 29, body: lab('산출내역').x }),
+        cell({ r: r, c: 5, w: W[5], h: hh, bf: 30, body: lab('금액').x })]);
+      heights.push(hh);
+      B.cats.forEach(function (cat, k) {
+        var rr = r + 1 + k, dw = sum(W, 2, 3) - CELL_PAD;
+        var det = cat.items.length ? join(cat.items.map(function (it) {
+          return para(P.right, '**' + (it.name || '') + '**' + itemRest(it), dw, C.budget, C.budgetName);
+        })) : para(P.right, '', dw);
+        var catP = para(P.center, cat.category, W[1] - CELL_PAD), h = rowH(det, catP);
+        rowsX.push([cell({ r: rr, c: 1, w: W[1], h: h, bf: 25, body: catP.x }),
+          cell({ r: rr, c: 2, cs: 3, w: sum(W, 2, 3), h: h, bf: 33, body: det.x }),
+          cell({ r: rr, c: 5, w: W[5], h: h, bf: 34, body: para(P.center, won(cat.total), W[5], C.budget).x })]);
+        heights.push(h);
+      });
+      var rt = r + 1 + B.cats.length;
+      rowsX.push([cell({ r: rt, c: 1, cs: 4, w: sum(W, 1, 4), h: 2100, bf: 26, body: lab('계').x }),
+        cell({ r: rt, c: 5, w: W[5], h: 2100, bf: 32, body: para(P.center, won(B.total), W[5], C.bold).x })]);
+      heights.push(2100);
+      var bl = heights.reduce(function (s, x) { return s + x; }, 0);
+      rowsX[0].unshift(cell({ r: r, c: 0, rs: rowsX.length, w: W[0], h: bl, bf: 27, body: lab(isResult ? '결산' : '소요예산').x }));
+      rowsX.forEach(function (cells, k) { xml += tr(cells, heights[k]); });
+      r = rt + 1;
+    }
+    // 활동사진 (결과보고서) — 2장씩 한 줄
+    if (isResult) {
+      var photos = (d.photos || []).filter(function (p) { return images[p.fileId]; });
+      var pairs = [];
+      for (var i = 0; i < Math.max(2, photos.length); i += 2) pairs.push([photos[i], photos[i + 1]]);
+      var cwL = sum(W, 1, 2), cwR = sum(W, 3, 3), PH = 15000;
+      var photoRows = pairs.map(function (pr) {
+        var a = pr[0] ? picPara(images[pr[0].fileId], pr[0].fileId, cwL - CELL_PAD, PH) : null;
+        var b = pr[1] ? picPara(images[pr[1].fileId], pr[1].fileId, cwR - CELL_PAD, PH) : null;
+        var h = Math.max(16000, Math.max(a ? a.h : 0, b ? b.h : 0) + CELL_VPAD + 400);
+        return { a: a, b: b, h: h };
+      });
+      var ph = photoRows.reduce(function (s, x) { return s + x.h; }, 0);
+      photoRows.forEach(function (pr, k) {
+        var cells = [];
+        if (k === 0) cells.push(cell({ r: r, c: 0, rs: photoRows.length, w: W[0], h: ph, bf: 23, body: lab('활동사진').x }));
+        cells.push(cell({ r: r + k, c: 1, cs: 2, w: cwL, h: pr.h, bf: 19, body: (pr.a || para(P.center, '')).x }));
+        cells.push(cell({ r: r + k, c: 3, cs: 3, w: cwR, h: pr.h, bf: 20, body: (pr.b || para(P.center, '')).x }));
+        xml += tr(cells, pr.h);
+      });
+      r += photoRows.length;
+    }
+    return tblOpen(1927477144, r, 6, sum(W, 0, 6), H, 1, 4075) + xml + '</hp:tbl>';
+  }
+
+  // ── 첨부 자료: 새 쪽에서 시작하는 1칸짜리 표 ──
+  function attachments(d, images) {
+    return (d.attachments || []).filter(function (a) { return a.title || a.text || (a.images || []).length; }).map(function (a) {
+      var tw = FULL_W - CELL_PAD, rows = [];
+      (a.images || []).forEach(function (im) {
+        var p = picPara(images[im.fileId], im.fileId, tw, 58000);
+        if (p) rows.push(p);
+      });
+      if (String(a.text || '').trim()) rows.push(lines(a.text, tw, P.line, P.dash, P.sub));
+      if (!rows.length) rows.push(para(P.line, '', tw));
+      var th = 2600, total = th, trs = '';
+      rows.forEach(function (b, k) {
+        var h = b.h + CELL_VPAD + 400; total += h;
+        var bf = rows.length === 1 ? 19 : k === 0 ? BF_CONTENT_FIRST : k === rows.length - 1 ? BF_CONTENT_LAST : BF_CONTENT_MID;
+        trs += '<hp:tr>' + cell({ r: k + 1, c: 0, w: FULL_W, h: h, bf: bf, valign: 'TOP', body: b.x }) + '</hp:tr>';
+      });
+      var tbl = tblOpen(nid(), rows.length + 1, 1, FULL_W, total, 2, 0, true) +
+        '<hp:tr>' + cell({ r: 0, c: 0, w: FULL_W, h: th, bf: 24, body: para(P.center, a.title || '첨부', tw, C.bold).x }) + '</hp:tr>' + trs + '</hp:tbl>';
+      return pOpen(P.heading, true) + '<hp:run charPrIDRef="5">' + tbl + '<hp:t/></hp:run></hp:p>';
+    }).join('');
+  }
+
+  function baseName(p) { return String(p || '').replace(/\s*(활동계획서|결과보고서|활동계획|결과보고)\s*$/, ''); }
+  function defaultTitle(d) { return baseName(d.programName) + (d.type === 'result' ? ' 결과보고서' : ' 활동계획서'); }
+
+  // 템플릿 section0.xml → 새 문서
+  function buildSection(tpl, d, images) {
+    seq = 0; picList = [];
+    images = images || {};
+    var i = tpl.indexOf('<hp:tbl ');
+    var depth = 0, re = /<hp:tbl |<\/hp:tbl>/g, m, end = -1;
+    re.lastIndex = i;
+    while ((m = re.exec(tpl))) {
+      if (m[0] === '<hp:tbl ') depth++; else { depth--; if (depth === 0) { end = m.index + 9; break; } }
+    }
+    var out = tpl.slice(0, i) + outerTable(d, images) + tpl.slice(end);
+    var title = d.title || defaultTitle(d);
+    out = out.replace(/(<hp:run charPrIDRef="10"><hp:t>)[^<]*(<\/hp:t>)/, '$1' + esc(title) + '$2');
+    // 제목 표도 쪽 나눔 설정 통일
+    out = out.replace(/pageBreak="TABLE"/g, 'pageBreak="' + PAGE_BREAK + '"');
+    var att = attachments(d, images);
+    if (att) out = out.replace(/<\/hs:sec>\s*$/, att + '</hs:sec>');
+    return { xml: out, pics: picList.slice() };
+  }
+
+  // header.xml 에 내용 칸용 테두리 3개 추가 (이미 있으면 그대로)
+  function patchHeader(h) {
+    if (h.indexOf('<hh:borderFill id="' + BF_CONTENT_FIRST + '"') >= 0) return h;
+    function bfXml(id, top, bottom) {
+      function side(n, t) { return t ? '<hh:' + n + ' type="SOLID" width="' + t + '" color="#BBBBBB"/>' : '<hh:' + n + ' type="NONE" width="0.1 mm" color="#000000"/>'; }
+      return '<hh:borderFill id="' + id + '" threeD="0" shadow="0" centerLine="NONE" breakCellSeparateLine="0"><hh:slash type="NONE" Crooked="0" isCounter="0"/><hh:backSlash type="NONE" Crooked="0" isCounter="0"/>' +
+        '<hh:leftBorder type="SOLID" width="0.12 mm" color="#BBBBBB"/><hh:rightBorder type="SOLID" width="0.4 mm" color="#000000"/>' +
+        side('topBorder', top) + side('bottomBorder', bottom) +
+        '<hh:diagonal type="SOLID" width="0.1 mm" color="#000000"/><hc:fillBrush><hc:winBrush faceColor="#FFFFFF" hatchColor="#010000" alpha="0"/></hc:fillBrush></hh:borderFill>';
+    }
+    var add = bfXml(BF_CONTENT_FIRST, '0.12 mm', null) + bfXml(BF_CONTENT_MID, null, null) + bfXml(BF_CONTENT_LAST, null, '0.15 mm');
+    h = h.replace(/<hh:borderFills itemCnt="(\d+)"/, function (_, n) { return '<hh:borderFills itemCnt="' + (Number(n) + 3) + '"'; });
+    return h.replace('</hh:borderFills>', add + '</hh:borderFills>');
+  }
+
+  // zip(JSZip, 틀을 불러온 상태)을 완성된 문서로 바꿈
+  function buildZip(zip, d, images) {
+    images = images || {};
+    return Promise.all([zip.file('Contents/section0.xml').async('string'), zip.file('Contents/header.xml').async('string'), zip.file('Contents/content.hpf').async('string')])
+      .then(function (r) {
+        var res = buildSection(r[0], d, images);
+        zip.file('Contents/section0.xml', res.xml);
+        zip.file('Contents/header.xml', patchHeader(r[1]));
+        var items = '';
+        res.pics.forEach(function (p) {
+          zip.file('BinData/' + p.binId + '.jpg', images[p.fileId].b64, { base64: true });
+          items += '<opf:item id="' + p.binId + '" href="BinData/' + p.binId + '.jpg" media-type="image/jpeg" isEmbeded="1"/>';
+        });
+        var hpf = r[2].replace(/<opf:item id="image\d+"[^>]*\/>/g, '');
+        if (items) hpf = hpf.replace('</opf:manifest>', items + '</opf:manifest>');
+        zip.file('Contents/content.hpf', hpf);
+        zip.file('mimetype', 'application/hwp+zip', { compression: 'STORE' });
+        return zip;
+      });
+  }
+
+  return { buildZip: buildZip, buildSection: buildSection, budgetCalc: budgetCalc, dateText: dateText, defaultTitle: defaultTitle, baseName: baseName, PRESETS: PRESETS, won: won, itemAmount: itemAmount };
+})();
+if (typeof module !== 'undefined') module.exports = HwpxGen;
+</script>

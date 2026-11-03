@@ -1,0 +1,884 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<base target="_top">
+<meta charset="utf-8">
+<title>보고서 만들기</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+  :root{--bg:#F6F5F2;--card:#fff;--ink:#222;--sub:#666;--line:#E2DFD8;--main:#2F6B5E;--main2:#E7F0EE;--warn:#B54A2A;--warn2:#FBEDE8}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:"Pretendard","Apple SD Gothic Neo","Malgun Gothic",sans-serif;font-size:15px;line-height:1.5}
+  header{position:sticky;top:0;z-index:10;background:var(--main);color:#fff;padding:10px 20px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  header h1{font-size:18px;margin:0;flex:1}
+  header .st{font-size:13px;opacity:.9}
+  button{font:inherit;cursor:pointer;border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:8px;padding:6px 12px}
+  button:hover{border-color:var(--main)}
+  button.pri{background:var(--main);border-color:var(--main);color:#fff}
+  header button{border-color:rgba(255,255,255,.5)}
+  header button.pri{background:#fff;color:var(--main)}
+  button.sm{padding:3px 8px;font-size:13px}
+  button.ghost{border-color:transparent;background:transparent;color:var(--sub)}
+  button.del{color:var(--warn)}
+  .wrap{display:grid;grid-template-columns:300px 1fr;gap:16px;padding:16px;max-width:1300px;margin:0 auto}
+  @media (max-width:900px){.wrap{grid-template-columns:1fr}}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:16px}
+  .card h2{font-size:16px;margin:0 0 12px;display:flex;align-items:center;gap:8px}
+  .card h2 small{font-weight:normal;color:var(--sub);font-size:13px}
+  label{display:block;font-size:13px;color:var(--sub);margin:10px 0 4px}
+  input,textarea,select{font:inherit;width:100%;border:1px solid var(--line);border-radius:8px;padding:7px 9px;background:#fff}
+  textarea{resize:vertical;min-height:38px}
+  input:focus,textarea:focus{outline:2px solid var(--main2);border-color:var(--main)}
+  .row{display:grid;gap:10px}
+  .r2{grid-template-columns:1fr 1fr}.r4{grid-template-columns:1.3fr 1.3fr 1fr 1fr}
+  @media (max-width:640px){.r2,.r4{grid-template-columns:1fr}}
+  .hint{font-size:12.5px;color:var(--sub);background:var(--bg);border-radius:8px;padding:8px 10px;margin-top:8px}
+  .preview{font-size:13px;color:var(--main);margin-top:4px}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+  .seg button{border:0;border-radius:0}
+  .seg button.on{background:var(--main);color:#fff}
+  /* 목록 */
+  #list .item{border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:8px;cursor:pointer}
+  #list .item:hover{border-color:var(--main)}
+  #list .item.on{border-color:var(--main);background:var(--main2)}
+  #list .t{font-weight:600;font-size:14px}
+  #list .m{font-size:12px;color:var(--sub)}
+  .tag{display:inline-block;font-size:11px;padding:1px 6px;border-radius:6px;background:var(--main2);color:var(--main);margin-right:4px}
+  .tag.res{background:var(--warn2);color:var(--warn)}
+  #list .acts{margin-top:6px;display:flex;gap:4px;flex-wrap:wrap}
+  /* 내용 블록 */
+  .blk{border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:10px;background:#FCFCFB}
+  .blk .bh{display:flex;align-items:center;gap:6px;margin-bottom:6px;font-size:13px;color:var(--sub)}
+  .blk .bh b{color:var(--ink)}
+  .blk .bh .sp{flex:1}
+  .blk.head{background:var(--main2)}
+  .blk.head input{font-weight:600}
+  table.grid{width:100%;border-collapse:collapse;table-layout:fixed}
+  table.grid th{font-size:12.5px;background:#EEE;font-weight:600;padding:4px;border:1px solid var(--line)}
+  table.grid td{border:1px solid var(--line);padding:0;vertical-align:top}
+  table.grid th input.hd{border:0;background:transparent;text-align:center;font-weight:600;font-size:12.5px;padding:2px}
+  table.grid th input.hd:focus{background:#fff}
+  table.grid td textarea{border:0;border-radius:0;min-height:36px;padding:6px;font-size:14px}
+  table.grid td.x{width:34px;text-align:center;vertical-align:middle}
+  .addbar{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+  /* 예산 */
+  .cat{border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:10px}
+  .cat .ch{display:flex;gap:8px;align-items:center;margin-bottom:6px}
+  .cat .ch input{max-width:240px;font-weight:600}
+  .cat .sum{margin-left:auto;font-weight:600}
+  table.bud{width:100%;border-collapse:collapse}
+  table.bud th{font-size:12.5px;color:var(--sub);font-weight:normal;text-align:left;padding:2px 4px}
+  table.bud td{padding:2px 4px}
+  table.bud td.amt{text-align:right;white-space:nowrap;width:110px}
+  .total{text-align:right;font-size:17px;font-weight:700;margin-top:6px}
+  .flag{border-color:var(--warn)!important;background:var(--warn2)}
+  #toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#222;color:#fff;padding:10px 18px;border-radius:10px;font-size:14px;display:none;z-index:99}
+  .empty{color:var(--sub);font-size:13px;text-align:center;padding:16px 0}
+  /* 사진 */
+  .thumbs{display:flex;flex-wrap:wrap;gap:10px;margin-top:8px}
+  .thumb{position:relative;width:150px;height:112px;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:#EEE;display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--sub)}
+  .thumb img{width:100%;height:100%;object-fit:cover}
+  .thumb .rm{position:absolute;top:4px;right:4px;background:rgba(0,0,0,.6);color:#fff;border:0;border-radius:6px;padding:0 6px}
+  .thumb .mv{position:absolute;bottom:4px;left:4px;display:flex;gap:2px}
+  .thumb .mv button{background:rgba(255,255,255,.85);border:0;padding:0 6px;font-size:12px}
+  .upl{display:inline-block;border:1px dashed var(--main);color:var(--main);border-radius:8px;padding:6px 12px;cursor:pointer;font-size:14px;margin-top:8px}
+  .upl input{display:none}
+  .att{border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:10px;background:#FCFCFB}
+  /* 장애이해교육 */
+  table.att{width:100%;border-collapse:collapse}
+  table.att th{font-size:12.5px;color:var(--sub);font-weight:normal;text-align:left;padding:2px 4px}
+  table.att td{padding:2px 4px;vertical-align:top}
+  .dates{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  .dates input{width:170px}
+  .sess{border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:10px;background:#FCFCFB}
+  .tag.edu{background:#EEE7F6;color:#5B3E8A}
+  .pg.edu .lb{background:#E3DCC1}
+  .pg.edu .nw{white-space:nowrap}
+  .pg.edu .th2{background:#E3DCC1;font-weight:700;text-align:center}
+  .pg.edu .in th{background:#E5E5E5;font-weight:700}
+  .pg .pfoot{text-align:center;font-weight:700;font-size:20px;margin-top:28px;letter-spacing:1px}
+  .pg .eduttl{font-size:22px;font-weight:700;text-align:center;padding:10px}
+  /* 미리보기 */
+  #pvWrap{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:50;overflow:auto}
+  #pvBar{position:sticky;top:0;z-index:10;background:#333;color:#fff;padding:10px 20px;display:flex;gap:10px;align-items:center}
+  #pvBar span{flex:1}
+  #pv{max-width:820px;margin:20px auto 60px}
+  .pg{-webkit-print-color-adjust:exact;print-color-adjust:exact;background:#fff;padding:48px 40px;margin-bottom:20px;box-shadow:0 2px 12px rgba(0,0,0,.2);color:#000;font-family:"Nanum Gothic","NanumGothic","Malgun Gothic",sans-serif;font-size:13px;line-height:1.55}
+  .pg .ttl{border:2px solid #000;text-align:center;font-size:20px;font-weight:700;padding:8px;margin:0 30px 14px}
+  .pg table{width:100%;border-collapse:collapse}
+  .pg td,.pg th{border:1px solid #999;padding:5px 8px;vertical-align:middle}
+  .pg .main{border:2px solid #000}
+  .pg .lb{background:#F2F2F2;font-weight:700;text-align:center;white-space:nowrap;width:17%}
+  .pg .in th{background:#DCDCDC;font-weight:normal}
+  .pg .in td,.pg .in th{border:1px solid #555}
+  .pg .in{margin:6px 0 10px}
+  .pg td,.pg th{position:relative;z-index:0}
+  .pg svg.bg{position:absolute;left:0;top:0;width:100%;height:100%;z-index:-1;display:block}
+  .pg .c{text-align:center}.pg .r{text-align:right}
+  .pg .ln{margin:0}.pg .dash{padding-left:14px;text-indent:-10px}.pg .sub{padding-left:24px;text-indent:-10px}
+  .pg .ph img{max-width:100%;max-height:260px;display:block;margin:auto}
+  .pg .attimg{max-width:100%;display:block;margin:6px auto}
+  @media print{
+    html,body{background:#fff!important}
+    *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
+    body>*:not(#pvWrap){display:none!important}
+    #pvWrap{position:static;display:block!important;background:#fff;overflow:visible}
+    #pvBar{display:none}
+    #pv{max-width:none;margin:0}
+    .pg{box-shadow:none;padding:0;margin:0}
+    .pg+.pg{break-before:page}
+    /* 내용 안의 표는 페이지 경계에서 나눌 수 있도록 */
+    .pg table.in,
+    .pg table.in tbody,
+    .pg table.in tr,
+    .pg table.in td,
+    .pg table.in th {
+        break-inside: auto;
+          page-break-inside: auto;
+          }
+          /* 사진은 중간에서 잘리지 않도록 */
+    .pg .ph {
+        break-inside: avoid;
+          page-break-inside: avoid;
+          }
+    .pg .attimg{max-height:230mm;width:auto}
+    /* 꼬리말: 인쇄하면 쪽마다 아래에 반복 */
+    .pg .pfoot{display:none}
+    #pv .pfoot-print{display:block!important;position:fixed;left:0;right:0;bottom:0;text-align:center;font-weight:700;font-size:20px;letter-spacing:1px;font-family:"Nanum Gothic","NanumGothic","Malgun Gothic",sans-serif}
+    @page{size:A4;margin:15mm 15mm 22mm}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>📄 보고서 만들기</h1>
+  <span class="st" id="status">새 보고서</span>
+  <button onclick="newDoc()">＋ 새 활동계획서</button>
+  <button onclick="newEdu()">＋ 장애이해교육 보고서</button>
+  <button onclick="save()">저장</button>
+  <button onclick="openPreview()">미리보기·인쇄</button>
+  <button class="pri" onclick="download()">한글(HWPX)로 내려받기</button>
+</header>
+
+<div class="wrap">
+  <!-- 왼쪽: 저장된 보고서 -->
+  <aside>
+    <div class="card">
+      <h2>저장된 보고서</h2>
+      <input id="q" placeholder="찾기 (예: 씨네큐브)" oninput="renderList()">
+      <div style="margin:8px 0" class="seg" id="filter">
+        <button class="on" data-v="">전체</button><button data-v="활동계획서">계획서</button><button data-v="결과보고서">결과보고서</button><button data-v="장애이해교육">교육</button>
+      </div>
+      <div id="list"><div class="empty">불러오는 중…</div></div>
+    </div>
+  </aside>
+
+  <!-- 오른쪽: 입력 -->
+  <main>
+   <div id="planForm">
+    <div class="card">
+      <h2>기본 정보 <small id="typeLabel"></small></h2>
+      <div class="seg" id="typeSeg">
+        <button data-v="plan">활동계획서</button><button data-v="result">결과보고서</button>
+      </div>
+      <label>프로그램명</label>
+      <input id="programName" placeholder="예: 장애이해 마을이음캠페인(씨네큐브 11회차) 활동계획">
+      <label>문서 제목 (맨 위 큰 제목) — 프로그램명을 쓰면 자동으로 채워져요</label>
+      <input id="title">
+      <div class="row r4">
+        <div><label>날짜</label><input type="date" id="date"></div>
+        <div><label>끝나는 날짜 (여러 날일 때만)</label><input type="date" id="dateEnd"></div>
+        <div><label>시작 시간</label><input id="timeStart" placeholder="13:00"></div>
+        <div><label>끝 시간</label><input id="timeEnd" placeholder="17:00"></div>
+      </div>
+      <div class="preview" id="datePreview"></div>
+      <div class="row r2">
+        <div><label>장소 (두 줄 가능)</label><textarea id="place" rows="2"></textarea></div>
+        <div><label>참여인원</label><textarea id="participants" rows="2"></textarea></div>
+      </div>
+      <label>담당자</label>
+      <input id="manager">
+      <label>프로그램 목표 (한 줄에 하나씩)</label>
+      <textarea id="goal" rows="3"></textarea>
+    </div>
+
+    <div class="card">
+      <h2>내용</h2>
+      <div class="hint">✏️ 글 쓰는 법 — 줄 앞에 <b>-</b> 와 띄어쓰기 → 「-」 글머리 / <b>*</b> 와 띄어쓰기 → 「•」 작은 글머리 / <b>**글자**</b> → 굵게</div>
+      <div id="blocks" style="margin-top:12px"></div>
+      <div class="addbar">
+        <button class="sm" onclick="addBlock('heading')">＋ 소제목(▪)</button>
+        <button class="sm" onclick="addBlock('text')">＋ 글</button>
+        <button class="sm" onclick="addBlock('schedule')">＋ 일정표</button>
+        <button class="sm" onclick="addBlock('roles')">＋ 업무분장표</button>
+        <button class="sm" onclick="addBlock('lecturers')">＋ 강사 명단표</button>
+        <button class="sm" onclick="addBlock('campaign')">＋ 캠페인 내용표</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 id="budgetTitle">소요예산</h2>
+      <div id="budget"></div>
+      <button class="sm" onclick="addCat()">＋ 구분 추가</button>
+      <div class="total" id="budgetTotal"></div>
+    </div>
+   </div>
+
+   <!-- 장애이해교육 결과보고서 -->
+   <div id="eduForm" style="display:none">
+    <div class="card">
+      <h2>장애이해교육 결과보고서 <small>기본 정보</small></h2>
+      <label>프로그램명</label>
+      <input id="eduProgram" placeholder="장애이해교육">
+      <label>목표</label>
+      <textarea id="eduGoal" rows="2"></textarea>
+      <label>날짜 (이틀 이상이면 ＋로 추가 — 보고서에 한 줄씩 들어가요)</label>
+      <div class="dates" id="eduDates"></div>
+      <div class="row r2">
+        <div><label>시간 (회차마다 다르면 줄 바꿔 쓰기)</label><textarea id="eduTime" rows="1" placeholder="11:10~12:15"></textarea></div>
+        <div><label>장소</label><textarea id="eduPlace" rows="1"></textarea></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>참석자 <small id="eduTotal"></small></h2>
+      <table class="att" id="eduAtt"></table>
+      <button class="sm" onclick="doc.attendees.push({group:'',count:'',names:''});markDirty();renderEdu()">＋ 구분 추가</button>
+    </div>
+
+    <div class="card">
+      <h2>일정 및 내용</h2>
+      <label>1. 주요내용 — 줄 앞에 <b>- </b> 를 쓰면 「-」 항목, 안 쓰면 소제목(예: ① 9월 16일)</label>
+      <textarea id="eduTopics" rows="6"></textarea>
+      <label style="margin-top:14px">2. 일정 — 이틀 이상이거나 반이 나뉘면 ＋ 회차 추가</label>
+      <div id="eduSess"></div>
+      <button class="sm" onclick="doc.schedules.push({label:'',rows:[['',''],['',''],['','']]});markDirty();renderEdu()">＋ 회차 추가</button>
+    </div>
+
+    <div class="card">
+      <h2>평가 <small>한 문단을 한 줄로 — 보고서에서 문단마다 「-」가 붙어요</small></h2>
+      <textarea id="eduEval" rows="10"></textarea>
+    </div>
+   </div>
+
+    <div class="card" id="photoCard">
+      <h2>활동사진 <small>2장씩 나란히 들어가요</small></h2>
+      <div class="thumbs" id="photos"></div>
+      <label class="upl">＋ 사진 올리기<input type="file" accept="image/*" multiple onchange="uploadTo(this, doc.photos, renderPhotos)"></label>
+    </div>
+
+    <div class="card">
+      <h2>첨부 자료 <small>보고서 뒤에 한 쪽씩 붙어요 (포스터, 카드뉴스, 안내문 등)</small></h2>
+      <div id="atts"></div>
+      <button class="sm" onclick="addAtt()">＋ 첨부 자료 추가</button>
+    </div>
+  </main>
+</div>
+<div id="toast"></div>
+<div id="errbox" style="display:none;position:fixed;top:70px;left:50%;transform:translateX(-50%);max-width:640px;width:92%;background:#FBEDE8;border:1px solid #B54A2A;color:#7A2E18;border-radius:10px;padding:12px 16px;z-index:60;font-size:14px"></div>
+<div id="pvWrap">
+  <div id="pvBar"><span>미리보기 — 실제 한글 파일과 줄바꿈·쪽 나눔은 조금 다를 수 있어요</span>
+    <button onclick="window.print()">🖨 인쇄하기</button>
+    <button class="pri" onclick="closePreview();download()">한글로 내려받기</button>
+    <button onclick="closePreview()">닫기</button></div>
+  <div id="pv"></div>
+</div>
+
+<?!= include('HwpxGen'); ?>
+<?!= include('EduGen'); ?>
+<script>
+var doc = null, saved = [], dirty = false, tplB64 = null, filterType = '';
+var PRESETS = HwpxGen.PRESETS;
+var BLOCK_NAMES = {heading:'소제목', text:'글', schedule:'일정표', roles:'업무분장표', lecturers:'강사 명단표', campaign:'캠페인 내용표'};
+
+function blankPlan() {
+  return {
+    type:'plan', programName:'', title:'', titleAuto:true, date:'', dateEnd:'', timeStart:'', timeEnd:'',
+    place:'', participants:'', manager:'이선민 사회복지사', goal:'',
+    blocks:[
+      {kind:'heading', text:'세부진행내용'},
+      {kind:'text', text:'1) 사전준비사항\n- \n\n2) 사전 홍보방안\n- 온라인: 복지관 홈페이지, 인스타, 카카오채널\n- 오프라인: 기관 게시판\n\n3) 세부일정'},
+      {kind:'table', preset:'schedule', rows:[['','',''],['','',''],['','','']]},
+      {kind:'heading', text:'업무분장'},
+      {kind:'table', preset:'roles', rows:[['1','김지영','사업진행 총괄','일상동행팀 팀장'],['2','이선민','계획서 및 결과보고 작성','사회복지사']]},
+      {kind:'heading', text:'평가방법'},
+      {kind:'text', text:'- 성과목표 : 참여자 반응을 통한 질적 평가\n- 산출목표 : 장애인식개선 캠페인 실시 여부 및 당일 참여자 수'}
+    ],
+    budget:[{category:'캠페인 진행비', items:[{name:'', price:'', qty:'', unit:'명'}]}],
+    photos:[], attachments:[]
+  };
+}
+
+var EDU_GOAL = '장애 당사자의 경험을 바탕으로 장애를 이해하고, 장애인의 권리와 선택을 존중하는 실천 태도를 형성한다.';
+function blankEdu(){
+  return {
+    type:'edu', programName:'장애이해교육', goal:EDU_GOAL, dates:[''], date:'', time:'', place:'',
+    attendees:[{group:'참가자', count:'', names:''}, {group:'직원 및 강사', count:'', names:''}],
+    topics:'- 장애당사자가 경험하는 사회적 장벽 이해\n- 도움을 제공하기 전 당사자의 의사를 확인하는 법\n- 배리어프리와 유니버설 디자인의 이해\n- 보통의 삶에 대한 생각 공유',
+    schedules:[{label:'', rows:[['','교육 준비'],['','장애당사자 / 기관담당자 장애이해교육 진행'],['','질의응답 및 마무리']]}],
+    evaluation:'', photos:[], attachments:[]
+  };
+}
+function newEdu(){
+  if (dirty && !confirm('지금 쓰던 내용이 저장되지 않았어요. 새로 시작할까요?')) return;
+  doc = blankEdu(); dirty = false; renderAll(); window.scrollTo(0,0);
+}
+function eduTitle(d){
+  d = d || doc;
+  var who = ((d.attendees||[])[0]||{}).names || d.place || '';
+  who = String(who).split('\n')[0]; if (who.length > 24) who = who.slice(0,24) + '…';
+  return '장애이해교육 결과보고서' + (who ? ' (' + who + ')' : '');
+}
+function typeName(t){ return t==='edu' ? '장애이해교육' : t==='result' ? '결과보고서' : '활동계획서'; }
+
+/* ── 장애이해교육 입력 화면 ── */
+var EDU_FIELDS = {eduProgram:'programName', eduGoal:'goal', eduTime:'time', eduPlace:'place', eduTopics:'topics', eduEval:'evaluation'};
+Object.keys(EDU_FIELDS).forEach(function(id){
+  var el_ = document.getElementById(id);
+  el_.addEventListener('input', function(){ doc[EDU_FIELDS[id]] = el_.value; if (el_.tagName==='TEXTAREA') autoGrow(el_); markDirty(); });
+});
+function renderEdu(){
+  Object.keys(EDU_FIELDS).forEach(function(id){ var e = document.getElementById(id); e.value = doc[EDU_FIELDS[id]] || ''; if (e.tagName==='TEXTAREA') setTimeout(function(){ autoGrow(e); }); });
+  // 날짜
+  var db = document.getElementById('eduDates'); db.innerHTML = '';
+  if (!doc.dates || !doc.dates.length) doc.dates = [''];
+  doc.dates.forEach(function(v, i){
+    var x = el('input', {type:'date'}); x.value = v || '';
+    x.addEventListener('input', function(){ doc.dates[i] = x.value; doc.date = doc.dates.filter(Boolean)[0] || ''; markDirty(); renderEduPreview(); });
+    db.appendChild(x);
+    if (doc.dates.length > 1) db.appendChild(el('button', {class:'sm ghost del', on:{click:function(){ doc.dates.splice(i,1); markDirty(); renderEdu(); }}, text:'✕'}));
+  });
+  db.appendChild(el('button', {class:'sm', on:{click:function(){ doc.dates.push(''); markDirty(); renderEdu(); }}, text:'＋ 날짜'}));
+  db.appendChild(el('span', {class:'preview', id:'eduDatePv'}));
+  renderEduPreview();
+  // 참석자
+  var at = document.getElementById('eduAtt'); at.innerHTML = '';
+  at.appendChild(el('tr', {}, ['구분','인원(명)','이름',''].map(function(t){ return el('th',{text:t}); })));
+  doc.attendees.forEach(function(a, i){
+    function inp(key, ph, w, area){
+      var x = area ? ta(a[key], function(v){ a[key] = v; updEduTotal(); }, 1) : el('input', {placeholder:ph, style: w?('width:'+w):''});
+      if (!area){ x.value = a[key]==null?'':a[key]; x.addEventListener('input', function(){ a[key] = x.value; updEduTotal(); markDirty(); }); }
+      else x.placeholder = ph;
+      return el('td', {}, [x]);
+    }
+    at.appendChild(el('tr', {}, [inp('group','참가자','130px'), inp('count','7','80px'), inp('names','예: 사회복지 실습생 6명, 신입직원 1명', null, true),
+      el('td', {}, [el('button', {class:'sm ghost del', on:{click:function(){ doc.attendees.splice(i,1); markDirty(); renderEdu(); }}, text:'✕'})])]));
+  });
+  updEduTotal();
+  // 일정 회차
+  var sb = document.getElementById('eduSess'); sb.innerHTML = '';
+  doc.schedules.forEach(function(sc, si){
+    var lab = el('input', {placeholder: doc.schedules.length > 1 ? '예: ① 9월 16일 / ① 1,2반' : '회차 이름 (하나뿐이면 비워두세요)'}); lab.value = sc.label || '';
+    lab.addEventListener('input', function(){ sc.label = lab.value; markDirty(); });
+    var tbl = el('table', {class:'grid'});
+    tbl.appendChild(el('tr', {}, [el('th',{text:'시간', style:'width:30%'}), el('th',{text:'내용'}), el('th',{class:'x', style:'width:34px'})]));
+    sc.rows.forEach(function(r, ri){
+      tbl.appendChild(el('tr', {}, [el('td', {}, [ta(r[0], function(v){ r[0] = v; })]), el('td', {}, [ta(r[1], function(v){ r[1] = v; })]),
+        el('td', {class:'x'}, [el('button', {class:'sm ghost del', on:{click:function(){ sc.rows.splice(ri,1); markDirty(); renderEdu(); }}, text:'✕'})])]));
+    });
+    sb.appendChild(el('div', {class:'sess'}, [
+      el('div', {class:'bh', style:'display:flex;gap:6px;align-items:center;margin-bottom:6px'}, [el('b',{text:'회차 ' + (si+1)}), el('span',{style:'flex:1'}),
+        doc.schedules.length > 1 ? el('button', {class:'sm ghost del', on:{click:function(){ if(confirm('이 회차 일정을 지울까요?')){ doc.schedules.splice(si,1); markDirty(); renderEdu(); } }}, text:'✕'}) : null]),
+      lab, tbl,
+      el('button', {class:'sm', style:'margin-top:6px', on:{click:function(){ sc.rows.push(['','']); markDirty(); renderEdu(); }}, text:'＋ 행 추가'})
+    ]));
+  });
+}
+function renderEduPreview(){
+  var t = EduGen.datesText(doc).replace(/\n/g, ' / ');
+  var e = document.getElementById('eduDatePv'); if (e) e.textContent = t ? '→ ' + t : '';
+}
+function updEduTotal(){ document.getElementById('eduTotal').textContent = '총 ' + EduGen.total(doc) + '명 (인원 칸을 더해서 자동으로 들어가요)'; }
+
+/* ── 제목 자동 ── */
+function baseName(p){ return String(p||'').replace(/\s*(활동계획|결과보고|활동계획서|결과보고서)\s*$/,''); }
+function autoTitle(){ return baseName(doc.programName) + (doc.type==='result' ? ' 결과보고서' : ' 활동계획서'); }
+
+/* ── 화면 그리기 ── */
+var FIELDS = ['programName','title','date','dateEnd','timeStart','timeEnd','place','participants','manager','goal'];
+function renderAll(){
+  var isEdu = doc.type==='edu';
+  document.getElementById('planForm').style.display = isEdu ? 'none' : '';
+  document.getElementById('eduForm').style.display = isEdu ? '' : 'none';
+  if (!doc.photos) doc.photos = [];
+  if (!doc.attachments) doc.attachments = [];
+  if (isEdu){
+    document.getElementById('photoCard').style.display = '';
+    renderEdu(); renderPhotos(); renderAtts(); renderStatus(); renderList();
+    return;
+  }
+  FIELDS.forEach(function(f){ document.getElementById(f).value = doc[f] || ''; });
+  document.querySelectorAll('#typeSeg button').forEach(function(b){ b.classList.toggle('on', b.dataset.v===doc.type); });
+  document.getElementById('budgetTitle').textContent = doc.type==='result' ? '결산' : '소요예산';
+  document.getElementById('participants').classList.toggle('flag', !!doc.flagParticipants);
+  if (!doc.photos) doc.photos = [];
+  if (!doc.attachments) doc.attachments = [];
+  document.getElementById('photoCard').style.display = doc.type==='result' ? '' : 'none';
+  renderPreview(); renderBlocks(); renderBudget(); renderPhotos(); renderAtts(); renderStatus(); renderList();
+}
+function renderPreview(){
+  var t = HwpxGen.dateText(doc);
+  document.getElementById('datePreview').textContent = t ? '→ 보고서에는 「' + t + '」 로 들어가요' : '';
+}
+function renderStatus(){
+  var s = doc.id ? typeName(doc.type) + ' · ' + (dirty?'저장 안 됨 ●':'저장됨') : '새 보고서' + (dirty?' · 저장 안 됨 ●':'');
+  document.getElementById('status').textContent = s;
+}
+function markDirty(){ dirty = true; renderStatus(); }
+
+FIELDS.forEach(function(f){
+  document.getElementById(f).addEventListener('input', function(e){
+    doc[f] = e.target.value;
+    if (f==='title') doc.titleAuto = !e.target.value;
+    if (f==='programName' && doc.titleAuto){ doc.title = autoTitle(); document.getElementById('title').value = doc.title; }
+    if (f==='participants' && doc.flagParticipants){ doc.flagParticipants=false; e.target.classList.remove('flag'); }
+    if (/date|time/.test(f)) renderPreview();
+    markDirty();
+  });
+});
+document.querySelectorAll('#typeSeg button').forEach(function(b){
+  b.onclick = function(){ doc.type = b.dataset.v; if (doc.titleAuto) doc.title = autoTitle(); markDirty(); renderAll(); };
+});
+document.querySelectorAll('#filter button').forEach(function(b){
+  b.onclick = function(){ filterType = b.dataset.v; document.querySelectorAll('#filter button').forEach(function(x){x.classList.toggle('on',x===b);}); renderList(); };
+});
+
+/* ── 내용 블록 ── */
+function el(tag, attrs, kids){
+  var e = document.createElement(tag);
+  for (var k in (attrs||{})) { if (k==='on') for (var ev in attrs.on) e.addEventListener(ev, attrs.on[ev]); else if (k==='text') e.textContent = attrs[k]; else e.setAttribute(k, attrs[k]); }
+  (kids||[]).forEach(function(c){ if (c) e.appendChild(c); });
+  return e;
+}
+function autoGrow(t){ t.style.height='auto'; t.style.height = (t.scrollHeight+2)+'px'; }
+function ta(val, onInput, rows){
+  var t = el('textarea', {rows: rows||1}); t.value = val||'';
+  t.addEventListener('input', function(){ onInput(t.value); autoGrow(t); markDirty(); });
+  setTimeout(function(){ autoGrow(t); });
+  return t;
+}
+function blockKey(b){ return b.kind==='table' ? b.preset : b.kind; }
+function renderBlocks(){
+  var box = document.getElementById('blocks'); box.innerHTML = '';
+  doc.blocks.forEach(function(b, i){
+    var head = el('div', {class:'bh'}, [
+      el('b', {text: BLOCK_NAMES[blockKey(b)] || '블록'}), el('span', {class:'sp'}),
+      el('button', {class:'sm ghost', title:'위로', on:{click:function(){ moveBlock(i,-1); }}, text:'▲'}),
+      el('button', {class:'sm ghost', title:'아래로', on:{click:function(){ moveBlock(i,1); }}, text:'▼'}),
+      el('button', {class:'sm ghost del', title:'삭제', on:{click:function(){ if(confirm('이 블록을 지울까요?')){ doc.blocks.splice(i,1); markDirty(); renderBlocks(); } }}, text:'✕'})
+    ]);
+    var body;
+    if (b.kind==='heading') {
+      body = el('input', {placeholder:'예: 세부진행내용'}); body.value = b.text||'';
+      body.addEventListener('input', function(){ b.text = body.value; markDirty(); });
+    } else if (b.kind==='text') {
+      body = ta(b.text, function(v){ b.text = v; }, 3);
+    } else {
+      body = tableEditor(b);
+    }
+    box.appendChild(el('div', {class:'blk' + (b.kind==='heading'?' head':'')}, [head, body]));
+  });
+}
+function tableEditor(b){
+  var cols = PRESETS[b.preset].cols, w = PRESETS[b.preset].w;
+  var tbl = el('table', {class:'grid'});
+  if (!b.cols || b.cols.length !== cols.length) b.cols = cols.slice();
+  var hr = el('tr'); b.cols.forEach(function(c, ci){
+    var inp = el('input', {class:'hd', title:'제목 칸도 고칠 수 있어요'}); inp.value = c;
+    inp.addEventListener('input', function(){ b.cols[ci] = inp.value; markDirty(); });
+    hr.appendChild(el('th', {style:'width:'+Math.round(w[ci]/396)+'%'}, [inp]));
+  }); hr.appendChild(el('th',{class:'x', style:'width:34px'}));
+  tbl.appendChild(hr);
+  b.rows.forEach(function(r, ri){
+    var tr = el('tr');
+    cols.forEach(function(c, ci){ tr.appendChild(el('td', {}, [ta(r[ci], function(v){ r[ci] = v; })])); });
+    tr.appendChild(el('td', {class:'x'}, [el('button', {class:'sm ghost del', title:'행 삭제', on:{click:function(){ b.rows.splice(ri,1); markDirty(); renderBlocks(); }}, text:'✕'})]));
+    tbl.appendChild(tr);
+  });
+  var add = el('button', {class:'sm', style:'margin-top:6px', on:{click:function(){
+    var nr = cols.map(function(){ return ''; });
+    if (b.preset==='roles' || b.preset==='lecturers') nr[0] = String(b.rows.length+1);
+    b.rows.push(nr); markDirty(); renderBlocks();
+  }}, text:'＋ 행 추가'});
+  return el('div', {}, [tbl, add]);
+}
+function addBlock(kind){
+  if (kind==='heading') doc.blocks.push({kind:'heading', text:''});
+  else if (kind==='text') doc.blocks.push({kind:'text', text:''});
+  else {
+    var n = PRESETS[kind].cols.length, row = []; for (var i=0;i<n;i++) row.push('');
+    if (kind==='roles'||kind==='lecturers') row[0]='1';
+    doc.blocks.push({kind:'table', preset:kind, rows:[row]});
+  }
+  markDirty(); renderBlocks();
+}
+function moveBlock(i, d){
+  var j = i + d; if (j<0 || j>=doc.blocks.length) return;
+  var t = doc.blocks[i]; doc.blocks[i] = doc.blocks[j]; doc.blocks[j] = t; markDirty(); renderBlocks();
+}
+
+/* ── 예산 ── */
+function num(v){ return Number(String(v||'').replace(/[^\d.]/g,'')) || 0; }
+function renderBudget(){
+  var box = document.getElementById('budget'); box.innerHTML = '';
+  doc.budget.forEach(function(cat, ci){
+    var catIn = el('input', {placeholder:'구분 (예: 캠페인 진행비)'}); catIn.value = cat.category||'';
+    catIn.addEventListener('input', function(){ cat.category = catIn.value; markDirty(); });
+    var sum = el('span', {class:'sum'});
+    var tbl = el('table', {class:'bud'});
+    tbl.appendChild(el('tr', {}, ['항목','단가(원)','수량','단위','금액',''].map(function(h){ return el('th',{text:h}); })));
+    cat.items.forEach(function(it, ii){
+      var amt = el('td', {class:'amt'});
+      function upd(){ amt.textContent = HwpxGen.won(num(it.price)*num(it.qty)); updTotals(); }
+      function inp(key, ph, width){
+        var x = el('input', {placeholder:ph, style: width?('width:'+width):''}); x.value = it[key]==null?'':it[key];
+        x.addEventListener('input', function(){ it[key] = x.value; upd(); markDirty(); });
+        return el('td', {}, [x]);
+      }
+      var tr = el('tr', {}, [inp('name','예: 식비'), inp('price','15000','110px'), inp('qty','4','70px'), inp('unit','명','80px'), amt,
+        el('td', {}, [el('button',{class:'sm ghost del', on:{click:function(){ cat.items.splice(ii,1); markDirty(); renderBudget(); }}, text:'✕'})])]);
+      tbl.appendChild(tr); upd();
+    });
+    box.appendChild(el('div', {class:'cat'}, [
+      el('div', {class:'ch'}, [catIn, sum, el('button',{class:'sm ghost del', title:'구분 삭제', on:{click:function(){ if(confirm('이 구분을 지울까요?')){ doc.budget.splice(ci,1); markDirty(); renderBudget(); } }}, text:'✕'})]),
+      tbl,
+      el('button', {class:'sm', style:'margin-top:6px', on:{click:function(){ cat.items.push({name:'',price:'',qty:'',unit:''}); markDirty(); renderBudget(); }}, text:'＋ 항목'})
+    ]));
+    cat._sumEl = sum;
+  });
+  updTotals();
+}
+function cleanBudget(){
+  return doc.budget.map(function(c){ return {category:c.category, items:c.items.map(function(it){ return {name:it.name, price:num(it.price), qty:num(it.qty), unit:it.unit}; })}; });
+}
+function updTotals(){
+  var B = HwpxGen.budgetCalc(cleanBudget());
+  doc.budget.forEach(function(c){ if (c._sumEl) c._sumEl.textContent = '소계 ' + HwpxGen.won(c.items.reduce(function(s,it){ return s + num(it.price)*num(it.qty); },0)); });
+  document.getElementById('budgetTotal').textContent = '계 ' + HwpxGen.won(B.total);
+}
+function addCat(){ doc.budget.push({category:'', items:[{name:'',price:'',qty:'',unit:''}]}); markDirty(); renderBudget(); }
+
+/* ── 저장된 목록 ── */
+function loadList(){
+  google.script.run.withSuccessHandler(function(r){ saved = r; renderList(); })
+    .withFailureHandler(fail).listReports();
+}
+function renderList(){
+  var box = document.getElementById('list'), q = document.getElementById('q').value.trim();
+  var arr = saved.filter(function(s){ return (!filterType || s.type===filterType) && (!q || (s.title+s.programName).indexOf(q) >= 0); });
+  box.innerHTML = '';
+  if (!arr.length){ box.appendChild(el('div',{class:'empty', text: saved.length ? '찾는 보고서가 없어요' : '아직 저장된 보고서가 없어요'})); return; }
+  arr.forEach(function(s){
+    var isRes = s.type==='결과보고서', isEdu = s.type==='장애이해교육';
+    var acts = el('div', {class:'acts'}, [
+      el('button', {class:'sm', title:'날짜만 비우고 똑같이 복사해서 새로 써요', on:{click:function(e){ e.stopPropagation(); openReport(s.id, 'copy'); }}, text:'복사해서 새로'}),
+      (isRes || isEdu) ? null : el('button', {class:'sm', on:{click:function(e){ e.stopPropagation(); openReport(s.id, 'toResult'); }}, text:'→ 결과보고서 만들기'}),
+      el('button', {class:'sm ghost del', on:{click:function(e){ e.stopPropagation(); delReport(s); }}, text:'삭제'})
+    ]);
+    var item = el('div', {class:'item' + (doc && doc.id===s.id ? ' on':'' ), on:{click:function(){ openReport(s.id); }}}, [
+      el('div', {class:'t', text: s.title || s.programName || '(제목 없음)'}),
+      el('div', {class:'m'}, [el('span',{class:'tag'+(isRes?' res':isEdu?' edu':''), text: isRes?'결과':isEdu?'교육':'계획'}), document.createTextNode((s.date||'날짜 없음') + ' · 수정 ' + s.updated)]),
+      acts
+    ]);
+    box.appendChild(item);
+  });
+}
+function openReport(id, mode){
+  if (dirty && !confirm('지금 쓰던 내용이 저장되지 않았어요. 그래도 열까요?')) return;
+  toast('불러오는 중…');
+  google.script.run.withSuccessHandler(function(d){
+    if (mode==='copy'){ delete d.id; d.date=''; d.dateEnd=''; d.titleAuto = true; d.title = ''; d.photos = [];
+      if (d.type==='edu'){ d.dates = ['']; d.evaluation = ''; } }
+    if (mode==='toResult') d = toResult(d);
+    doc = d; if (doc.titleAuto==null) doc.titleAuto = false;
+    if (doc.type!=='edu' && (doc.titleAuto || !doc.title)){ doc.titleAuto = true; doc.title = autoTitle(); }
+    dirty = !!mode; renderAll();
+    toast(mode==='toResult' ? '결과보고서로 바꿨어요. 참여인원·진행평가·향후 계획·결산을 확인해주세요.' : mode==='copy' ? '복사했어요. 날짜와 바뀐 내용만 고쳐주세요.' : '불러왔어요.', 3500);
+    window.scrollTo(0,0);
+  }).withFailureHandler(fail).getReport(id);
+}
+function toResult(d){
+  d.sourcePlanId = d.id; delete d.id;
+  d.type = 'result';
+  d.programName = String(d.programName||'').replace(/활동계획\s*$/, '결과보고');
+  d.titleAuto = true;
+  d.flagParticipants = true;
+  d.photos = [];
+  var bl = d.blocks, idx = -1;
+  for (var i=0;i<bl.length;i++) if (bl[i].kind==='heading' && /평가방법|평가 방법/.test(bl[i].text)) { idx = i; break; }
+  var add = [{kind:'heading', text:' 진행평가'}, {kind:'text', text:''}, {kind:'heading', text:' 향후 계획'}, {kind:'text', text:''}];
+  if (idx >= 0){
+    var cnt = (bl[idx+1] && bl[idx+1].kind==='text') ? 2 : 1;
+    bl.splice.apply(bl, [idx, cnt].concat(add));
+  } else bl.push.apply(bl, add);
+  return d;
+}
+function delReport(s){
+  if (!confirm('「' + (s.title||s.programName) + '」 을(를) 삭제할까요? 되돌릴 수 없어요.')) return;
+  google.script.run.withSuccessHandler(function(){ if (doc.id===s.id){ delete doc.id; dirty=true; renderStatus(); } loadList(); toast('삭제했어요.'); })
+    .withFailureHandler(fail).deleteReport(s.id);
+}
+
+/* ── 저장 / 내려받기 ── */
+function payload(){
+  var d = JSON.parse(JSON.stringify(doc, function(k,v){ return k==='_sumEl' ? undefined : v; }));
+  if (d.type==='edu'){
+    d.dates = (d.dates||[]).filter(Boolean); if (!d.dates.length) d.dates = [''];
+    d.date = d.dates[0] || ''; d.title = eduTitle(d);
+    return d;
+  }
+  d.budget = cleanBudget();
+  if (!d.title) d.title = autoTitle();
+  return d;
+}
+function save(cb){
+  if (!doc.programName){ toast('프로그램명을 먼저 써주세요.'); document.getElementById('programName').focus(); return; }
+  var d = payload();
+  google.script.run.withSuccessHandler(function(r){
+    doc.id = r.id; dirty = false; renderStatus(); loadList(); toast('저장했어요.');
+    if (cb) cb();
+  }).withFailureHandler(fail).saveReport(d);
+}
+var tplCache = {};
+function getTpl(cb, kind){
+  kind = kind || 'plan';
+  if (tplCache[kind]) return cb(tplCache[kind]);
+  google.script.run.withSuccessHandler(function(b){ tplCache[kind] = b; cb(b); }).withFailureHandler(fail).getTemplate(kind);
+}
+function neededImages(d){
+  var ids = [];
+  ((d.type==='result' || d.type==='edu') ? (d.photos||[]) : []).forEach(function(p){ ids.push(p.fileId); });
+  (d.attachments||[]).forEach(function(a){ (a.images||[]).forEach(function(im){ ids.push(im.fileId); }); });
+  return ids.filter(function(x, i){ return x && ids.indexOf(x)===i; });
+}
+function dimsOf(id){
+  var all = (doc.photos||[]).slice();
+  (doc.attachments||[]).forEach(function(a){ all = all.concat(a.images||[]); });
+  for (var i=0;i<all.length;i++) if (all[i].fileId===id) return all[i];
+  return {w:0, h:0};
+}
+function ensureImages(ids, cb){
+  var miss = ids.filter(function(id){ return !imgCache[id]; });
+  if (!miss.length) return cb();
+  var left = miss.length;
+  miss.forEach(function(id){
+    google.script.run.withSuccessHandler(function(b64){
+      var dm = dimsOf(id); imgCache[id] = b64 ? {b64: b64, w: dm.w, h: dm.h} : null; if (--left===0) cb();
+    }).withFailureHandler(function(e){ imgCache[id] = null; if (--left===0) cb(); }).getImage(id);
+  });
+}
+function download(){
+  save(function(){
+    toast('한글 파일 만드는 중…', 20000);
+    var d = payload();
+    ensureImages(neededImages(d), function(){
+      var isEdu = d.type==='edu';
+      getTpl(function(b64){
+        var imgs = {}; for (var k in imgCache) if (imgCache[k]) imgs[k] = imgCache[k];
+        JSZip.loadAsync(b64, {base64:true}).then(function(z){
+          return isEdu ? EduGen.buildZip(z, d, imgs) : HwpxGen.buildZip(z, d, imgs);
+        }).then(function(z){
+          return z.generateAsync({type:'blob', compression:'DEFLATE', mimeType:'application/hwp+zip'});
+        }).then(function(blob){
+          var base = isEdu ? '장애이해교육 결과보고서_' + (d.date || '') + (((d.attendees||[])[0]||{}).names ? '_' + String(d.attendees[0].names).split('\n')[0].slice(0,20) : '') : (doc.title || autoTitle());
+          var name = base.replace(/[\\/:*?"<>|]/g,'_') + '.hwpx';
+          var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
+          document.body.appendChild(a); a.click(); a.remove();
+          toast('내려받았어요: ' + name, 3000);
+        }).catch(fail);
+      }, isEdu ? 'edu' : 'plan');
+    });
+  });
+}
+
+/* ── 사진 올리기 (줄여서 구글 드라이브에 저장) ── */
+var imgCache = {};
+function shrink(file, cb){
+  var fr = new FileReader();
+  fr.onload = function(){
+    var im = new Image();
+    im.onload = function(){
+      var M = 1600, w = im.width, h = im.height, s = Math.min(1, M / Math.max(w, h));
+      w = Math.round(w*s); h = Math.round(h*s);
+      var c = document.createElement('canvas'); c.width = w; c.height = h;
+      var g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0,0,w,h); g.drawImage(im, 0, 0, w, h);
+      cb({b64: c.toDataURL('image/jpeg', 0.85).split(',')[1], w: w, h: h});
+    };
+    im.onerror = function(){ fail('「' + file.name + '」은(는) 열 수 없는 사진 형식이에요. 아이폰 사진(HEIC)이면 JPG로 바꾸거나, 사진을 한 번 열어 캡처해서 올려주세요.'); cb(null); };
+    im.src = fr.result;
+  };
+  fr.readAsDataURL(file);
+}
+function uploadTo(input, list, rerender){
+  var files = Array.prototype.slice.call(input.files); input.value = '';
+  if (!files.length) return;
+  var left = files.length; toast('사진 올리는 중… (' + left + '장)', 60000);
+  files.forEach(function(f){
+    shrink(f, function(r){
+      if (!r){ if (--left===0) toast('완료', 800); return; }
+      google.script.run.withSuccessHandler(function(id){
+        imgCache[id] = r; list.push({fileId: id, w: r.w, h: r.h, name: f.name});
+        markDirty(); rerender();
+        if (--left===0) toast('사진을 올렸어요.');
+      }).withFailureHandler(function(e){ fail(e); --left; }).saveImage(r.b64, f.name);
+      toast('사진 올리는 중… (' + left + '장 남음)', 60000);
+    });
+  });
+}
+function thumbs(box, list, rerender){
+  box.innerHTML = '';
+  list.forEach(function(p, i){
+    var t = el('div', {class:'thumb'});
+    if (imgCache[p.fileId]) t.appendChild(el('img', {src:'data:image/jpeg;base64,' + imgCache[p.fileId].b64}));
+    else { t.textContent = '불러오는 중…'; ensureImages([p.fileId], rerender); }
+    t.appendChild(el('button', {class:'rm', title:'빼기', on:{click:function(){ list.splice(i,1); markDirty(); rerender(); }}, text:'✕'}));
+    t.appendChild(el('div', {class:'mv'}, [
+      el('button', {title:'앞으로', on:{click:function(){ if(i>0){ var x=list[i]; list[i]=list[i-1]; list[i-1]=x; markDirty(); rerender(); } }}, text:'◀'}),
+      el('button', {title:'뒤로', on:{click:function(){ if(i<list.length-1){ var x=list[i]; list[i]=list[i+1]; list[i+1]=x; markDirty(); rerender(); } }}, text:'▶'})]));
+    box.appendChild(t);
+  });
+}
+function renderPhotos(){ thumbs(document.getElementById('photos'), doc.photos, renderPhotos); }
+
+/* ── 첨부 자료 ── */
+function addAtt(){ doc.attachments.push({title:'', text:'', images:[]}); markDirty(); renderAtts(); }
+function renderAtts(){
+  var box = document.getElementById('atts'); box.innerHTML = '';
+  doc.attachments.forEach(function(a, i){
+    var t = el('input', {placeholder:'제목 (예: 홍보 포스터, SNS용 카드뉴스)'}); t.value = a.title || '';
+    t.addEventListener('input', function(){ a.title = t.value; markDirty(); });
+    var th = el('div', {class:'thumbs'}); thumbs(th, a.images, renderAtts);
+    var file = el('input', {type:'file', accept:'image/*', multiple:'multiple'});
+    file.addEventListener('change', function(){ uploadTo(file, a.images, renderAtts); });
+    box.appendChild(el('div', {class:'att'}, [
+      el('div', {class:'bh', style:'display:flex;gap:6px;align-items:center;margin-bottom:6px'}, [el('b',{text:'첨부 ' + (i+1)}), el('span',{style:'flex:1'}),
+        el('button', {class:'sm ghost', on:{click:function(){ if(i>0){ var x=doc.attachments[i]; doc.attachments[i]=doc.attachments[i-1]; doc.attachments[i-1]=x; markDirty(); renderAtts(); } }}, text:'▲'}),
+        el('button', {class:'sm ghost del', on:{click:function(){ if(confirm('이 첨부 자료를 뺄까요?')){ doc.attachments.splice(i,1); markDirty(); renderAtts(); } }}, text:'✕'})]),
+      t, th,
+      el('label', {class:'upl'}, [document.createTextNode('＋ 그림 올리기'), file]),
+      el('label', {text:'설명 글 (없어도 돼요)'}), ta(a.text, function(v){ a.text = v; }, 2)
+    ]));
+  });
+}
+
+/* ── 미리보기 · 인쇄 ── */
+function h(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function rich(s){ return h(s).replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>'); }
+function pvLines(text){
+  return String(text||'').split('\n').map(function(ln){
+    var m;
+    if ((m = ln.match(/^\s*-\s+(.*)$/)) || (m = ln.match(/^\s*-$/))) return '<p class="ln dash">- ' + rich(m[1]||'') + '</p>';
+    if ((m = ln.match(/^\s*[*•·]\s+(.*)$/))) return '<p class="ln sub">• ' + rich(m[1]) + '</p>';
+    return '<p class="ln">' + (rich(ln) || '&nbsp;') + '</p>';
+  }).join('');
+}
+function imgTag(id, cls){ return imgCache[id] ? '<img class="' + (cls||'') + '" src="data:image/jpeg;base64,' + imgCache[id].b64 + '">' : ''; }
+function previewHtml(d){
+  var isRes = d.type==='result', o = '<div class="pg"><div class="ttl">' + h(d.title || autoTitle()) + '</div><table class="main">';
+  o += '<tr><td class="lb">프로그램명</td><td colspan="3">' + h(d.programName) + '</td></tr>';
+  o += '<tr><td class="lb">일 시</td><td>' + h(HwpxGen.dateText(d)) + '</td><td class="lb" style="width:11%">장 소</td><td>' + h(d.place).replace(/\n/g,'<br>') + '</td></tr>';
+  o += '<tr><td class="lb">참 여 인 원</td><td>' + h(d.participants).replace(/\n/g,'<br>') + '</td><td class="lb">담 당 자</td><td>' + h(d.manager) + '</td></tr>';
+  if (String(d.goal||'').trim()) o += '<tr><td class="lb">프로그램 목표</td><td colspan="3">' + String(d.goal).split('\n').filter(function(l){return l.trim();}).map(function(l){ return '<p class="ln dash">- ' + rich(l.replace(/^\s*-\s+/,'')) + '</p>'; }).join('') + '</td></tr>';
+  var body = (d.blocks||[]).map(function(b){
+    if (b.kind==='heading') return '<p class="ln">▪' + h(b.text) + '</p>';
+    if (b.kind==='text') return pvLines(b.text);
+    var pre = PRESETS[b.preset], rows = (b.rows||[]).filter(function(r){ return r.some(function(x){ return String(x||'').trim(); }); });
+    var hc = (b.cols && b.cols.length === pre.cols.length) ? b.cols : pre.cols;
+    return '<table class="in"><tr>' + hc.map(function(c, i){ return '<th style="width:' + Math.round(pre.w[i]/396) + '%">' + c + '</th>'; }).join('') + '</tr>' +
+      rows.map(function(r){ return '<tr>' + pre.cols.map(function(_, i){ return pre.align[i]==='l' ? '<td>' + pvLines(r[i]) + '</td>' : '<td class="c">' + h(r[i]).replace(/\n/g,'<br>') + '</td>'; }).join('') + '</tr>'; }).join('') + '</table>';
+  }).join('');
+  o += '<tr><td class="lb">내용</td><td colspan="3" style="vertical-align:top">' + body + '</td></tr>';
+  var B = HwpxGen.budgetCalc(d.budget);
+  if (B.cats.length){
+    o += '<tr><td class="lb">' + (isRes?'결산':'소요예산') + '</td><td colspan="3" style="padding:0"><table><tr><th style="width:18%;background:#F2F2F2">구분</th><th style="background:#F2F2F2">산출내역</th><th style="width:18%;background:#F2F2F2">금액</th></tr>';
+    B.cats.forEach(function(c){
+      o += '<tr><td class="c">' + h(c.category) + '</td><td class="r">' + c.items.map(function(it){ return '<b>' + h(it.name) + '</b> ' + HwpxGen.won(it.price).replace('원','') + '원×' + it.qty + h(it.unit||'') + '=' + HwpxGen.won(HwpxGen.itemAmount(it)); }).join('<br>') + '</td><td class="c">' + HwpxGen.won(c.total) + '</td></tr>';
+    });
+    o += '<tr><th colspan="2" style="background:#F2F2F2">계</th><th>' + HwpxGen.won(B.total) + '</th></tr></table></td></tr>';
+  }
+  if (isRes){
+    var ps = d.photos || [], cells = '';
+    for (var i = 0; i < Math.max(2, ps.length); i += 2)
+      cells += '<tr>' + (i===0 ? '<td class="lb" rowspan="' + Math.ceil(Math.max(2, ps.length)/2) + '">활동사진</td>' : '') +
+        '<td class="ph" colspan="2" style="height:200px;width:41%">' + (ps[i] ? imgTag(ps[i].fileId) : '') + '</td><td class="ph">' + (ps[i+1] ? imgTag(ps[i+1].fileId) : '') + '</td></tr>';
+    o += cells;
+  }
+  o += '</table></div>';
+  (d.attachments||[]).forEach(function(a){
+    if (!a.title && !a.text && !(a.images||[]).length) return;
+    o += '<div class="pg"><table class="main"><tr><td class="lb" style="width:auto">' + h(a.title || '첨부') + '</td></tr><tr><td>' +
+      (a.images||[]).map(function(im){ return imgTag(im.fileId, 'attimg'); }).join('') + pvLines(a.text) + '</td></tr></table></div>';
+  });
+  return o;
+}
+function previewEduHtml(d){
+  var lb = function(t){ return '<td class="lb">' + t + '</td>'; };
+  var att = (d.attendees||[]).filter(function(a){ return a.group || a.count || a.names; });
+  var o = '<div class="pg edu"><table class="main">';
+  o += '<tr><td colspan="6" class="eduttl">장애이해교육 결과보고서</td></tr>';
+  o += '<tr>' + lb('프로그램명') + '<td colspan="5" class="c">' + h(d.programName) + '</td></tr>';
+  o += '<tr>' + lb('목 표') + '<td colspan="5" class="c">' + h(d.goal).replace(/\n/g,'<br>') + '</td></tr>';
+  o += '<tr>' + lb('일 시') + (String(d.time||'').trim() ? '<td class="c nw">' + h(EduGen.datesText(d)).replace(/\n/g,'<br>') + '</td><td class="c">' + h(d.time).replace(/\n/g,'<br>') + '</td>' : '<td class="c nw" colspan="2">' + h(EduGen.datesText(d)).replace(/\n/g,'<br>') + '</td>') + lb('장 소') + '<td colspan="2" class="c">' + h(d.place).replace(/\n/g,'<br>') + '</td></tr>';
+  o += '<tr><td class="lb" rowspan="' + (att.length+1) + '">참 석 자<br>(총' + EduGen.total(d) + '명)</td><td class="th2">구분</td><td class="th2">인원</td><td class="th2" colspan="3">이름</td></tr>';
+  att.forEach(function(a){ o += '<tr><td class="c">' + h(a.group) + '</td><td class="c">' + (a.count!==''&&a.count!=null ? h(a.count) + '명' : '') + '</td><td colspan="3" class="c">' + h(a.names).replace(/\n/g,'<br>') + '</td></tr>'; });
+  var sched = '<p class="ln">2. 일정</p>' + (d.schedules||[]).map(function(sc){
+    var rows = (sc.rows||[]).filter(function(r){ return String(r[0]||'').trim() || String(r[1]||'').trim(); });
+    return (sc.label ? '<p class="ln">' + h(sc.label) + '</p>' : '') + '<table class="in"><tr><th style="width:39%">시간</th><th>내용</th></tr>' +
+      rows.map(function(r){ return '<tr><td class="c">' + h(r[0]).replace(/\n/g,'<br>') + '</td><td class="c">' + h(r[1]).replace(/\n/g,'<br>') + '</td></tr>'; }).join('') + '</table>';
+  }).join('');
+  o += '<tr><td class="lb">일 정<br>및<br>내 용</td><td colspan="3" style="vertical-align:top;border-right:0"><p class="ln"> 1. <b>주요내용</b></p>' + pvLines(d.topics) + '</td><td colspan="2" style="vertical-align:top;border-left:0">' + sched + '</td></tr>';
+  o += '<tr>' + lb('평 가') + '<td colspan="5" style="vertical-align:top">' + String(d.evaluation||'').split('\n').map(function(l){ return l.trim() ? '<p class="ln dash" style="text-align:justify">- ' + rich(l.replace(/^\s*-\s+/,'')) + '</p>' : '<p class="ln">&nbsp;</p>'; }).join('') + '</td></tr>';
+  var ps = d.photos || [];
+  for (var i = 0; i < Math.max(2, ps.length); i += 2)
+    o += '<tr>' + (i===0 ? '<td class="lb" rowspan="' + Math.ceil(Math.max(2, ps.length)/2) + '">활동사진</td>' : '') +
+      '<td class="ph" colspan="3" style="height:200px;width:42%">' + (ps[i] ? imgTag(ps[i].fileId) : '') + '</td><td class="ph" colspan="2">' + (ps[i+1] ? imgTag(ps[i+1].fileId) : '') + '</td></tr>';
+  o += '</table><div class="pfoot">종로장애인복지관</div></div>';
+  (d.attachments||[]).forEach(function(a){
+    if (!a.title && !a.text && !(a.images||[]).length) return;
+    o += '<div class="pg"><table class="main"><tr><td class="lb" style="width:auto">' + h(a.title || '첨부') + '</td></tr><tr><td>' +
+      (a.images||[]).map(function(im){ return imgTag(im.fileId, 'attimg'); }).join('') + pvLines(a.text) + '</td></tr></table><div class="pfoot">종로장애인복지관</div></div>';
+  });
+  return o + '<div class="pfoot-print" style="display:none">종로장애인복지관</div>';
+}
+function openPreview(){
+  var d = payload();
+  toast('미리보기 준비 중…', 20000);
+  ensureImages(neededImages(d), function(){
+    var pv = document.getElementById('pv');
+    pv.innerHTML = d.type==='edu' ? previewEduHtml(d) : previewHtml(d);
+    // 인쇄할 때 바탕색이 빠지지 않도록 회색 칸에 그림(SVG)으로 색을 깔아줌
+    pv.querySelectorAll('td, th').forEach(function(c){
+      var bg = getComputedStyle(c).backgroundColor;
+      if (!bg || bg === 'rgba(0, 0, 0, 0)' || bg === 'transparent' || bg === 'rgb(255, 255, 255)') return;
+      c.insertAdjacentHTML('afterbegin', '<svg class="bg" preserveAspectRatio="none" viewBox="0 0 10 10"><rect width="10" height="10" fill="' + bg + '"/></svg>');
+    });
+    document.getElementById('pvWrap').style.display = 'block';
+    toast('', 1);
+  });
+}
+function closePreview(){ document.getElementById('pvWrap').style.display = 'none'; }
+
+function toast(msg, ms){
+  var t = document.getElementById('toast'); t.textContent = msg; t.style.display = 'block';
+  clearTimeout(toast._t); toast._t = setTimeout(function(){ t.style.display='none'; }, ms||1800);
+}
+function fail(e){
+  var m = String(e && e.message || e || '');
+  var tip = '';
+  if (/authoriz|권한|permission|DriveApp/i.test(m)) tip = '<br><b>해결:</b> Apps Script 편집기에서 위쪽 함수 목록에서 <b>setup</b>을 고르고 ▶실행 → 권한 허용 후 다시 해보세요.';
+  else if (/not found|찾을 수 없|saveImage|getImage/i.test(m)) tip = '<br><b>해결:</b> 코드를 바꾼 뒤 [배포 → 배포 관리 → 편집 → 새 버전]으로 다시 배포했는지 확인해주세요.';
+  var b = document.getElementById('errbox');
+  b.innerHTML = '⚠️ 문제가 생겼어요: ' + m.replace(/</g,'&lt;') + tip + '<div style="text-align:right;margin-top:6px"><button class="sm" onclick="this.parentNode.parentNode.style.display=\'none\'">닫기</button></div>';
+  b.style.display = 'block';
+  toast('', 1);
+}
+function newDoc(){
+  if (dirty && !confirm('지금 쓰던 내용이 저장되지 않았어요. 새로 시작할까요?')) return;
+  doc = blankPlan(); dirty = false; renderAll();
+}
+window.addEventListener('beforeunload', function(e){ if (dirty){ e.preventDefault(); e.returnValue=''; } });
+
+doc = blankPlan(); renderAll(); loadList();
+</script>
+</body>
+</html>

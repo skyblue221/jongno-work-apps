@@ -1,0 +1,1250 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    :root {
+      --bg: #f5f6f8;
+      --panel: #ffffff;
+      --text: #202124;
+      --sub: #5f6368;
+      --line: #d8dce1;
+      --primary: #2457a7;
+      --primary-dark: #17468d;
+      --soft: #eef3fb;
+      --ok: #176b36;
+      --ok-bg: #e8f4ec;
+      --warn: #8a5300;
+      --warn-bg: #fff4e0;
+      --err: #b3261e;
+      --err-bg: #fcebea;
+    }
+
+    * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Arial, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+      font-size: 15px;
+    }
+
+    header {
+      background: var(--panel);
+      border-bottom: 1px solid var(--line);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    .top {
+      max-width: 1040px;
+      margin: 0 auto;
+      padding: 14px 16px 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .top h1 { margin: 0; font-size: 20px; }
+    .who { color: var(--sub); font-size: 14px; }
+
+    nav {
+      max-width: 1040px;
+      margin: 0 auto;
+      padding: 10px 12px 0;
+      display: flex;
+      gap: 4px;
+      overflow-x: auto;
+    }
+
+    nav button {
+      flex: 0 0 auto;
+      border: 0;
+      background: none;
+      padding: 10px 12px;
+      font-size: 15px;
+      color: var(--sub);
+      border-bottom: 3px solid transparent;
+      cursor: pointer;
+      font-family: inherit;
+    }
+
+    nav button.on { color: var(--primary); border-bottom-color: var(--primary); font-weight: 700; }
+    nav .badge {
+      display: inline-block;
+      min-width: 20px;
+      padding: 1px 6px;
+      margin-left: 4px;
+      border-radius: 10px;
+      background: var(--err);
+      color: #fff;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    main { max-width: 1040px; margin: 0 auto; padding: 16px 12px 60px; }
+
+    .card {
+      background: var(--panel);
+      border-radius: 14px;
+      box-shadow: 0 2px 10px rgba(0,0,0,.05);
+      padding: 18px;
+      margin-bottom: 14px;
+    }
+
+    h2 { margin: 0 0 12px; font-size: 18px; }
+    h3 { margin: 18px 0 8px; font-size: 16px; }
+    .hint { color: var(--sub); font-size: 14px; line-height: 1.6; margin: 0 0 12px; }
+
+    .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+
+    input, select, textarea {
+      font-family: inherit;
+      font-size: 15px;
+      padding: 9px 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      min-height: 42px;
+    }
+
+    textarea { width: 100%; min-height: 70px; }
+    label.f { display: block; font-weight: 700; font-size: 14px; margin: 10px 0 5px; }
+
+    button.b {
+      border: 0;
+      border-radius: 8px;
+      padding: 10px 14px;
+      min-height: 42px;
+      font-family: inherit;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      background: var(--primary);
+      color: #fff;
+    }
+    button.b:hover:not(:disabled) { background: var(--primary-dark); }
+    button.b.gray { background: #e7e9ec; color: var(--text); }
+    button.b.soft { background: var(--soft); color: var(--primary-dark); }
+    button.b.red { background: var(--err); }
+    button.b.sm { min-height: 34px; padding: 6px 10px; font-size: 14px; }
+    button.b:disabled { opacity: .5; cursor: not-allowed; }
+
+    .msg {
+      display: none;
+      position: fixed;
+      left: 50%;
+      bottom: 18px;
+      transform: translateX(-50%);
+      max-width: 92vw;
+      padding: 12px 16px;
+      border-radius: 10px;
+      font-weight: 700;
+      z-index: 50;
+      box-shadow: 0 6px 20px rgba(0,0,0,.15);
+    }
+    .msg.ok { display: block; background: var(--ok-bg); color: var(--ok); }
+    .msg.err { display: block; background: var(--err-bg); color: var(--err); }
+    .msg.info { display: block; background: var(--soft); color: var(--primary-dark); }
+
+    .gate { max-width: 520px; margin: 60px auto; text-align: center; line-height: 1.7; }
+
+    .item {
+      display: block;
+      width: 100%;
+      text-align: left;
+      border: 1px solid var(--line);
+      background: #fff;
+      border-radius: 10px;
+      padding: 12px 14px;
+      margin-bottom: 8px;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 15px;
+    }
+    .item:hover { background: #f7f9fc; }
+    .item .t { display: flex; justify-content: space-between; gap: 10px; font-weight: 700; }
+    .item .m { color: var(--sub); font-size: 13px; margin-top: 4px; }
+    .item .go { float: right; margin-top: 2px; font-size: 13px; font-weight: 700; color: var(--primary); background: var(--soft); border-radius: 8px; padding: 4px 10px; }
+    tr.click { cursor: pointer; }
+    tr.click:hover td { background: #f7f9fc; }
+    tr.sub td { background: #fafbfc; }
+    .status-line { background: #f6f7f9; border-radius: 10px; padding: 10px 12px; margin: 10px 0; line-height: 1.8; font-size: 14px; }
+
+    .chip {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 12px;
+      font-weight: 700;
+      background: #eceff3;
+      color: var(--sub);
+      margin-left: 4px;
+      white-space: nowrap;
+    }
+    .chip.ok { background: var(--ok-bg); color: var(--ok); }
+    .chip.warn { background: var(--warn-bg); color: var(--warn); }
+    .chip.err { background: var(--err-bg); color: var(--err); }
+    .chip.blue { background: var(--soft); color: var(--primary-dark); }
+
+    table.t { width: 100%; border-collapse: collapse; font-size: 14px; }
+    table.t th, table.t td { border-bottom: 1px solid #eceff3; padding: 8px 6px; text-align: left; vertical-align: middle; }
+    table.t th { background: #f6f7f9; font-size: 13px; color: var(--sub); position: sticky; top: 0; }
+    .scroll { overflow-x: auto; }
+
+    .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 6px; }
+    .stat { background: #f6f7f9; border-radius: 10px; padding: 12px; }
+    .stat .n { font-size: 24px; font-weight: 700; }
+    .stat .l { color: var(--sub); font-size: 13px; }
+    .stat.hot { background: var(--warn-bg); }
+
+    /* 상세 창 */
+    .overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.35);
+      z-index: 30;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      overflow-y: auto;
+      padding: 20px 10px;
+    }
+    .sheet { background: #fff; border-radius: 14px; width: 100%; max-width: 640px; padding: 20px; }
+    dl.d { display: grid; grid-template-columns: 110px 1fr; gap: 8px 10px; margin: 0 0 12px; }
+    dl.d dt { color: var(--sub); font-size: 14px; }
+    dl.d dd { margin: 0; font-weight: 600; word-break: break-all; }
+    .sigimg { max-width: 260px; max-height: 100px; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+
+    .timebox { background: var(--soft); border-radius: 10px; padding: 12px; margin: 12px 0; }
+    .timebox .row input { width: 80px; }
+    .timebox button.b.soft { background: #fff; border: 1px solid #c9d6ec; }
+
+    .canvas-wrap { width: 100%; max-width: 520px; height: 180px; border: 2px solid #555; border-radius: 10px; background: #fff; }
+    .canvas-wrap canvas { width: 100%; height: 100%; display: block; touch-action: none; }
+
+    .group { border: 1px solid var(--line); border-radius: 12px; padding: 12px; margin-bottom: 12px; }
+    .group-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+    .group-head strong { font-size: 16px; }
+    .check { width: 20px; height: 20px; min-height: auto; }
+
+    .empty { color: var(--sub); text-align: center; padding: 24px 10px; }
+
+    @media (max-width: 560px) {
+      dl.d { grid-template-columns: 90px 1fr; }
+      .hide-sm { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <div id="gate" class="gate">
+    <p>담당자 정보를 확인하고 있어요...</p>
+  </div>
+
+  <div id="app" hidden>
+    <header>
+      <div class="top">
+        <h1>자원봉사 활동일지</h1><div id="appBuild" class="hint">활동일지 v2 · 연결 확인 중</div>
+        <div id="who" class="who"></div>
+      </div>
+      <nav id="tabs"></nav>
+    </header>
+
+    <main>
+
+      <!-- 담당자 확인 -->
+      <section id="tab-staff" hidden>
+        <div class="card">
+          <div class="row" style="justify-content:space-between">
+            <h2 style="margin:0">담당자 확인</h2>
+            <div class="row">
+              <select id="staffScope" onchange="loadStaffQueue()" hidden>
+                <option value="mine">내 담당</option>
+                <option value="all">전체</option>
+                <option value="unassigned">담당자 미배정</option>
+              </select>
+              <button class="b gray sm" onclick="loadStaffQueue()">새로고침</button>
+            </div>
+          </div>
+          <p class="hint" id="staffHint" style="margin-top:10px"></p>
+          <div id="staffList"></div>
+        </div>
+      </section>
+
+      <!-- 팀장 확인 -->
+      <section id="tab-leader" hidden>
+        <div class="card">
+          <div class="row" style="justify-content:space-between">
+            <h2 style="margin:0">팀장 확인</h2>
+            <div class="row">
+              <label class="row" id="leaderAllWrap" hidden style="font-size:14px;color:var(--sub)">
+                <input type="checkbox" id="leaderAll" class="check" onchange="loadLeaderQueue()"> 모든 팀 보기
+              </label>
+              <button class="b gray sm" onclick="loadLeaderQueue()">새로고침</button>
+            </div>
+          </div>
+          <p class="hint" style="margin-top:10px">담당자 확인이 끝난 일지예요. 봉사자별로 묶어서 한 번에 확인할 수 있어요.</p>
+          <div id="leaderList"></div>
+          <div class="row" style="justify-content:flex-end;margin-top:6px">
+            <span id="leaderCount" class="hint" style="margin:0"></span>
+            <button class="b" id="leaderBtn" onclick="leaderApproveSelected()">선택한 일지 확인</button>
+          </div>
+          <details style="margin-top:12px">
+            <summary style="cursor:pointer;color:var(--err);font-weight:700">선택한 일지 반려하기 (담당자에게 되돌리기)</summary>
+            <p class="hint" style="margin:8px 0">반려하면 담당자 확인 단계로 돌아가요. 담당자 화면에 「팀장 반려」와 사유가 보이고, 담당자가 고쳐서 다시 확인하면 다시 팀장님께 와요.</p>
+            <textarea id="leaderReason" placeholder="반려 사유 (예: 인정시간 다시 확인해 주세요)"></textarea>
+            <button class="b red" style="margin-top:8px" onclick="leaderReturnSelected()">선택한 일지 반려</button>
+          </details>
+        </div>
+      </section>
+
+      <!-- 현황판 -->
+      <section id="tab-dash" hidden>
+        <div class="card">
+          <h2>미완료 현황</h2>
+          <div class="row" style="margin-bottom:12px">
+            <input type="date" id="dashFrom"> ~ <input type="date" id="dashTo">
+            <button class="b sm" onclick="loadDashboard()">보기</button>
+          </div>
+          <div class="row" style="margin-bottom:14px">
+            <button class="b soft sm" onclick="quickRange('dash','h1')">이번 달 1~15일</button>
+            <button class="b soft sm" onclick="quickRange('dash','h2')">이번 달 16일~말일</button>
+            <button class="b soft sm" onclick="quickRange('dash','month')">이번 달</button>
+            <button class="b soft sm" onclick="quickRange('dash','prev')">지난달</button>
+            <button class="b soft sm" onclick="quickRange('dash','all')">전체 기간</button>
+          </div>
+          <div id="dashBody"></div>
+        </div>
+      </section>
+
+      <!-- 실적 입력 -->
+      <section id="tab-input" hidden>
+        <div class="card">
+          <h2>실적 입력</h2>
+          <p class="hint">VMS·1365에 실적을 입력한 뒤 체크해 주세요. 서명이 아직 남아 있어도 먼저 체크할 수 있어요. (현황판에 '서명 나중에 받기'로 따로 모여요)</p>
+          <div class="row" style="margin-bottom:10px">
+            <input type="date" id="inputFrom"> ~ <input type="date" id="inputTo">
+            <label class="row" style="font-size:14px"><input type="checkbox" id="inputTodo" class="check" checked> 아직 안 한 것만</label>
+            <button class="b sm" onclick="loadInputList()">보기</button>
+          </div>
+          <div class="row" style="margin-bottom:14px">
+            <button class="b soft sm" onclick="quickRange('input','h1')">이번 달 1~15일</button>
+            <button class="b soft sm" onclick="quickRange('input','h2')">이번 달 16일~말일</button>
+            <button class="b soft sm" onclick="quickRange('input','prev')">지난달</button>
+          </div>
+          <div id="inputBody"></div>
+        </div>
+      </section>
+
+      <!-- 일지 출력 -->
+      <section id="tab-print" hidden>
+        <div class="card">
+          <h2>일지 출력 (PDF)</h2>
+          <p class="hint">봉사자와 기간을 고르면 종이 일지와 같은 모양으로 PDF를 만들어요. 한 봉사자가 여러 프로그램에서 활동했다면 날짜순으로 한 파일에 모여요.</p>
+
+          <label class="f">봉사자</label>
+          <div class="row">
+            <input id="printSearch" placeholder="이름 또는 연락처 뒤 4자리" style="flex:1;min-width:180px" onkeydown="if(event.key==='Enter')searchPrint()">
+            <button class="b gray sm" onclick="searchPrint()">찾기</button>
+          </div>
+          <div id="printResults" style="margin-top:8px"></div>
+          <div id="printPicked" class="hint" style="margin-top:8px">선택 안 함 → 기간 안의 <b>모든 봉사자</b>를 한 파일로 만들어요.</div>
+
+          <label class="f">기간</label>
+          <div class="row">
+            <input type="date" id="printFrom"> ~ <input type="date" id="printTo">
+          </div>
+          <div class="row" style="margin-top:8px">
+            <button class="b soft sm" onclick="quickRange('print','month')">이번 달</button>
+            <button class="b soft sm" onclick="quickRange('print','prev')">지난달</button>
+            <button class="b soft sm" onclick="quickRange('print','year')">올해</button>
+          </div>
+
+          <div style="margin-top:16px">
+            <button class="b" id="printBtn" onclick="makePdf()">일지 만들기</button>
+          </div>
+          <p class="hint" style="margin-top:12px">서명이 모두 끝난 일지는 매달 자동으로 드라이브 <b>자원봉사 활동일지 보관 › 연도 › 월</b> 폴더에도 저장돼요.</p>
+        </div>
+      </section>
+
+      <!-- 담당자 관리 -->
+      <section id="tab-staffadmin" hidden>
+        <div class="card">
+          <div class="row" style="justify-content:space-between">
+            <h2 style="margin:0">담당자 관리</h2>
+            <button class="b sm" onclick="editStaff(null)">+ 담당자 추가</button>
+          </div>
+          <p class="hint" style="margin-top:10px">기관 구글 계정 이메일로 등록하면, 그 계정으로 접속할 때 자동으로 로그인돼요. 서명은 각자 「내 정보」에서 직접 등록해요.</p>
+          <div class="scroll"><table class="t" id="staffTable"></table></div>
+          <h3 style="margin-top:22px">활동내용 추천 문구</h3><p class="hint">연결된 시트의 <b>활동내용 문구</b> 탭에서 프로그램·활동내용·사용(Y/N)을 입력하세요. 프로그램을 비우거나 *로 쓰면 공통 문구가 됩니다. Y인 문구만 봉사자에게 보여요. 봉사자는 다른 내용을 직접 쓸 수도 있어요.</p>
+        </div>
+      </section>
+
+      <!-- 내 정보 -->
+      <section id="tab-me" hidden>
+        <div class="card">
+          <h2>내 서명</h2>
+          <p class="hint">확인할 때 이 서명이 일지에 자동으로 들어가요.</p>
+          <div id="mySigNow" style="margin-bottom:10px"></div>
+          <div class="canvas-wrap"><canvas id="sigCanvas"></canvas></div>
+          <div class="row" style="margin-top:10px">
+            <button class="b" onclick="saveMySignature()">서명 저장</button>
+            <button class="b gray" onclick="sigPad.clear()">다시 쓰기</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>자리 비울 때 (대직)</h2>
+          <p class="hint">휴가 등으로 자리를 비우면 대직자와 기간을 정해 주세요. 그 기간에는 내 담당 일지가 대직자 화면에도 보이고, 알림 메일도 대직자에게 가요.</p>
+          <div class="row">
+            <select id="subName"></select>
+            <input type="date" id="subFrom"> ~ <input type="date" id="subTo">
+          </div>
+          <div class="row" style="margin-top:10px">
+            <button class="b" onclick="saveSubstitute()">저장</button>
+            <button class="b gray" onclick="clearSubstitute()">대직 해제</button>
+          </div>
+          <p id="subNow" class="hint" style="margin-top:10px"></p>
+        </div>
+
+        <div class="card">
+          <h2>내 정보</h2>
+          <dl class="d" id="myInfo"></dl>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- 일지 상세 -->
+  <div id="detail" class="overlay" hidden onclick="if(event.target===this)closeDetail()">
+    <div class="sheet">
+      <div class="row" style="justify-content:space-between">
+        <h2 style="margin:0">활동일지 확인</h2>
+        <button class="b gray sm" onclick="closeDetail()">닫기</button>
+      </div>
+      <dl class="d" id="detailGrid" style="margin-top:14px"></dl>
+
+      <div id="statusLine" class="status-line" hidden></div>
+
+      <div id="actBox">
+      <div class="timebox">
+        <div style="font-weight:700;margin-bottom:6px">인정시간</div>
+        <div class="hint" id="mealHint" style="margin-bottom:8px"></div>
+        <div class="row">
+          <input type="number" id="finalH" min="0" max="23"> 시간
+          <input type="number" id="finalM" min="0" max="59" step="5"> 분
+        </div>
+        <div class="row" style="margin-top:8px">
+          <button class="b soft sm" onclick="adjustTime(-30)">−30분</button>
+          <button class="b soft sm" onclick="adjustTime(-60)">−1시간</button>
+          <button class="b gray sm" onclick="resetTime()">원래대로</button>
+        </div>
+      </div>
+
+      <div id="reassignBox" hidden style="margin-bottom:12px">
+        <label class="f">기본 담당자 바꾸기 (관리자)</label>
+        <div class="row">
+          <select id="reassignSel"></select>
+          <button class="b gray sm" onclick="reassign()">변경</button>
+        </div>
+      </div>
+
+      <div class="row">
+        <button class="b" id="approveBtn" onclick="approve()" style="flex:1">확인 (서명)</button>
+      </div>
+
+      <details style="margin-top:14px">
+        <summary style="cursor:pointer;color:var(--err);font-weight:700">반려하기</summary>
+        <textarea id="rejectReason" placeholder="반려 사유 (예: 활동시간 확인 필요)" style="margin-top:8px"></textarea>
+        <button class="b red" style="margin-top:8px" onclick="reject()">반려</button>
+      </details>
+      </div>
+    </div>
+  </div>
+
+  <!-- 일지 미리보기 -->
+  <div id="preview" class="overlay" hidden>
+    <div class="sheet" style="max-width:900px">
+      <div class="row" style="justify-content:space-between;margin-bottom:10px">
+        <h2 id="previewTitle" style="margin:0">미리보기</h2>
+        <div class="row">
+          <button class="b" onclick="printPreview()">인쇄</button>
+          <button class="b soft" onclick="savePdf()">PDF 저장</button>
+          <button class="b gray" onclick="document.getElementById('preview').hidden=true">닫기</button>
+        </div>
+      </div>
+      <iframe id="previewFrame" style="width:100%;height:75vh;border:1px solid var(--line);border-radius:8px;background:#fff"></iframe>
+    </div>
+  </div>
+
+  <!-- 담당자 편집 -->
+  <div id="staffEdit" class="overlay" hidden onclick="if(event.target===this)this.hidden=true">
+    <div class="sheet">
+      <h2 id="staffEditTitle">담당자 추가</h2>
+      <input type="hidden" id="seRow">
+      <label class="f">이름</label>
+      <input id="seName" style="width:100%">
+      <label class="f">기관 구글 계정 이메일</label>
+      <input id="seEmail" type="email" style="width:100%" placeholder="name@jpurme.org">
+      <div class="row">
+        <div style="flex:1">
+          <label class="f">팀</label>
+          <select id="seTeam" style="width:100%" onchange="teamChanged()"></select>
+          <input id="seTeamNew" style="width:100%;margin-top:6px" placeholder="새 팀 이름 (예: 지역복지팀)" hidden>
+        </div>
+        <div style="flex:1">
+          <label class="f">역할</label>
+          <select id="seRole" style="width:100%">
+            <option>담당자</option>
+            <option>팀장</option>
+            <option>관리자</option>
+          </select>
+        </div>
+      </div>
+      <label class="f">담당 프로그램 <span class="hint">(쉼표로 구분 · 봉사자가 이 프로그램을 고르면 이 분에게 갑니다)</span></label>
+      <textarea id="sePrograms" placeholder="예: 주말탐험대, 밑반찬 배달"></textarea>
+      <label class="row" style="margin-top:10px"><input type="checkbox" id="seActive" class="check" checked> 사용 중</label>
+      <div class="row" style="margin-top:14px">
+        <button class="b" onclick="saveStaff()">저장</button>
+        <button class="b gray" onclick="document.getElementById('staffEdit').hidden=true">취소</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="msg" class="msg"></div>
+
+  <script>
+    let ME = null;
+    let INIT = null;
+    let current = null;
+    let leaderGroups = [];
+    let inputRows = [];
+    let printKey = '';
+
+    /* ---------- 공용 ---------- */
+    function run(fn) {
+      const args = Array.prototype.slice.call(arguments, 1);
+      return new Promise(function (resolve, reject) {
+        google.script.run
+          .withSuccessHandler(resolve)
+          .withFailureHandler(function (e) { reject(e); })[fn].apply(null, args);
+      });
+    }
+
+    let msgTimer = null;
+    function toast(text, type) {
+      const box = document.getElementById('msg');
+      box.textContent = text;
+      box.className = 'msg ' + (type || 'ok');
+      clearTimeout(msgTimer);
+      msgTimer = setTimeout(function () { box.className = 'msg'; }, type === 'err' ? 6000 : 3000);
+    }
+    function fail(e) { toast(e && e.message ? e.message : String(e), 'err'); }
+
+    function esc(v) {
+      return String(v == null ? '' : v)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+    }
+
+    function md(d) {
+      if (!d) return '';
+      const p = d.split('-');
+      return Number(p[1]) + '/' + Number(p[2]);
+    }
+
+    function ymd(date) {
+      return date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0');
+    }
+
+    function quickRange(prefix, kind) {
+      const now = new Date();
+      const y = now.getFullYear();
+      const m = now.getMonth();
+      let from, to;
+      if (kind === 'h1') { from = new Date(y, m, 1); to = new Date(y, m, 15); }
+      if (kind === 'h2') { from = new Date(y, m, 16); to = new Date(y, m + 1, 0); }
+      if (kind === 'month') { from = new Date(y, m, 1); to = new Date(y, m + 1, 0); }
+      if (kind === 'prev') { from = new Date(y, m - 1, 1); to = new Date(y, m, 0); }
+      if (kind === 'year') { from = new Date(y, 0, 1); to = new Date(y, 11, 31); }
+      document.getElementById(prefix + 'From').value = kind === 'all' ? '' : ymd(from);
+      document.getElementById(prefix + 'To').value = kind === 'all' ? '' : ymd(to);
+      if (prefix === 'dash') loadDashboard();
+      if (prefix === 'input') loadInputList();
+    }
+
+    /* ---------- 시작 ---------- */
+    window.addEventListener('load', function () {
+      run('getAdminInit').then(function (init) {
+        INIT = init;
+        document.getElementById('appBuild').textContent=init.buildVersion||'서버 버전 확인 필요 · 담당자용 배포를 업데이트해 주세요.';
+        ME = init.me;
+        document.getElementById('gate').hidden = true;
+        document.getElementById('app').hidden = false;
+        document.getElementById('who').textContent =
+          (ME.name || ME.email) + (ME.team ? ' · ' + ME.team : '') + ' · ' + ME.role;
+        buildTabs();
+        ['dash', 'input', 'print'].forEach(function (p) {
+          document.getElementById(p + 'From').value = init.period.from;
+          document.getElementById(p + 'To').value = init.period.to;
+        });
+        if (ME.isAdmin) quickRange('print', 'month');
+      }).catch(function (e) {
+        document.getElementById('gate').innerHTML =
+          '<h2>들어갈 수 없어요</h2><p>' + esc(e && e.message ? e.message : e) + '</p>';
+      });
+    });
+
+    function buildTabs() {
+      const tabs = [];
+      if (ME.registered || ME.isAdmin) tabs.push(['staff', '담당자 확인']);
+      if (ME.isLeader || ME.isAdmin) tabs.push(['leader', '팀장 확인']);
+      if (ME.isAdmin) tabs.push(['dash', '현황판'], ['input', '실적 입력'], ['print', '일지 출력'], ['staffadmin', '담당자 관리']);
+      tabs.push(['me', '내 정보']);
+
+      const nav = document.getElementById('tabs');
+      nav.innerHTML = tabs.map(function (t) {
+        return '<button data-tab="' + t[0] + '" onclick="showTab(\'' + t[0] + '\')">' + t[1] + '<span class="badge" id="badge-' + t[0] + '" hidden></span></button>';
+      }).join('');
+
+      if (ME.isAdmin) {
+        document.getElementById('staffScope').hidden = false;
+        document.getElementById('leaderAllWrap').hidden = false;
+      }
+
+      if (!ME.registered) {
+        showTab(ME.isAdmin ? 'staffadmin' : 'me');
+        toast('담당자 관리에서 본인(이메일)을 먼저 등록해 주세요.', 'info');
+      } else if (!ME.hasSignature) {
+        showTab('me');
+        toast('처음이시네요! 먼저 서명을 등록해 주세요.', 'info');
+      } else {
+        showTab(ME.isLeader && !(ME.programs || []).length ? 'leader' : 'staff');
+      }
+
+      if (ME.isLeader || ME.isAdmin) loadLeaderQueue(true);
+    }
+
+    function showTab(name) {
+      document.querySelectorAll('main > section').forEach(function (s) { s.hidden = s.id !== 'tab-' + name; });
+      document.querySelectorAll('nav button').forEach(function (b) { b.classList.toggle('on', b.dataset.tab === name); });
+      if (name === 'staff') loadStaffQueue();
+      if (name === 'leader') loadLeaderQueue();
+      if (name === 'dash') loadDashboard();
+      if (name === 'input') loadInputList();
+      if (name === 'staffadmin') loadStaffAdmin();
+      if (name === 'me') loadMe();
+    }
+
+    function setBadge(tab, n) {
+      const b = document.getElementById('badge-' + tab);
+      if (!b) return;
+      b.hidden = !n;
+      b.textContent = n;
+    }
+
+    /* ---------- 담당자 확인 ---------- */
+    function loadStaffQueue() {
+      const scope = ME.isAdmin ? document.getElementById('staffScope').value : 'mine';
+      const box = document.getElementById('staffList');
+      box.innerHTML = '<div class="empty">불러오는 중...</div>';
+
+      run('getStaffQueue', scope).then(function (list) {
+        if (scope === 'mine') setBadge('staff', list.length);
+        document.getElementById('staffHint').textContent =
+          '확인 대기 ' + list.length + '건' +
+          (scope === 'mine' && (ME.programs || []).length ? ' · 내 담당 프로그램: ' + ME.programs.join(', ') : '');
+
+        if (!list.length) {
+          box.innerHTML = '<div class="empty">확인할 일지가 없어요 👍</div>';
+          return;
+        }
+
+        box.innerHTML = list.map(function (l) {
+          return '<button class="item" onclick="openDetail(' + l.rowNumber + ',\'' + esc(l.logId) + '\')">' +
+            '<div class="t"><span>' + esc(l.volunteerName) +
+            (l.registrationType === '미등록봉사자' ? '<span class="chip warn">명단에 없음</span>' : '') +
+            (l.substituteFor ? '<span class="chip blue">' + esc(l.substituteFor) + ' 대직</span>' : '') +
+            (!l.assigned ? '<span class="chip err">미배정</span>' : '') +
+            (l.returned ? '<span class="chip err">팀장 반려</span>' : '') +
+            '</span><span>' + esc(l.calculatedTimeText) + '</span></div>' +
+            '<div class="m"><span class="go">상세보기 ›</span>' + esc(l.activityDate) + ' (' + esc(l.dayOfWeek) + ') · ' + esc(l.program) +
+            ' · 식사 ' + (l.mealStatus === '식사함' ? 'O' : 'X') +
+            (scope !== 'mine' && l.assigned ? ' · 담당 ' + esc(l.assigned) : '') + '</div></button>';
+        }).join('');
+      }).catch(function (e) { box.innerHTML = ''; fail(e); });
+    }
+
+    function openDetail(rowNumber, logId) {
+      toast('불러오는 중...', 'info');
+      run('getLogDetail', rowNumber, logId).then(function (d) {
+        current = d;
+        document.getElementById('msg').className = 'msg';
+        const sig = d.signatureImage
+          ? '<img class="sigimg" src="' + d.signatureImage + '" alt="봉사자 서명">'
+          : '<span class="chip err">서명 이미지를 불러오지 못했어요</span>';
+
+        const items = [
+          ['봉사자', esc(d.volunteerName) + ' <span class="chip">' + esc(d.phoneLast4) + '</span>' +
+            (d.registrationType === '미등록봉사자' ? '<span class="chip warn">명단에 없음</span>' : '')],
+          ['소속', esc(d.organization || '-')],
+          ['활동일', esc(d.activityDate) + ' (' + esc(d.dayOfWeek) + ')'],
+          ['프로그램', esc(d.program) + (d.assigned ? ' <span class="chip">담당 ' + esc(d.assigned) + '</span>' : ' <span class="chip err">미배정</span>')],
+          ['활동내용', esc(d.activityContent)],
+          ['활동시간', esc(d.startTime) + ' ~ ' + esc(d.endTime) + ' <span class="chip">' + esc(d.calculatedTimeText) + '</span>'],
+          ['식사', d.mealStatus === '식사함' ? '<span class="chip warn">식사함</span>' : '식사하지 않음'],
+          ['본인 서명', sig]
+        ];
+        if (d.note) items.push(['비고', '<span style="color:var(--err)">' + esc(d.note) + '</span>']);
+
+        document.getElementById('detailGrid').innerHTML = items.map(function (i) {
+          return '<dt>' + i[0] + '</dt><dd>' + i[1] + '</dd>';
+        }).join('');
+
+        document.getElementById('mealHint').textContent = d.mealStatus === '식사함'
+          ? '식사를 했어요. 식사 시간을 빼고 인정시간을 정해 주세요.'
+          : '식사하지 않았어요. 활동시간 그대로 인정하면 돼요.';
+        setTime(d.finalApprovedMinutes);
+
+        const pending = d.staffConfirmStatus === '확인대기';
+        const canAct = pending && d.canApprove;
+        document.getElementById('actBox').hidden = !canAct;
+        document.getElementById('approveBtn').disabled = false;
+        document.getElementById('rejectReason').value = '';
+
+        const st = document.getElementById('statusLine');
+        st.hidden = pending;
+        if (!pending) {
+          st.innerHTML =
+            '<b>담당자 확인</b> ' + (d.staffConfirmStatus === '확인완료'
+              ? '<span class="chip ok">완료</span> ' + esc(d.staffName) + (d.staffSubstitute ? ' <span class="chip blue">대직</span>' : '') + ' · 인정 <b>' + esc(d.finalTimeText) + '</b>'
+              : '<span class="chip err">' + esc(d.staffConfirmStatus) + '</span> ' + esc(d.staffName)) +
+            '<br><b>팀장 확인</b> ' + (d.leaderStatus === '확인완료'
+              ? '<span class="chip ok">완료</span> ' + esc(d.leaderName)
+              : '<span class="chip warn">대기</span>') +
+            '<br><b>실적 입력</b> ' + (d.inputDone ? '<span class="chip ok">완료</span>' : '<span class="chip">아직</span>');
+        }
+
+        const rb = document.getElementById('reassignBox');
+        rb.hidden = !(d.canReassign && pending);
+        if (d.canReassign) {
+          document.getElementById('reassignSel').innerHTML =
+            '<option value="">(프로그램 담당자로 자동)</option>' +
+            d.staffNames.map(function (n) {
+              return '<option' + (d.assignedManual && n === d.assigned ? ' selected' : '') + '>' + esc(n) + '</option>';
+            }).join('');
+        }
+        document.getElementById('detail').hidden = false;
+      }).catch(fail);
+    }
+
+    function closeDetail() { document.getElementById('detail').hidden = true; current = null; }
+
+    function getTime() {
+      return (Number(document.getElementById('finalH').value) || 0) * 60 + (Number(document.getElementById('finalM').value) || 0);
+    }
+    function setTime(min) {
+      min = Math.max(0, min);
+      document.getElementById('finalH').value = Math.floor(min / 60);
+      document.getElementById('finalM').value = min % 60;
+    }
+    function adjustTime(delta) { setTime(getTime() + delta); }
+    function resetTime() { if (current) setTime(current.calculatedMinutes); }
+
+    function approve() {
+      if (!current) return;
+      if (!ME.hasSignature) { toast('「내 정보」에서 서명을 먼저 등록해 주세요.', 'err'); return; }
+      const minutes = getTime();
+      if (minutes <= 0) { toast('인정시간을 입력해 주세요.', 'err'); return; }
+      const btn = document.getElementById('approveBtn');
+      btn.disabled = true;
+      run('approveLog', { rowNumber: current.rowNumber, logId: current.logId, finalApprovedMinutes: minutes })
+        .then(function (r) {
+          toast(r.volunteerName + ' 님 일지를 확인했어요 (' + r.finalApprovedTimeText + ')');
+          closeDetail();
+          loadStaffQueue();
+        })
+        .catch(function (e) { btn.disabled = false; fail(e); });
+    }
+
+    function reject() {
+      if (!current) return;
+      const reason = document.getElementById('rejectReason').value.trim();
+      if (!reason) { toast('반려 사유를 입력해 주세요.', 'err'); return; }
+      run('rejectLog', { rowNumber: current.rowNumber, logId: current.logId, reason: reason })
+        .then(function (r) { toast(r.volunteerName + ' 님 일지를 반려했어요.'); closeDetail(); loadStaffQueue(); })
+        .catch(fail);
+    }
+
+    function reassign() {
+      if (!current) return;
+      const name = document.getElementById('reassignSel').value;
+      run('reassignLog', current.rowNumber, current.logId, name)
+        .then(function (r) { toast('기본 담당자를 ' + r.assigned + ' 님으로 바꿨어요.'); closeDetail(); loadStaffQueue(); })
+        .catch(fail);
+    }
+
+    /* ---------- 팀장 확인 ---------- */
+    function loadLeaderQueue(badgeOnly) {
+      const all = ME.isAdmin && document.getElementById('leaderAll').checked;
+      const box = document.getElementById('leaderList');
+      if (!badgeOnly) box.innerHTML = '<div class="empty">불러오는 중...</div>';
+
+      run('getLeaderQueue', all).then(function (groups) {
+        leaderGroups = groups;
+        const total = groups.reduce(function (s, g) { return s + g.items.length; }, 0);
+        if (!all) setBadge('leader', total);
+        if (badgeOnly) return;
+
+        if (!groups.length) {
+          box.innerHTML = '<div class="empty">팀장 확인을 기다리는 일지가 없어요 👍</div>';
+          updateLeaderCount();
+          return;
+        }
+
+        box.innerHTML = groups.map(function (g, gi) {
+          return '<div class="group"><div class="group-head">' +
+            '<label class="row"><input type="checkbox" class="check" checked onchange="toggleGroup(' + gi + ',this.checked)">' +
+            '<strong>' + esc(g.volunteerName) + '</strong><span class="chip">' + esc(g.phoneLast4) + '</span></label>' +
+            '<span class="hint" style="margin:0">' + md(g.from) + ' ~ ' + md(g.to) + ' · ' + g.items.length + '건</span></div>' +
+            '<div class="scroll"><table class="t"><tr><th></th><th>날짜</th><th>프로그램</th><th class="hide-sm">활동시간</th><th>인정</th><th>담당자</th><th></th></tr>' +
+            g.items.map(function (it, ii) {
+              return '<tr><td><input type="checkbox" class="check lchk" data-g="' + gi + '" data-i="' + ii + '" checked onchange="updateLeaderCount()"></td>' +
+                '<td>' + md(it.activityDate) + '(' + esc(it.dayOfWeek) + ')</td>' +
+                '<td>' + esc(it.program) + '<div class="hint" style="margin:0;font-size:12px">' + esc(String(it.activityContent || '').slice(0, 40)) + '</div></td>' +
+                '<td class="hide-sm">' + esc(it.timeRange) + (it.mealStatus === '식사함' ? ' <span class="chip">식사</span>' : '') + '</td>' +
+                '<td><b>' + esc(it.finalTimeText) + '</b></td>' +
+                '<td>' + esc(it.staffName) + (it.substitute ? '<span class="chip blue">대직</span>' : '') +
+                (all ? '<div class="hint" style="margin:0;font-size:12px">' + esc(it.team || '팀 미지정') + '</div>' : '') + '</td>' +
+                '<td><button class="b soft sm" onclick="openDetail(' + it.rowNumber + ',\'' + esc(it.logId) + '\')">상세보기</button></td></tr>';
+            }).join('') + '</table></div></div>';
+        }).join('');
+        updateLeaderCount();
+      }).catch(function (e) { if (!badgeOnly) { box.innerHTML = ''; fail(e); } });
+    }
+
+    function toggleGroup(gi, on) {
+      document.querySelectorAll('.lchk[data-g="' + gi + '"]').forEach(function (c) { c.checked = on; });
+      updateLeaderCount();
+    }
+
+    function selectedLeaderItems() {
+      return Array.prototype.map.call(document.querySelectorAll('.lchk:checked'), function (c) {
+        const it = leaderGroups[c.dataset.g].items[c.dataset.i];
+        return { rowNumber: it.rowNumber, logId: it.logId };
+      });
+    }
+
+    function updateLeaderCount() {
+      const n = selectedLeaderItems().length;
+      document.getElementById('leaderCount').textContent = n ? n + '건 선택' : '';
+      document.getElementById('leaderBtn').disabled = !n;
+    }
+
+    function leaderApproveSelected() {
+      const items = selectedLeaderItems();
+      if (!items.length) return;
+      if (!ME.hasSignature) { toast('「내 정보」에서 서명을 먼저 등록해 주세요.', 'err'); return; }
+      const btn = document.getElementById('leaderBtn');
+      btn.disabled = true;
+      run('leaderApprove', items).then(function (r) {
+        toast(r.count + '건을 확인했어요.');
+        loadLeaderQueue();
+      }).catch(function (e) { btn.disabled = false; fail(e); });
+    }
+
+    function leaderReturnSelected() {
+      const items = selectedLeaderItems();
+      if (!items.length) { toast('반려할 일지를 선택해 주세요.', 'err'); return; }
+      const reason = document.getElementById('leaderReason').value.trim();
+      if (!reason) { toast('반려 사유를 입력해 주세요.', 'err'); return; }
+      run('leaderReturn', items, reason).then(function (r) {
+        toast(r.count + '건을 담당자에게 되돌렸어요.');
+        document.getElementById('leaderReason').value = '';
+        loadLeaderQueue();
+      }).catch(fail);
+    }
+
+    /* ---------- 현황판 ---------- */
+    function loadDashboard() {
+      const box = document.getElementById('dashBody');
+      box.innerHTML = '<div class="empty">불러오는 중...</div>';
+      run('getDashboard', document.getElementById('dashFrom').value, document.getElementById('dashTo').value)
+        .then(function (d) {
+          const pendStaff = d.byStaff.reduce(function (s, x) { return s + x.count; }, 0);
+          const pendLeader = d.byTeam.reduce(function (s, x) { return s + x.count; }, 0);
+
+          let html = '<div class="stats">' +
+            stat(d.total, '전체 일지') +
+            stat(d.complete, '서명 모두 완료') +
+            stat(pendStaff, '담당자 확인 대기', pendStaff > 0) +
+            stat(pendLeader, '팀장 확인 대기', pendLeader > 0) +
+            stat(d.inputTodo, '실적 입력할 것', d.inputTodo > 0) +
+            stat(d.rejected, '반려') +
+            '</div>';
+
+          html += '<h3>담당자 확인 대기 <span class="hint" style="font-weight:400">· 줄을 누르면 일지 목록이 펼쳐져요</span></h3>' + (d.byStaff.length
+            ? groupTable(['담당자', '건수', '가장 오래된 활동일'], d.byStaff.map(function (x) {
+                return { cells: [x.name === '미배정' ? '<span class="chip err">미배정</span>' : esc(x.name), '<b>' + x.count + '</b>', esc(x.oldest)], items: x.items };
+              }), 'staff')
+            : '<div class="hint">없어요 👍</div>');
+
+          html += '<h3>팀장 확인 대기</h3>' + (d.byTeam.length
+            ? groupTable(['팀', '팀장', '건수', '가장 오래된 활동일'], d.byTeam.map(function (x) {
+                return { cells: [esc(x.name), x.leaders === '팀장 미지정' ? '<span class="chip err">팀장 미지정</span>' : esc(x.leaders), '<b>' + x.count + '</b>', esc(x.oldest)], items: x.items };
+              }), 'team')
+            : '<div class="hint">없어요 👍</div>');
+
+          html += '<h3>서명 나중에 받기 (실적은 먼저 입력함)</h3>' + (d.early.length
+            ? table(['활동일', '봉사자', '프로그램', '남은 서명', '받을 사람', ''], d.early.map(function (x) {
+                return [md(x.activityDate), esc(x.volunteerName), esc(x.program), '<span class="chip warn">' + esc(x.missing) + '</span>', esc(x.who), detailBtn(x)];
+              }))
+            : '<div class="hint">없어요 👍</div>');
+
+          box.innerHTML = html;
+        }).catch(function (e) { box.innerHTML = ''; fail(e); });
+    }
+
+    function detailBtn(x) {
+      return '<button class="b soft sm" onclick="event.stopPropagation();openDetail(' + x.rowNumber + ',\'' + esc(x.logId) + '\')">상세보기</button>';
+    }
+
+    function groupTable(head, groups, key) {
+      const cols = head.length + 1;
+      return '<div class="scroll"><table class="t"><tr>' + head.map(function (h) { return '<th>' + h + '</th>'; }).join('') + '<th></th></tr>' +
+        groups.map(function (g, gi) {
+          const id = key + gi;
+          return '<tr class="click" onclick="toggleSub(\'' + id + '\')">' + g.cells.map(function (c) { return '<td>' + c + '</td>'; }).join('') +
+            '<td style="text-align:right"><span class="chip blue" id="arr-' + id + '">펼치기 ▾</span></td></tr>' +
+            (g.items || []).map(function (it) {
+              return '<tr class="sub sub-' + id + '" hidden><td colspan="' + (cols - 1) + '">' +
+                md(it.activityDate) + '(' + esc(it.dayOfWeek) + ') · <b>' + esc(it.volunteerName) + '</b> · ' + esc(it.program) +
+                (it.staffName ? ' <span class="hint" style="font-size:12px">담당 확인: ' + esc(it.staffName) + '</span>' : '') +
+                '</td><td style="text-align:right">' + detailBtn(it) + '</td></tr>';
+            }).join('');
+        }).join('') + '</table></div>';
+    }
+
+    function toggleSub(id) {
+      const rows = document.querySelectorAll('.sub-' + id);
+      const open = rows.length && rows[0].hidden;
+      rows.forEach(function (r) { r.hidden = !open; });
+      const arr = document.getElementById('arr-' + id);
+      if (arr) arr.textContent = open ? '접기 ▴' : '펼치기 ▾';
+    }
+
+    function stat(n, label, hot) {
+      return '<div class="stat' + (hot ? ' hot' : '') + '"><div class="n">' + n + '</div><div class="l">' + label + '</div></div>';
+    }
+
+    function table(head, rows) {
+      return '<div class="scroll"><table class="t"><tr>' + head.map(function (h) { return '<th>' + h + '</th>'; }).join('') + '</tr>' +
+        rows.map(function (r) { return '<tr>' + r.map(function (c) { return '<td>' + c + '</td>'; }).join('') + '</tr>'; }).join('') +
+        '</table></div>';
+    }
+
+    /* ---------- 실적 입력 ---------- */
+    function loadInputList() {
+      const box = document.getElementById('inputBody');
+      box.innerHTML = '<div class="empty">불러오는 중...</div>';
+      run('getInputList',
+        document.getElementById('inputFrom').value,
+        document.getElementById('inputTo').value,
+        document.getElementById('inputTodo').checked
+      ).then(function (list) {
+        inputRows = list;
+        if (!list.length) { box.innerHTML = '<div class="empty">해당하는 일지가 없어요.</div>'; return; }
+
+        const totalMin = list.reduce(function (s, r) { return s + toMin(r.finalTimeText); }, 0);
+
+        box.innerHTML =
+          '<div class="row" style="justify-content:space-between;margin-bottom:8px">' +
+          '<span class="hint" style="margin:0">' + list.length + '건 · 합계 ' + fmtMin(totalMin) + '</span>' +
+          '<span class="row"><button class="b sm" onclick="markInput(true)">선택 → 입력 완료</button>' +
+          '<button class="b gray sm" onclick="markInput(false)">선택 → 체크 취소</button></span></div>' +
+          '<div class="scroll"><table class="t"><tr>' +
+          '<th><input type="checkbox" class="check" onchange="document.querySelectorAll(\'.ichk\').forEach(function(c){c.checked=this.checked}.bind(this))"></th>' +
+          '<th>활동일</th><th>봉사자</th><th>ID</th><th>프로그램</th><th class="hide-sm">활동시간</th><th>인정</th><th>서명</th><th>입력</th></tr>' +
+          list.map(function (r, i) {
+            return '<tr><td><input type="checkbox" class="check ichk" data-i="' + i + '"></td>' +
+              '<td>' + md(r.activityDate) + '(' + esc(r.dayOfWeek) + ')</td>' +
+              '<td>' + esc(r.volunteerName) + ' <span class="chip">' + esc(r.phoneLast4) + '</span></td>' +
+              '<td>' + (r.perfId ? esc(r.perfSystem) + ' ' + esc(r.perfId) : '<span class="hint">-</span>') + '</td>' +
+              '<td>' + esc(r.program) + '</td>' +
+              '<td class="hide-sm">' + esc(r.timeRange) + '</td>' +
+              '<td><b>' + esc(r.finalTimeText) + '</b>' + (r.finalConfirmed ? '' : '<div><span class="chip warn">미확정</span></div>') + '</td>' +
+              '<td>' + (r.staffDone ? '<span class="chip ok">담당</span>' : '<span class="chip err">담당</span>') +
+              (r.leaderDone ? '<span class="chip ok">팀장</span>' : '<span class="chip err">팀장</span>') + '</td>' +
+              '<td>' + (r.inputDone ? '<span class="chip ok">완료</span>' : '') + '</td></tr>';
+          }).join('') + '</table></div>' +
+          '<p class="hint" style="margin-top:8px">빨간 칩 = 아직 서명 전. <b>미확정</b> = 담당자가 아직 인정시간을 정하지 않아 계산된 시간으로 보여요.</p>';
+      }).catch(function (e) { box.innerHTML = ''; fail(e); });
+    }
+
+    function toMin(text) {
+      const h = /(\d+)시간/.exec(text);
+      const m = /(\d+)분/.exec(text);
+      return (h ? Number(h[1]) * 60 : 0) + (m ? Number(m[1]) : 0);
+    }
+    function fmtMin(n) {
+      const h = Math.floor(n / 60), m = n % 60;
+      return (h ? h + '시간' : '') + (h && m ? ' ' : '') + (m || !h ? m + '분' : '');
+    }
+
+    function markInput(done) {
+      const items = Array.prototype.map.call(document.querySelectorAll('.ichk:checked'), function (c) {
+        const r = inputRows[c.dataset.i];
+        return { rowNumber: r.rowNumber, logId: r.logId };
+      });
+      if (!items.length) { toast('일지를 선택해 주세요.', 'err'); return; }
+      run('setInputDone', items, done).then(function (r) {
+        toast(r.count + '건 ' + (done ? '입력 완료로 체크했어요.' : '체크를 취소했어요.'));
+        loadInputList();
+      }).catch(fail);
+    }
+
+    /* ---------- 일지 출력 ---------- */
+    function searchPrint() {
+      const k = document.getElementById('printSearch').value.trim();
+      const box = document.getElementById('printResults');
+      box.innerHTML = '<span class="hint">찾는 중...</span>';
+      run('searchVolunteersForPrint', k).then(function (list) {
+        if (!list.length) { box.innerHTML = '<span class="hint">찾지 못했어요.</span>'; return; }
+        box.innerHTML = list.map(function (v) {
+          return '<button class="b soft sm" style="margin:0 6px 6px 0" onclick="pickPrint(\'' + esc(v.key) + '\',\'' + esc(v.name) + ' (' + esc(v.phoneLast4) + ')\')">' +
+            esc(v.name) + ' ' + esc(v.phoneLast4) + ' · ' + v.count + '건</button>';
+        }).join('');
+      }).catch(fail);
+    }
+
+    function pickPrint(key, label) {
+      printKey = key;
+      document.getElementById('printPicked').innerHTML = '선택: <b>' + label + '</b> <button class="b gray sm" onclick="pickPrint(\'\',\'\')">선택 해제</button>';
+      if (!key) document.getElementById('printPicked').innerHTML = '선택 안 함 → 기간 안의 <b>모든 봉사자</b>를 한 파일로 만들어요.';
+      document.getElementById('printResults').innerHTML = '';
+    }
+
+    let lastPdf = null;
+
+    function makePdf() {
+      const btn = document.getElementById('printBtn');
+      btn.disabled = true;
+      btn.textContent = '일지 만드는 중... (조금 걸려요)';
+      run('makeLogPdf', printKey, document.getElementById('printFrom').value, document.getElementById('printTo').value)
+        .then(function (r) {
+          lastPdf = r;
+          document.getElementById('previewTitle').textContent =
+            '미리보기 · ' + r.volunteers + '명 · ' + r.entries + '건';
+          document.getElementById('previewFrame').srcdoc = r.html;
+          document.getElementById('preview').hidden = false;
+        })
+        .catch(fail)
+        .then(function () { btn.disabled = false; btn.textContent = '일지 만들기'; });
+    }
+
+    function printPreview() {
+      const f = document.getElementById('previewFrame');
+      try {
+        f.contentWindow.focus();
+        f.contentWindow.print();
+      } catch (e) {
+        toast('바로 인쇄가 안 돼요. [PDF 저장] 후 파일을 열어 인쇄해 주세요.', 'err');
+      }
+    }
+
+    function savePdf() {
+      if (!lastPdf) return;
+      const bytes = atob(lastPdf.base64);
+      const arr = new Uint8Array(bytes.length);
+      for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
+      const url = URL.createObjectURL(new Blob([arr], { type: 'application/pdf' }));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = lastPdf.fileName;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      toast('PDF를 저장했어요.');
+    }
+
+    /* ---------- 담당자 관리 ---------- */
+    let staffCache = [];
+    function loadStaffAdmin() {
+      const t = document.getElementById('staffTable');
+      t.innerHTML = '<tr><td class="empty">불러오는 중...</td></tr>';
+      run('getStaffAdmin').then(function (list) {
+        staffCache = list;
+        teamList = Array.from(new Set(list.map(function (s) { return s.team; }).filter(Boolean)))
+          .sort(function (a, b) { return a.localeCompare(b, 'ko'); });
+        t.innerHTML = '<tr><th>이름</th><th>팀</th><th>역할</th><th>담당 프로그램</th><th>이메일</th><th>서명</th><th></th></tr>' +
+          list.map(function (s, i) {
+            return '<tr' + (s.active ? '' : ' style="opacity:.45"') + '>' +
+              '<td><b>' + esc(s.name) + '</b>' + (s.active ? '' : ' <span class="chip">사용 안 함</span>') +
+              (s.substitute ? '<div class="hint" style="margin:0;font-size:12px">대직: ' + esc(s.substitute) + ' ' + md(s.subFrom) + '~' + md(s.subTo) + '</div>' : '') + '</td>' +
+              '<td>' + esc(s.team || '-') + '</td>' +
+              '<td>' + esc(s.role) + '</td>' +
+              '<td>' + esc(s.programs || '-') + '</td>' +
+              '<td>' + (s.email ? esc(s.email) : '<span class="chip err">이메일 없음</span>') + '</td>' +
+              '<td>' + (s.hasSignature ? '<span class="chip ok">등록</span>' : '<span class="chip warn">아직</span>') + '</td>' +
+              '<td><button class="b gray sm" onclick="editStaff(' + i + ')">수정</button></td></tr>';
+          }).join('');
+      }).catch(fail);
+    }
+
+    let teamList = [];
+
+    function teamChanged() {
+      const isNew = document.getElementById('seTeam').value === '__new';
+      document.getElementById('seTeamNew').hidden = !isNew;
+      if (isNew) document.getElementById('seTeamNew').focus();
+    }
+
+    function editStaff(i) {
+      const s = i == null ? null : staffCache[i];
+      document.getElementById('staffEditTitle').textContent = s ? s.name + ' 님 정보 수정' : '담당자 추가';
+      document.getElementById('seRow').value = s ? s.rowNumber : '';
+      document.getElementById('seName').value = s ? s.name : '';
+      document.getElementById('seEmail').value = s ? s.email : '';
+      const sel = document.getElementById('seTeam');
+      sel.innerHTML = '<option value="">팀 선택</option>' +
+        teamList.map(function (t) { return '<option value="' + esc(t) + '">' + esc(t) + '</option>'; }).join('') +
+        '<option value="__new">＋ 새 팀 추가</option>';
+      sel.value = s && s.team ? s.team : '';
+      document.getElementById('seTeamNew').value = '';
+      document.getElementById('seTeamNew').hidden = true;
+      document.getElementById('seRole').value = s ? s.role : '담당자';
+      document.getElementById('sePrograms').value = s ? s.programs : '';
+      document.getElementById('seActive').checked = s ? s.active : true;
+      document.getElementById('staffEdit').hidden = false;
+    }
+
+    function saveStaff() {
+      if (document.getElementById('seTeam').value === '__new' && !document.getElementById('seTeamNew').value.trim()) {
+        toast('새 팀 이름을 입력해 주세요.', 'err');
+        return;
+      }
+      run('saveStaffAdmin', {
+        rowNumber: document.getElementById('seRow').value,
+        name: document.getElementById('seName').value,
+        email: document.getElementById('seEmail').value,
+        team: document.getElementById('seTeam').value === '__new'
+          ? document.getElementById('seTeamNew').value
+          : document.getElementById('seTeam').value,
+        role: document.getElementById('seRole').value,
+        programs: document.getElementById('sePrograms').value,
+        active: document.getElementById('seActive').checked
+      }).then(function (r) {
+        toast(r.message);
+        document.getElementById('staffEdit').hidden = true;
+        loadStaffAdmin();
+      }).catch(fail);
+    }
+
+    /* ---------- 내 정보 ---------- */
+    function loadMe() {
+      setTimeout(function () { sigPad.resize(); }, 30);
+      document.getElementById('myInfo').innerHTML =
+        '<dt>이름</dt><dd>' + esc(ME.name || '(미등록)') + '</dd>' +
+        '<dt>이메일</dt><dd>' + esc(ME.email) + '</dd>' +
+        '<dt>팀 · 역할</dt><dd>' + esc((ME.team || '-') + ' · ' + ME.role) + '</dd>' +
+        '<dt>담당 프로그램</dt><dd>' + esc((ME.programs || []).join(', ') || '-') + '</dd>';
+
+      const sel = document.getElementById('subName');
+      sel.innerHTML = '<option value="">대직자 선택</option>' + INIT.staffNames.filter(function (n) { return n !== ME.name; })
+        .map(function (n) { return '<option' + (n === ME.substitute ? ' selected' : '') + '>' + esc(n) + '</option>'; }).join('');
+      document.getElementById('subFrom').value = ME.subFrom || '';
+      document.getElementById('subTo').value = ME.subTo || '';
+      document.getElementById('subNow').textContent = ME.substitute
+        ? '지금 설정: ' + ME.substitute + ' 님 (' + (ME.subFrom || '처음') + ' ~ ' + (ME.subTo || '해제할 때까지') + ')'
+        : '지금은 대직이 설정되어 있지 않아요.';
+
+      if (!ME.registered) {
+        document.getElementById('mySigNow').innerHTML = '<span class="chip err">담당자 관리에서 먼저 등록해 주세요</span>';
+        return;
+      }
+      document.getElementById('mySigNow').innerHTML = '<span class="hint">불러오는 중...</span>';
+      run('getMySignature').then(function (r) {
+        document.getElementById('mySigNow').innerHTML = r.image
+          ? '<div class="hint" style="margin-bottom:4px">지금 등록된 서명</div><img class="sigimg" src="' + r.image + '">'
+          : '<span class="chip warn">아직 서명이 없어요. 아래에 그려 주세요.</span>';
+      }).catch(fail);
+    }
+
+    function saveMySignature() {
+      if (!sigPad.has) { toast('서명을 그려 주세요.', 'err'); return; }
+      run('saveMySignature', sigPad.data()).then(function (r) {
+        ME.hasSignature = true;
+        sigPad.clear();
+        document.getElementById('mySigNow').innerHTML =
+          '<div class="hint" style="margin-bottom:4px">지금 등록된 서명</div><img class="sigimg" src="' + r.image + '">';
+        toast('서명을 저장했어요.');
+      }).catch(fail);
+    }
+
+    function saveSubstitute() {
+      const data = {
+        substitute: document.getElementById('subName').value,
+        from: document.getElementById('subFrom').value,
+        to: document.getElementById('subTo').value
+      };
+      if (!data.substitute) { toast('대직자를 골라 주세요.', 'err'); return; }
+      run('saveSubstitute', data).then(function () {
+        ME.substitute = data.substitute; ME.subFrom = data.from; ME.subTo = data.to;
+        loadMe();
+        toast('대직을 설정했어요.');
+      }).catch(fail);
+    }
+
+    function clearSubstitute() {
+      run('saveSubstitute', { substitute: '' }).then(function () {
+        ME.substitute = ''; ME.subFrom = ''; ME.subTo = '';
+        loadMe();
+        toast('대직을 해제했어요.');
+      }).catch(fail);
+    }
+
+    /* ---------- 서명 패드 ---------- */
+    const sigPad = (function () {
+      const canvas = document.getElementById('sigCanvas');
+      const ctx = canvas.getContext('2d');
+      let drawing = false;
+      const pad = { has: false };
+
+      pad.resize = function () {
+        const r = canvas.getBoundingClientRect();
+        if (!r.width) return;
+        const ratio = Math.max(window.devicePixelRatio || 1, 1);
+        canvas.width = Math.round(r.width * ratio);
+        canvas.height = Math.round(r.height * ratio);
+        ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+        ctx.lineWidth = 3; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#111';
+        pad.has = false;
+      };
+      pad.clear = function () { ctx.clearRect(0, 0, canvas.width, canvas.height); pad.has = false; };
+      pad.data = function () { return canvas.toDataURL('image/png'); };
+
+      function pos(e) { const r = canvas.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
+      canvas.addEventListener('pointerdown', function (e) {
+        e.preventDefault(); drawing = true; pad.has = true; canvas.setPointerCapture(e.pointerId);
+        const p = pos(e); ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x + .1, p.y + .1); ctx.stroke();
+      });
+      canvas.addEventListener('pointermove', function (e) {
+        if (!drawing) return; e.preventDefault(); const p = pos(e); ctx.lineTo(p.x, p.y); ctx.stroke();
+      });
+      ['pointerup', 'pointercancel'].forEach(function (t) {
+        canvas.addEventListener(t, function () { drawing = false; });
+      });
+      return pad;
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,183 @@
+<!-- 후원자 문자 명단 화면 · Index.html이 불러와서 붙여요 (min만) -->
+<style>
+  #sms .smsTop{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  #sms .smsCount{font-weight:700;color:#2d2450}
+  #sms .noPhone{color:#9b2c2c;font-size:12px;font-weight:700}
+  #sms .pill.warn{background:#fff3d6;color:#6b4a00}
+  #sms .pill.pin{background:#e3f0fb;color:#1d4f7a}
+  #sms tr.off td{opacity:.55}
+  #sms details.smsMiss{border:1px solid #efdcaa;background:#fffaf0;border-radius:10px;padding:10px 12px;margin-top:10px}
+  #sms details.smsMiss summary{cursor:pointer;font-weight:700}
+  #sms .smsTable td{white-space:normal;word-break:keep-all;vertical-align:middle}
+  @media(max-width:520px){#sms .hideSm{display:none}}
+</style>
+
+<section id="sms" hidden>
+  <div class="panel">
+    <h2>📱 후원자 문자 명단 <span class="muted small" style="font-weight:400">화면 10/31 ③ · 서버 <span id="smsVer">?</span></span></h2>
+    <p class="muted">달을 고르면 <b>그 달 정기후원자(CMS·통장)</b>, <b>신규후원자</b>, <b>📌 고정한 분</b>이 자동으로 체크돼요. 희망이음 <b>후원금·후원품 수입 내역</b> 엑셀을 올리면 그 달 후원하신 분(기업 포함)도 더해져요. 연락처는 이 시트의 <b>「후원자연락처」</b> 탭에서 읽기만 하고, 앱에는 저장하지 않아요.</p>
+    <div class="tools">
+      <select id="smsYear" aria-label="연도"></select><select id="smsMonth" aria-label="월"></select>
+      <button id="smsLoad" class="primary">명단 만들기</button>
+    </div>
+    <div class="tools">
+      <label class="small" for="smsFile"><b>그 달 수입 내역 엑셀</b> (선택 · 두 파일 함께 가능)</label>
+      <input type="file" id="smsFile" accept=".xlsx,.xls,.csv" multiple>
+    </div>
+    <div id="smsInfo"></div>
+  </div>
+
+  <div class="panel" id="smsListPanel" hidden>
+    <div class="smsTop">
+      <span id="smsCount" class="smsCount"></span>
+      <input id="smsSearch" type="search" placeholder="이름 · 소속 검색" aria-label="이름 검색" style="min-width:160px">
+      <select id="smsView" aria-label="보기"><option value="checked">체크한 분만</option><option value="all">전체 연락처에서 고르기</option></select>
+    </div>
+    <div class="tools">
+      <button id="smsCopy" class="primary">이름·연락처 복사</button>
+      <button id="smsXlsx">엑셀로 받기</button>
+      <button id="smsMail" hidden>✉ 메일 주소 복사</button>
+      <button id="smsReset">자동 체크로 되돌리기</button>
+    </div>
+    <p id="smsNote" class="small" style="color:#4b3c86;min-height:18px"></p>
+    <div id="smsRows" class="overflow"></div>
+    <div id="smsMissBox"></div>
+  </div>
+</section>
+
+<script>
+(function(){
+  const SMS={data:null,monthly:[],monthlyNote:'',people:[],unmatched:[],on:new Set(),off:new Set(),init:false};
+  const nm=s=>String(s==null?'':s).replace(/\s+/g,'').replace(/님$/,'').replace(/\(주\)|㈜|주식회사|\(재\)|\(사\)|\(유\)/g,'').toLowerCase();
+  const digits=v=>String(v||'').replace(/\D/g,'');
+  const msg=t=>{$('smsNote').textContent=t;};
+
+  // 메뉴에 탭 버튼 넣기 (확인서·증서 앞)
+  const btn=document.createElement('button');btn.dataset.tab='sms';btn.textContent='📱 문자 명단';
+  const before=document.querySelector('nav button[data-tab=cert]');
+  before?before.parentNode.insertBefore(btn,before):document.querySelector('nav').appendChild(btn);
+  btn.onclick=()=>{show('sms');smsInit();};
+
+  function smsInit(){
+    if(SMS.init)return;SMS.init=true;
+    const now=new Date(),base=now.getDate()<=15?new Date(now.getFullYear(),now.getMonth()-1,1):now;   // 15일 전이면 지난달이 기본
+    for(let y=now.getFullYear();y>=now.getFullYear()-3;y--)$('smsYear').insertAdjacentHTML('beforeend',`<option value="${y}">${y}년</option>`);
+    for(let m=1;m<=12;m++)$('smsMonth').insertAdjacentHTML('beforeend',`<option value="${m}">${m}월</option>`);
+    $('smsYear').value=String(base.getFullYear());$('smsMonth').value=String(base.getMonth()+1);
+    $('smsLoad').onclick=load;
+    $('smsYear').onchange=$('smsMonth').onchange=()=>{SMS.monthly=[];SMS.monthlyNote='';$('smsFile').value='';load();};
+    $('smsFile').onchange=readFiles;
+    $('smsSearch').oninput=render;$('smsView').onchange=render;
+    $('smsReset').onclick=()=>{SMS.on.clear();SMS.off.clear();msg('자동 체크 상태로 되돌렸어요.');render();};
+    $('smsCopy').onclick=copyList;$('smsXlsx').onclick=xlsxList;$('smsMail').onclick=copyMail;
+    load();
+  }
+  const ym=()=>$('smsYear').value+'-'+String($('smsMonth').value).padStart(2,'0');
+
+  async function load(){
+    $('smsInfo').innerHTML='<p class="muted">불러오는 중입니다.</p>';
+    try{SMS.data=await api('getSmsData',ym());$('smsVer').textContent=SMS.data.version||'예전 버전';SMS.on.clear();SMS.off.clear();build();}
+    catch(e){$('smsInfo').innerHTML=`<div class="notice">${esc(e.message)}</div>`;}
+  }
+
+  // 희망이음 후원금·후원품 수입 내역 → 그 달 후원하신 분 (CMS 줄은 정기후원이라 빼요)
+  async function readFiles(e){
+    const files=[...e.target.files];SMS.monthly=[];SMS.monthlyNote='';if(!files.length){build();return;}
+    if(typeof parseDonors!=='function'||typeof readBook!=='function'){msg('엑셀 읽기 기능을 찾지 못했어요. 최신 Index.html인지 확인해 주세요.');return;}
+    const want=ym(),notes=[];let masked=0;
+    for(const f of files){
+      try{let done=false;
+        for(const aoa of await readBook(f)){const d=parseDonors(aoa,Number(want.slice(0,4)));if(d.error)continue;
+          const recs=d.recs.filter(r=>r.date.slice(0,7)===want&&r.cls!=='CMS');
+          recs.forEach(r=>{if(r.name.includes('*'))masked++;SMS.monthly.push({name:r.name,reason:d.type==='cash'?'이달 후원금':'이달 후원품'});});
+          notes.push(`${d.type==='cash'?'후원금':'후원품'} ${recs.length}건`);done=true;break;}
+        if(!done)notes.push(`${f.name}: 수입 내역 칸을 찾지 못했어요`);
+      }catch(err){notes.push(f.name+': '+err.message);}
+    }
+    SMS.monthlyNote=`${Number(want.slice(5))}월 수입 내역에서 ${notes.join(', ')}을 읽었어요.`+(masked?` 이름이 가려진(*) 줄이 ${masked}건 있어요. 이름이 보이는 파일이어야 정확히 맞출 수 있어요.`:'');
+    build();
+  }
+
+  // 자동 대상 → 연락처 맞추기
+  function build(){
+    const D=SMS.data;if(!D)return;
+    const people=D.contacts.map(c=>Object.assign({},c,{reasons:[],warn:'',pinned:false,dup:0}));
+    const byKey={},byNo={};people.forEach(p=>{(byKey[p.key]=byKey[p.key]||[]).push(p);if(p.no)(byNo[p.no]=byNo[p.no]||[]).push(p);});
+    const unmatched=new Map();
+    const findMasked=name=>{const k=nm(name);return people.filter(p=>p.key.length===k.length&&[...k].every((ch,i)=>ch==='*'||ch===p.key[i]));};
+    const attach=(name,no,reason,warn)=>{
+      let hit=(no&&byNo[no])||byKey[nm(name)]||(String(name).includes('*')?findMasked(name):[]);
+      if(!hit||!hit.length){const k=nm(name),u=unmatched.get(k)||{name,reasons:[]};if(!u.reasons.includes(reason))u.reasons.push(reason);unmatched.set(k,u);return;}
+      hit.forEach(p=>{if(!p.reasons.includes(reason))p.reasons.push(reason);if(warn&&!p.warn)p.warn=warn;if(hit.length>1)p.dup=hit.length;});
+    };
+    D.auto.forEach(a=>a.reasons.forEach(r=>attach(a.name,a.no,r,a.warn)));
+    SMS.monthly.forEach(m=>attach(m.name,'',m.reason));
+    D.pins.forEach(pn=>{const hit=byKey[nm(pn.name)];if(hit)hit.forEach(p=>{p.pinned=true;if(hit.length>1)p.dup=hit.length;});else{const u=unmatched.get(nm(pn.name))||{name:pn.name,reasons:[]};u.reasons.push('📌 고정');unmatched.set(nm(pn.name),u);}});
+    people.forEach(p=>{p.auto=(p.reasons.length>0||p.pinned)&&!p.optOut&&!p.dup;});
+    people.sort((a,b)=>(b.auto-a.auto)||a.name.localeCompare(b.name,'ko'));
+    SMS.people=people;SMS.unmatched=[...unmatched.values()];
+    // 안내
+    const I=D.contactInfo,m=Number(D.ym.slice(5));
+    let info='';
+    if(I.missing||!I.count)info+=`<div class="notice"><b>「후원자연락처」 탭에 연락처를 넣어 주세요.</b> 첫 줄에 <b>후원자명</b>, <b>연락처</b> 칸이 있으면 돼요. (있으면 좋은 칸: 소속(업체), 후원자번호, 문자 수신, 메모)<br>지금 가지고 계신 후원자 명단을 그대로 복사해서 붙여도 머리글 이름만 맞으면 읽어요.${I.seen&&I.seen.length?`<br><span class="small">지금 탭에서 본 머리글: ${I.seen.map(esc).join(' · ')}</span>`:''}</div>`;
+    else info+=`<p class="small muted">「후원자연락처」 탭에서 ${I.count}명을 읽었어요.${I.cols.includes('no')?' 후원자번호 칸이 있어서 CMS 후원자는 번호로 맞춰요.':''}${I.cols.includes('optOut')?' 문자 수신 칸도 반영했어요.':''}</p>`;
+    const cnt=r=>D.auto.filter(a=>a.reasons.includes(r)).length;
+    info+=`<p class="small">${m}월 자동 대상: 정기 CMS ${cnt('정기 CMS')}명 · 정기 통장 ${cnt('정기 통장')}명 · 신규 ${cnt('신규')}명 · 📌 고정 ${D.pins.length}명${SMS.monthly.length?` · 이달 후원 ${new Set(SMS.monthly.map(x=>nm(x.name))).size}명`:''}</p>`;
+    if(SMS.monthlyNote)info+=`<p class="small muted">${esc(SMS.monthlyNote)}</p>`;
+    else info+=`<p class="small muted">그 달 후원금·후원품을 보내 주신 분(기업 포함)도 넣으려면 위에서 희망이음 수입 내역 엑셀을 올려 주세요.</p>`;
+    $('smsInfo').innerHTML=info;
+    $('smsListPanel').hidden=!I.count;
+    render();
+  }
+  const isOn=p=>SMS.on.has(p.id)||(p.auto&&!SMS.off.has(p.id));
+
+  function render(){
+    if(!SMS.data)return;
+    const q=nm($('smsSearch').value),view=$('smsView').value;
+    const on=SMS.people.filter(isOn),mail=on.filter(p=>!p.hasPhone&&p.email).length,noPhone=on.filter(p=>!p.hasPhone&&!p.email).length;
+    $('smsCount').textContent=`체크 ${on.length}명`+(mail?` · 메일로 보낼 분 ${mail}명`:'')+(noPhone?` · 연락처 없음 ${noPhone}명`:'');
+    $('smsMail').hidden=!mail;
+    const rows=SMS.people.filter(p=>(view==='all'||isOn(p))&&(!q||nm(p.name+p.org).includes(q))).slice(0,view==='all'&&!q?300:2000);
+    $('smsRows').innerHTML=rows.length?`<table class="smsTable"><thead><tr><th>보내기</th><th>이름</th><th>연락처</th><th>체크 이유</th><th>고정</th></tr></thead><tbody>${rows.map(p=>`<tr class="${isOn(p)?'':'off'}">
+      <td><input type="checkbox" class="smsChk" data-id="${esc(p.id)}" ${isOn(p)?'checked':''} style="width:auto" aria-label="${esc(p.name)} 문자 대상"></td>
+      <td><b>${esc(p.name)}</b>${p.org?`<br><span class="small muted">${esc(p.org)}</span>`:''}</td>
+      <td>${p.hasPhone?esc(p.phone):p.email?`<span class="small">✉ ${esc(p.email)}</span>`:'<span class="noPhone">연락처 없음</span>'}</td>
+      <td>${[...p.reasons.map(r=>`<span class="pill">${esc(r)}</span>`),p.pinned?'<span class="pill pin">📌 고정</span>':'',p.warn?`<span class="pill warn">${esc(p.warn)}</span>`:'',p.dup?`<span class="pill warn">같은 이름 ${p.dup}명 · 확인 후 체크</span>`:'',p.optOut?'<span class="pill err">수신 안 함</span>':''].filter(Boolean).join(' ')||'<span class="muted small">직접 선택</span>'}</td>
+      <td><button class="small smsPin" data-id="${esc(p.id)}">${p.pinned?'고정 해제':'📌 고정'}</button></td></tr>`).join('')}</tbody></table>`
+      :`<p class="muted">${view==='checked'?'체크한 분이 없어요. 「전체 연락처에서 고르기」로 골라 주세요.':'찾는 분이 없어요.'}</p>`;
+    if(view==='all'&&!q&&SMS.people.length>300)$('smsRows').insertAdjacentHTML('beforeend','<p class="small muted">300명까지 보여요. 이름으로 검색해 주세요.</p>');
+    $('smsRows').querySelectorAll('.smsChk').forEach(c=>c.onchange=()=>{const p=SMS.people.find(x=>x.id===c.dataset.id);
+      if(c.checked){SMS.off.delete(p.id);if(!p.auto)SMS.on.add(p.id);}else{SMS.on.delete(p.id);if(p.auto)SMS.off.add(p.id);}render();});
+    $('smsRows').querySelectorAll('.smsPin').forEach(b=>b.onclick=async()=>{const p=SMS.people.find(x=>x.id===b.dataset.id);b.disabled=true;
+      try{await api('setSmsPin',{name:p.name,on:!p.pinned});
+        if(p.pinned)SMS.data.pins=SMS.data.pins.filter(x=>nm(x.name)!==p.key);else SMS.data.pins.push({name:p.name});
+        msg(p.pinned?`${p.name}님 고정을 풀었어요.`:`${p.name}님을 고정했어요. 다음 달에도 자동으로 체크돼요.`);build();}
+      catch(e){msg(e.message);b.disabled=false;}});
+    // 연락처를 못 찾은 분
+    const U=SMS.unmatched,line=list=>list.map(u=>`${esc(u.name)} <span class="muted">(${esc((u.reasons.length?u.reasons:['📌 고정']).join(', '))})</span>`).join(' · ');
+    const dupNames=new Map();SMS.people.filter(p=>p.dup&&(p.reasons.length||p.pinned)).forEach(p=>dupNames.set(p.key,p));
+    const opt=SMS.people.filter(p=>p.optOut&&(p.reasons.length||p.pinned));
+    let miss='';
+    if(U.length)miss+=`<details class="smsMiss" open><summary>연락처를 못 찾은 분 ${U.length}명</summary><p class="small muted">「후원자연락처」 탭에 없거나 이름 표기가 달라요(띄어쓰기·(주)는 무시하고 맞춰요). 탭에 추가하거나 이름을 맞춘 뒤 「명단 만들기」를 다시 눌러 주세요.</p><p class="small">${line(U)}</p></details>`;
+    if(dupNames.size)miss+=`<details class="smsMiss" open><summary>같은 이름이 여러 명이라 체크하지 않은 분 ${dupNames.size}명</summary><p class="small muted">「전체 연락처에서 고르기」에서 이름을 검색해 맞는 분만 체크해 주세요. 연락처 탭에 후원자번호를 넣어 두면 CMS 후원자는 번호로 정확히 맞춰요.</p><p class="small">${line([...dupNames.values()])}</p></details>`;
+    if(opt.length)miss+=`<details class="smsMiss"><summary>문자 수신 안 함이라 뺀 분 ${opt.length}명</summary><p class="small">${line(opt)}</p></details>`;
+    $('smsMissBox').innerHTML=miss;
+  }
+
+  function picked(){const seen=new Set(),out=[];let skipped=0,dupPhone=0;
+    SMS.people.filter(isOn).forEach(p=>{if(!p.hasPhone){skipped++;return;}const d=digits(p.phone);if(seen.has(d)){dupPhone++;return;}seen.add(d);out.push(p);});
+    return {out,skipped,dupPhone};}
+  async function copyList(){const {out,skipped,dupPhone}=picked(),mailOnly=SMS.people.filter(p=>isOn(p)&&!p.hasPhone&&p.email).length;
+    if(!out.length){msg('복사할 연락처가 없어요.');return;}
+    const ok=await copyText(['이름\t연락처',...out.map(p=>`${String(p.name).replace(/\s+/g,' ')}\t${p.phone}`)].join('\n'));
+    msg(ok?`${out.length}명을 복사했어요. 엑셀 A1칸에 붙여넣으세요.`+(skipped?` (휴대폰 번호 없는 ${skipped}명 제외${mailOnly?` · 그중 ${mailOnly}명은 「메일 주소 복사」로`:''})`:'')+(dupPhone?` (같은 번호 ${dupPhone}건은 한 번만)`:''):'복사가 막혔어요. 「엑셀로 받기」를 써 주세요.');}
+  // 휴대폰 번호 없이 메일만 있는 분(주로 업체) → 받는 사람 칸에 붙일 수 있게
+  async function copyMail(){const list=[...new Set(SMS.people.filter(p=>isOn(p)&&!p.hasPhone&&p.email).map(p=>p.email))];
+    if(!list.length){msg('복사할 메일 주소가 없어요.');return;}
+    const ok=await copyText(list.join(', '));
+    msg(ok?`메일 주소 ${list.length}개를 복사했어요. 메일 받는 사람(또는 숨은 참조) 칸에 붙여넣으세요.`:'복사가 막혔어요. 다른 브라우저로 열어 주세요.');}
+  function xlsxList(){const {out,skipped}=picked();if(!out.length){msg('받을 연락처가 없어요.');return;}
+    xlsxDownload(`후원자 문자 명단 ${ym()}.xlsx`,[['이름','연락처'],...out.map(p=>[p.name,p.phone])]);
+    msg(`${out.length}명을 엑셀로 받았어요.`+(skipped?` (연락처 없는 ${skipped}명 제외)`:''));}
+})();
+</script>
