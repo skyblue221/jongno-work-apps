@@ -278,9 +278,10 @@ function appendRows_(key, objs) {
   const inDateWritable = m.cols.inDate && !auto[m.cols.inDate];
   const start = last + 1, n = objs.length;
   const block = sh.getRange(start, 1, n, lastCol), curF = block.getFormulas(), curV = block.getValues();
-  objs.forEach((o, i) => {
+  guardBlock_(sh, start, curV, curF, auto); // 실패하면 이 줄들만 원래대로 되돌릴 수 있게 기억
+  // 줄마다 칸별 할 일: 값 쓰기(v) / 윗줄 수식 이어 쓰기(f) / 그대로 두기(null)
+  const plans = objs.map((o, i) => {
     if (o.inDate && !inDateWritable) o.note = ((o.note || '') + ' (입고 ' + o.inDate + ')').trim();
-    // 칸마다 할 일: 값 쓰기(v) / 윗줄 수식 이어 쓰기(f) / 그대로 두기(null)
     const acts = [];
     for (let c = 1; c <= lastCol; c++) {
       const f = fieldOf[c];
@@ -289,16 +290,25 @@ function appendRows_(key, objs) {
       else if (tplF[c - 1] && tplF[c - 1].indexOf('#REF!') < 0 && !curF[i][c - 1] && curV[i][c - 1] === '') acts.push({ t: 'f', v: tplF[c - 1] });
       else acts.push(null);
     }
-    // 같은 종류가 이어지는 칸은 한 번에 씀
+    // 같은 종류가 이어지는 칸 묶음 [시작, 끝, 종류]
+    const segs = [];
     for (let c = 0; c < acts.length;) {
       if (!acts[c]) { c++; continue; }
       let e = c; while (e + 1 < acts.length && acts[e + 1] && acts[e + 1].t === acts[c].t) e++;
-      const rg = sh.getRange(start + i, c + 1, 1, e - c + 1), vals = [acts.slice(c, e + 1).map(a => a.v)];
-      if (acts[c].t === 'v') rg.setValues(vals); else rg.setFormulasR1C1(vals);
-      c = e + 1;
+      segs.push([c, e, acts[c].t]); c = e + 1;
     }
+    return { acts: acts, segs: segs, sig: JSON.stringify(segs) };
   });
-  SpreadsheetApp.flush();
+  // 칸 모양이 같은 줄끼리는 여러 줄을 한 번에 씀 (줄마다 따로 쓰면 아주 느림)
+  for (let i = 0; i < plans.length;) {
+    let j = i; while (j + 1 < plans.length && plans[j + 1].sig === plans[i].sig) j++;
+    plans[i].segs.forEach(([c, e, t]) => {
+      const rg = sh.getRange(start + i, c + 1, j - i + 1, e - c + 1);
+      const vals = plans.slice(i, j + 1).map(p => p.acts.slice(c, e + 1).map(a => a.v));
+      if (t === 'v') rg.setValues(vals); else rg.setFormulasR1C1(vals);
+    });
+    i = j + 1;
+  }
 }
 function own_(k) {
   delete MEMO['own_' + k]; // 이 탭에 쓰기 전에 읽어 둔 것을 비움
@@ -427,7 +437,7 @@ function createTeamReceipt(p,requestId) {
 
     const items = lots.map(l => ({ key: l.key, name: l.name, inDate: l.inDate, donor: l.donor, unit: l.unit, inQty: l.inQty, give: need[l.key] || 0, remainAfter: l.remain - (need[l.key] || 0) }));
     const ppl = people.map(x => ({ name: str_(x.name), team: str_(x.team), qty: x.qty, sig: '', at: '' }));
-    own_('RCPT').appendRow([id, '팀', no, date, me_(), '서명 대기', JSON.stringify(items), JSON.stringify(ppl), '', str_(p.note), new Date()]);
+    appendOwn_('RCPT', [id, '팀', no, date, me_(), '서명 대기', JSON.stringify(items), JSON.stringify(ppl), '', str_(p.note), new Date()]);
     return { id: id, url: ScriptApp.getService().getUrl() + '?r=' + id };
   });
 }
@@ -454,6 +464,7 @@ function signReceipt(id, idx, dataUrl,requestId) {
     const f = saveDataUrl_(dataUrl, ['서명', x.r[0]], x.r[0] + '_' + (idx + 1) + '.png');
     p.sig = f.getId(); p.at = today_();
     const sh = own_('RCPT');
+    guardRows_(sh, [x.row]);
     sh.getRange(x.row, 8).setValue(JSON.stringify(ppl));
     if (ppl.every(q => q.sig)) sh.getRange(x.row, 6).setValue('완료');
     x.r[7] = JSON.stringify(ppl); if (ppl.every(q => q.sig)) x.r[5] = '완료';
@@ -470,7 +481,7 @@ function saveReceiptPdf(id, html, version,requestId) {
   const kind = x.r[1] === '기관' ? '인수증' : '수령증';
   const blob = Utilities.newBlob(pdfColorHtml_(html), 'text/html', 'r.html').getAs('application/pdf').setName(kind + '_' + x.r[2] + '.pdf');
   const f = trackedFile_(folder_([kind, d.slice(0, 4), d.slice(5, 7)]),blob);
-  if (x.r[1] === '팀' || x.r[1] === '상품권') own_('RCPT').getRange(x.row, 9).setValue(f.getId());
+  if (x.r[1] === '팀' || x.r[1] === '상품권') { const sh = own_('RCPT'); guardRows_(sh, [x.row]); sh.getRange(x.row, 9).setValue(f.getId()); }
   if (x.r[1] === '상품권' && x.r[5] === '완료') { const p0 = JSON.parse(x.r[7] || '[]')[0]; if (p0 && p0.af) { try { DriveApp.getFileById(p0.af).setTrashed(true); } catch (e) {} } }
   return 'https://drive.google.com/file/d/' + f.getId() + '/view';
 
@@ -513,7 +524,7 @@ function requestHome(p,requestId) {
       const f = trackedFile_(folder_(['가정배분_임시명단']),id + '.json', JSON.stringify(data), 'application/json');
       row[9] = '서명 대기'; row[11] = f.getId();
     }
-    own_('HOME').appendRow(row);
+    appendOwn_('HOME', row);
     return id;
   });
 }
@@ -527,6 +538,7 @@ function confirmHome(id, ok,requestId) {
     const x = ownRows_('HOME').find(y => y.r[0] === id);
     if (!x || x.r[6] !== '확인 대기') throw new Error('이미 처리됐어요.');
     const sh = own_('HOME');
+    guardRows_(sh, [x.row]);
     if (!ok) {
       sh.getRange(x.row, 7, 1, 2).setValues([['취소', today_()]]);
       if (x.r[11]) { try { DriveApp.getFileById(x.r[11]).setTrashed(true); } catch (e) {} sh.getRange(x.row, 10, 1, 3).setValues([['취소', '', '']]); }
@@ -636,7 +648,8 @@ function finishHome(id, html,requestId) {
     const x = findHome_(id), h = homeData_(x), d = h.d;
     const blob = Utilities.newBlob(pdfColorHtml_(html), 'text/html', 'r.html').getAs('application/pdf').setName('가정배분 수령증_' + d.date + '_' + d.manager + '.pdf');
     const pdf = trackedFile_(folder_(['가정배분 수령증', d.date.slice(0, 4), d.date.slice(5, 7)]),blob);
-    own_('HOME').getRange(x.row, 10, 1, 3).setValues([['서명 완료', pdf.getId(), '']]);
+    const sh = own_('HOME'); guardRows_(sh, [x.row]);
+    sh.getRange(x.row, 10, 1, 3).setValues([['서명 완료', pdf.getId(), '']]);
     h.f.setTrashed(true);
     return true;
   });
@@ -647,7 +660,7 @@ function listOrgs() { needAdmin_(); return ownRows_('ORG').map(x => ({ name: x.r
 function saveOrg_(o) {
   const sh = own_('ORG'), x = ownRows_('ORG').find(y => y.r[0] === o.name);
   const row = [o.name, o.ceo || '', o.addr || '', o.tel || '', o.contact || '', ''];
-  if (x) sh.getRange(x.row, 1, 1, 6).setValues([row]); else sh.appendRow(row);
+  if (x) { guardRows_(sh, [x.row]); sh.getRange(x.row, 1, 1, 6).setValues([row]); } else { guardTail_(sh); sh.appendRow(row); }
 }
 function createOrgReceipt(p,requestId) {
   needAdmin_();
@@ -663,7 +676,7 @@ function createOrgReceipt(p,requestId) {
 
     const units = {}; p.items.forEach(i => { units[i.key] = i.unit; });
     const items = lots.filter(l => need[l.key] > 0).map(l => ({ key: l.key, name: l.name, inDate: l.inDate, unit: str_(units[l.key]) || l.unit || '개', give: need[l.key] }));
-    own_('RCPT').appendRow([id, '기관', no, date, me_(), '회수 대기', JSON.stringify(items), JSON.stringify(org), '', str_(p.note), new Date()]);
+    appendOwn_('RCPT', [id, '기관', no, date, me_(), '회수 대기', JSON.stringify(items), JSON.stringify(org), '', str_(p.note), new Date()]);
     return rcptObj_(findRcpt_(id), false);
   });
 }
@@ -671,6 +684,7 @@ function markOrgReturned(id, scan,requestId) {
   needAdmin_();
  return withMutation_('markOrgReturned',requestId,[id,scan],()=>{
   const x = findRcpt_(id), sh = own_('RCPT');
+  guardRows_(sh, [x.row]);
   if (scan && scan.dataUrl) {
     const d = ymd_(x.r[3]) || today_();
     const f = saveDataUrl_(scan.dataUrl, ['인수증', d.slice(0, 4), d.slice(5, 7)], '인수증_직인_' + x.r[2] + '_' + (scan.name || 'scan'));
@@ -687,12 +701,13 @@ function markOrgReturned(id, scan,requestId) {
 /** 배분 기록에서 이 수령증 줄(배분번호 + 수령인 + 품목)을 찾아 고치고, 없어진 줄은 지우고, 새 줄은 더함 */
 function syncDist_(no,oldPairs,rows,rename,recordId){
  if(!recordId)throw Error('배분 기록 연결번호가 없어요. 새로고침해주세요.');
- linkLegacyDist_(recordId,no);const m=mapOrThrow_('DIST'),sh=sheet_('DIST'),auto=autoCols_(sh,m.headerRow),cand=readSheet_('DIST').filter(r=>str_(r.recordId)===recordId&&oldPairs.some(p=>p.person===str_(r.person)&&p.name===str_(r.name)&&(!p.inDate||incomingDate_(r)===p.inDate))),keep=new Set(),add=[];
+ linkLegacyDist_(recordId,no);const m=mapOrThrow_('DIST'),sh=sheet_('DIST'),auto=autoCols_(sh,m.headerRow),cand=readSheet_('DIST').filter(r=>str_(r.recordId)===recordId&&oldPairs.some(p=>p.person===str_(r.person)&&p.name===str_(r.name)&&(!p.inDate||incomingDate_(r)===p.inDate))),keep=new Set(),add=[],w=cellWriter_(sh,auto);
  for(const o of rows){if(!(o.qty>0))continue;const before=(rename&&rename[o.person])||o.person;
   const hit=cand.find(r=>!keep.has(r._row)&&str_(r.name)===o.name&&str_(r.person)===before&&(!o.inDate||incomingDate_(r)===o.inDate));if(!hit){add.push(o);continue;}keep.add(hit._row);
   const data=Object.assign({},o);if(o.inDate&&(!m.cols.inDate||auto[m.cols.inDate]))data.note=((o.note||'')+' (입고 '+o.inDate+')').trim();
-  ['date','person','team','addr','qty','note'].forEach(f=>{const col=m.cols[f];if(col&&!auto[col]&&data[f]!==undefined)sh.getRange(hit._row,col).setValue(f==='date'?toDate_(data[f]):data[f]);});
+  ['date','person','team','addr','qty','note'].forEach(f=>{if(data[f]!==undefined)w.set(hit._row,m.cols[f],f==='date'?toDate_(data[f]):data[f]);});
  }
+ w.flush(); // 줄을 지우기 전에 고친 칸부터 한 번에 씀
  cand.filter(r=>!keep.has(r._row)).map(r=>r._row).sort((a,b)=>b-a).forEach(row=>sh.deleteRow(row));if(add.length)appendDist_(recordId,add);
 }
 /** 수정할 때 쓸 수 있는 수량 = 지금 남은 수량 + 이 수령증이 이미 가져간 수량 */
@@ -770,7 +785,7 @@ function dispose(p,requestId) {
     if (p.photo && p.photo.dataUrl) { const f = saveDataUrl_(p.photo.dataUrl, ['폐기사진', date.slice(0, 4)], date + '_' + items[0].name + '_' + (p.photo.name || 'photo.jpg')); photoId = f.getId(); link = f.getUrl(); }
     appendRows_('DISP', items.map(it => Object.assign(dispRow_(it, date, p.reason, link),{recordId:id})));
 
-    own_('DLOG').appendRow([id, date, JSON.stringify(items), str_(p.reason), photoId, me_(), new Date()]);
+    appendOwn_('DLOG', [id, date, JSON.stringify(items), str_(p.reason), photoId, me_(), new Date()]);
     return getDisposal(id);
   });
 }
@@ -870,10 +885,11 @@ function giveVouchers(p,requestId) {
     people.forEach(x => x.serials.forEach(sr => { const l = link[vGroup_(bySerial[sr])]; if (l) need[l] = (need[l] || 0) + 1; }));
     Object.keys(need).forEach(k => { const l = st[k]; if (!l) throw new Error('연결한 후원품을 찾을 수 없어요.'); if (need[k] > l.remain) throw new Error('후원품 「' + l.name + '」 남은 수량(' + l.remain + ')보다 많아요. 후원품 기록이 맞지 않으면 「연결 안 함」으로 해 주세요.'); });
     // 관리대장 기록
-    const set = (row, f, val) => { const c = m.cols[f]; if (c && !auto[c]) sh.getRange(row, c).setValue(f === 'outDate' ? toDate_(val) : val); };
+    const w = cellWriter_(sh, auto), set = (row, f, val) => w.set(row, m.cols[f], f === 'outDate' ? toDate_(val) : val);
     people.forEach(x => x.serials.forEach(sr => { const row = bySerial[sr].row;
       set(row, 'outDate', date); set(row, 'purpose', str_(p.purpose)); set(row, 'person', str_(x.name)); set(row, 'check', str_(p.check) || '수령증 확인');
       set(row, 'status', '지급완료'); set(row, 'outBy', str_(p.outBy)); if (str_(p.note)) set(row, 'note', str_(p.note)); }));
+    w.flush(); // 칸마다 따로 쓰지 않고 모아서 한 번에
     // 배분 기록 (연결한 후원품만)
     const id=newRecordId_('V'),no = date + '_' + groups[order[0]].kind + (order.length > 1 ? ' 외 ' + (order.length - 1) : '')+'_'+id.slice(-6);
     const dist = [];
@@ -891,7 +907,7 @@ function giveVouchers(p,requestId) {
     const af = addrs.some(Boolean) ? trackedFile_(folder_(['상품권_수령자주소']),id + '.json', JSON.stringify(addrs), 'application/json').getId() : '';
     const ppl = people.map(x => { const q = {}; order.forEach(g => { q[g] = x.serials.filter(sr => vGroup_(bySerial[sr]) === g).length; });
       return { name: str_(x.name), team: x.type === '당사자' ? '' : str_(x.team), who: x.type === '당사자' ? '당사자' : '직원', idType:x.idType==='생년월일'?'생년월일':'주소', qty: q, serials: x.serials, sig: '', at: '', af: af }; });
-    own_('RCPT').appendRow([id, '상품권', no, date, me_(), '서명 대기', JSON.stringify(items), JSON.stringify(ppl), '', str_(p.purpose), new Date()]);
+    appendOwn_('RCPT', [id, '상품권', no, date, me_(), '서명 대기', JSON.stringify(items), JSON.stringify(ppl), '', str_(p.purpose), new Date()]);
     return id;
   });
 }
@@ -905,7 +921,7 @@ function updateVoucherGive(id, list,requestId) {
     const items = JSON.parse(x.r[6] || '[]'), old = JSON.parse(x.r[7] || '[]');
     const m = mapOrThrow_('VOUCH'), sh = sheet_('VOUCH'), auto = autoCols_(sh, m.headerRow), bySerial = {};
     vouchers_().forEach(v => { bySerial[v.serial] = v; });
-    const set = (row, f, val) => { const c = m.cols[f]; if (c && !auto[c]) sh.getRange(row, c).setValue(val); };
+    const w = cellWriter_(sh, auto), set = (row, f, val) => w.set(row, m.cols[f], val);
     let af = old[0] && old[0].af,oldAddrs=[];if(af){oldAddrs=JSON.parse(DriveApp.getFileById(af).getBlob().getDataAsString());}
     const nu = (list || []).map(q => {
       const o = old[q.i]; if (!o) return null;
@@ -924,6 +940,7 @@ function updateVoucherGive(id, list,requestId) {
     old.forEach(o => o.serials.forEach(sr => { const v = bySerial[sr]; if (!v) return;
       if (!kept[sr]) { ['outDate', 'purpose', 'person', 'check', 'outBy'].forEach(f => set(v.row, f, '')); set(v.row, 'status', '보유'); }
       else if (kept[sr].name !== o.name) set(v.row, 'person', kept[sr].name); }));
+    w.flush();
     // 배분 기록 (연결한 후원품)
     const st = stockMap_(), rename = {}; nu.forEach(p => { if (p.name !== p.from) rename[p.name] = p.from; });
     const oldPairs=[],distRows=[];
@@ -951,9 +968,11 @@ function cancelVoucherGive(id,requestId) {
     const items = JSON.parse(x.r[6] || '[]'), ppl = JSON.parse(x.r[7] || '[]');
     const m = mapOrThrow_('VOUCH'), sh = sheet_('VOUCH'), auto = autoCols_(sh, m.headerRow), bySerial = {};
     vouchers_().forEach(v => { bySerial[v.serial] = v; });
+    const w = cellWriter_(sh, auto);
     ppl.forEach(p => (p.serials || []).forEach(sr => { const v = bySerial[sr]; if (!v) return;
-      ['outDate', 'purpose', 'person', 'check', 'outBy'].forEach(f => { const c = m.cols[f]; if (c && !auto[c]) sh.getRange(v.row, f === 'outDate' ? c : c).setValue(''); });
-      const c = m.cols.status; if (c && !auto[c]) sh.getRange(v.row, c).setValue('보유'); }));
+      ['outDate', 'purpose', 'person', 'check', 'outBy'].forEach(f => w.set(v.row, m.cols[f], ''));
+      w.set(v.row, m.cols.status, '보유'); }));
+    w.flush();
     const st = stockMap_(), pairs = [], rows = [];
     items.forEach(it => { const l = it.link && st[it.link]; if (!l) return; ppl.forEach(p => { pairs.push({ person: p.name, name: l.name,inDate:l.inDate }); rows.push({ name: l.name, person: p.name, qty: 0 }); }); });
     if (pairs.length) syncDist_(x.r[2], pairs, rows,null,id);
@@ -1089,7 +1108,16 @@ function validateMutation_(kind,args){
  if(kind==='addVouchers'&&(!Number.isInteger(quantity_(p.face,'면액'))||quantity_(p.face)<1))throw Error('면액은 1원 이상의 정수로 입력해주세요.');
 }
 function journal_(){let sh=ss_().getSheetByName('앱_작업기록');if(!sh){sh=ss_().insertSheet('앱_작업기록');sh.appendRow(['요청ID','작업','입력지문','상태','결과','복구정보','오류','시각']);sh.setFrozenRows(1);sh.hideSheet();}return sh;}
-function journalRows_(sh){return sh.getLastRow()<2?[]:sh.getRange(2,1,sh.getLastRow()-1,8).getValues().map((r,i)=>({row:i+2,r}));}
+/** 작업기록은 짧은 4칸(요청ID·작업·입력지문·상태)만 읽어요. 복구정보·결과는 필요한 줄만 따로 읽음 */
+function journalIndex_(sh){return sh.getLastRow()<2?[]:sh.getRange(2,1,sh.getLastRow()-1,4).getValues().map((r,i)=>({row:i+2,r}));}
+const JOURNAL_PENDING=['처리중','준비중','복구필요'],JOURNAL_MAX=500,JOURNAL_KEEP=200;
+/** 작업기록이 길어지면 오래된(끝난) 기록을 한 번에 정리 — 매번 읽는 양이 늘지 않게 */
+function pruneJournal_(sh,rows){
+ if(rows.length<=JOURNAL_MAX)return false;
+ const cut=rows.length-JOURNAL_KEEP;
+ if(rows.slice(0,cut).some(x=>JOURNAL_PENDING.includes(x.r[3])))return false;
+ sh.deleteRows(2,cut);return true;
+}
 function journalWrite_(ctx,status,result,error){ctx.sh.getRange(ctx.row,4,1,5).setValues([[status,result===undefined?'':JSON.stringify(result),JSON.stringify(ctx.meta),String(error||'').slice(0,4000),new Date()]]);SpreadsheetApp.flush();}
 function sheetById_(id){const sh=ss_().getSheets().find(s=>s.getSheetId()===id);if(!sh)throw Error('복구할 시트가 없어요: '+id);return sh;}
 function snapshotSheet_(ctx,key){
@@ -1109,6 +1137,7 @@ function snapshotFiles_(ctx,kind,args){
 }
 function trackedFile_(folder,...args){const f=folder.createFile(...args);if(ACTIVE_OP){ACTIVE_OP.meta.created.push(f.getId());journalWrite_(ACTIVE_OP,'처리중');}return f;}
 function restoreOperation_(meta){
+ if(meta.light)restoreLight_(meta);
  for(const item of meta.sheets||[]){const sh=sheetById_(item.source),backup=sheetById_(item.backup),rg=backup.getRange(1,1,item.rows,item.cols),values=rg.getValues(),packed=rg.getNotes();
   const formulas=packed.map(row=>row.map(v=>v?JSON.parse(v).f:'')),notes=packed.map(row=>row.map(v=>v?JSON.parse(v).n:''));
   if(sh.getMaxRows()<item.maxRows)sh.insertRowsAfter(sh.getMaxRows(),item.maxRows-sh.getMaxRows());if(sh.getMaxColumns()<item.maxCols)sh.insertColumnsAfter(sh.getMaxColumns(),item.maxCols-sh.getMaxColumns());
@@ -1121,26 +1150,105 @@ function restoreOperation_(meta){
  for(const id of meta.created||[])DriveApp.getFileById(id).setTrashed(true);
  clearCache_();
 }
-function cleanupOperation_(meta){for(const item of meta.sheets||[]){try{ss_().deleteSheet(sheetById_(item.backup));}catch(e){}}for(const item of meta.files||[]){try{DriveApp.getFileById(item.backup).setTrashed(true);}catch(e){}}}
+function cleanupOperation_(meta){for(const id of meta.stash||[]){try{DriveApp.getFileById(id).setTrashed(true);}catch(e){}}for(const item of meta.sheets||[]){try{ss_().deleteSheet(sheetById_(item.backup));}catch(e){}}for(const item of meta.files||[]){try{DriveApp.getFileById(item.backup).setTrashed(true);}catch(e){}}}
 function resultRef_(kind,result){if(result&&result.id){if(['updateHomeSign','signHome'].includes(kind))return {ref:'home',id:result.id};if(['dispose','updateDisposal'].includes(kind))return {ref:'disposal',id:result.id};if(['createOrgReceipt','updateOrgReceipt','updateTeamReceipt','updateVoucherGive','signReceipt'].includes(kind))return {ref:'receipt',id:result.id};}return {value:result};}
 function resolveResult_(r){return r.ref==='receipt'?getReceipt(r.id):r.ref==='home'?getHomeSign(r.id):r.ref==='disposal'?getDisposal(r.id):r.value;}
 function withMutation_(kind,requestId,args,fn){
  if(!/^[A-Za-z0-9_-]{8,100}$/.test(String(requestId||'')))throw Error('앱을 새로고침한 뒤 다시 시도해주세요.');
  validateMutation_(kind,args);
  return withLock_(()=>{const sh=journal_(),id=hash_(me_()+'|'+kind+'|'+requestId),fingerprint=hash_(JSON.stringify(args));
+  let rows=journalIndex_(sh);
   // 시간 초과된 이전 실행도 다음 저장 전에 복구합니다.
-  for(const old of journalRows_(sh).filter(x=>['처리중','준비중','복구필요'].includes(x.r[3]))){const previous={sh,row:old.row,id:old.r[0],meta:JSON.parse(old.r[5]||'{}')};try{if(old.r[3]!=='준비중')restoreOperation_(previous.meta);journalWrite_(previous,'복구완료',undefined,'이전 실행 복구');cleanupOperation_(previous.meta);}catch(e){journalWrite_(previous,'복구필요',undefined,e.message);throw Error('이전 저장 작업을 복구하지 못해 새 저장을 중단했어요. 관리자에게 알려주세요. 복구 기록: '+old.r[0]);}}
-  let old=journalRows_(sh).find(x=>x.r[0]===id);
+  for(const old of rows.filter(x=>JOURNAL_PENDING.includes(x.r[3]))){const previous={sh,row:old.row,id:old.r[0],meta:JSON.parse(sh.getRange(old.row,6).getValue()||'{}')};try{if(old.r[3]!=='준비중')restoreOperation_(previous.meta);finishJournal_(previous,'복구완료',undefined,'이전 실행 복구');}catch(e){journalWrite_(previous,'복구필요',undefined,e.message);throw Error('이전 저장 작업을 복구하지 못해 새 저장을 중단했어요. 관리자에게 알려주세요. 복구 기록: '+old.r[0]);}}
+  if(pruneJournal_(sh,rows))rows=journalIndex_(sh);
+  const old=rows.find(x=>x.r[0]===id);
   if(old&&old.r[2]!==fingerprint)throw Error('같은 요청의 입력 내용이 바뀌었어요. 이전 결과를 확인하고 새 화면에서 다시 작성해주세요.');
-  if(old&&old.r[3]==='완료')return resolveResult_(JSON.parse(old.r[4]));
-  if(!old){sh.appendRow([id,kind,fingerprint,'준비중','','','',new Date()]);old={row:sh.getLastRow()};}
-  const ctx={sh,row:old.row,id,meta:{sheets:[],files:[],created:[]}};journalWrite_(ctx,'준비중');
+  if(old&&old.r[3]==='완료')return resolveResult_(JSON.parse(sh.getRange(old.row,5).getValue()));
+  // 자주 쓰는 저장(새로 추가·서명·확인)은 시트를 통째로 복사하지 않고, 이번에 건드리는 줄만 기억했다가 실패하면 그 줄만 되돌려요.
+  const light=LIGHT_OPS.includes(kind);
+  const ctx={sh,id,seen:{},meta:light?{light:true,blocks:[],tails:{},stash:[],files:[],created:[]}:{sheets:[],files:[],created:[]}};
+  if(old){ctx.row=old.row;journalWrite_(ctx,'준비중');}
+  else{sh.appendRow([id,kind,fingerprint,'준비중','',JSON.stringify(ctx.meta),'',new Date()]);ctx.row=sh.getLastRow();}
   try{const targets=MUTATION_TARGETS[kind]||[];for(const key of targets)if(['DIST','DISP'].includes(key))ensureRecordColumn_(key);
-   for(const key of targets)snapshotSheet_(ctx,key);snapshotFiles_(ctx,kind,args);journalWrite_(ctx,'처리중');ACTIVE_OP=ctx;ctx.executing=true;
-   const result=fn();SpreadsheetApp.flush();journalWrite_(ctx,'완료',resultRef_(kind,result));ACTIVE_OP=null;cleanupOperation_(ctx.meta);return result;
-  }catch(e){ACTIVE_OP=null;try{if(ctx.executing)restoreOperation_(ctx.meta);journalWrite_(ctx,'복구완료',undefined,e.message);cleanupOperation_(ctx.meta);}catch(recovery){journalWrite_(ctx,'복구필요',undefined,recovery.message);throw Error('저장 중 오류가 났고 자동 복구를 확인하지 못했어요. 관리자에게 알려주세요. 복구 기록: '+id);}
+   if(!light)for(const key of targets)snapshotSheet_(ctx,key);
+   snapshotFiles_(ctx,kind,args);journalWrite_(ctx,'처리중');ACTIVE_OP=ctx;ctx.executing=true;
+   const result=fn();SpreadsheetApp.flush();ACTIVE_OP=null;finishJournal_(ctx,'완료',resultRef_(kind,result));return result;
+  }catch(e){ACTIVE_OP=null;try{if(ctx.executing)restoreOperation_(ctx.meta);finishJournal_(ctx,'복구완료',undefined,e.message);}catch(recovery){journalWrite_(ctx,'복구필요',undefined,recovery.message);throw Error('저장 중 오류가 났고 자동 복구를 확인하지 못했어요. 관리자에게 알려주세요. 복구 기록: '+id);}
    throw Error('저장하지 못해 이전 자료로 복구했어요. 같은 버튼으로 다시 시도할 수 있어요. ('+(e.message||e)+')');}
  });
+}
+/** 끝난 작업: 기록을 남기고 백업을 정리. 가벼운 저장은 되돌리기 정보를 비워 작업기록이 무거워지지 않게 함 */
+function finishJournal_(ctx,status,result,error){const meta=ctx.meta;if(meta.light)ctx.meta={light:true};journalWrite_(ctx,status,result,error);cleanupOperation_(meta);}
+
+/* ───────── 가벼운 되돌리기: 이번 저장이 건드리는 줄만 기억 ───────── */
+const LIGHT_OPS=['createTeamReceipt','createOrgReceipt','requestHome','confirmHome','dispose','addVouchers','giveVouchers','signReceipt','signHome','finishHome','saveReceiptPdf','markOrgReturned'];
+function lightCtx_(){return ACTIVE_OP&&ACTIVE_OP.meta.light?ACTIVE_OP:null;}
+/** [3,4,5,8] → [[3,5],[8,8]] (이어지는 번호 묶음) */
+function runs_(nums){const out=[];nums.forEach(n=>{const last=out[out.length-1];if(last&&n===last[1]+1)last[1]=n;else out.push([n,n]);});return out;}
+const packCell_=v=>v instanceof Date?{d:v.getTime()}:v;
+const unpackCell_=v=>v&&typeof v==='object'&&'d' in v?new Date(v.d):v;
+function pushBlock_(ctx,sh,row,values,formulas,auto){
+ const a=Object.keys(auto||{}).map(Number),base={s:sh.getSheetId(),r:row,n:values.length,w:values[0].length,a};
+ const empty=values.every((r,i)=>r.every((v,j)=>v===''&&!formulas[i][j]));
+ ctx.meta.blocks.push(empty?Object.assign(base,{e:1}):Object.assign(base,{v:values.map(r=>r.map(packCell_)),f:formulas}));
+}
+/** 고치기 전에 기억을 작업기록에 먼저 남김 (중간에 시간 초과돼도 다음 저장 때 되돌릴 수 있게). 너무 크면 드라이브 파일로 */
+function saveLight_(ctx){
+ if(JSON.stringify(ctx.meta).length>40000){
+  const big=ctx.meta.blocks.map((b,i)=>[b,i]).filter(([b])=>b.v);
+  if(big.length){const f=folder_(['작업복구']).createFile('되돌리기_'+ctx.id.slice(0,10)+'_'+Date.now()+'.json',JSON.stringify(big.map(([b])=>b)),'application/json');
+   ctx.meta.stash.push(f.getId());big.forEach(([b,i],at)=>{ctx.meta.blocks[i]={ref:f.getId(),at};});}
+ }
+ journalWrite_(ctx,'처리중');
+}
+/** appendRows_가 쓸 칸(이미 읽어 둔 값)을 기억 */
+function guardBlock_(sh,row,values,formulas,auto){
+ const ctx=lightCtx_();if(!ctx||!values.length)return;
+ const id=sh.getSheetId();for(let i=0;i<values.length;i++)ctx.seen[id+':'+(row+i)]=1;
+ pushBlock_(ctx,sh,row,values,formulas,auto);saveLight_(ctx);
+}
+/** 이미 있는 줄을 고치기 전에 그 줄만 기억 */
+function guardRows_(sh,rows,auto){
+ const ctx=lightCtx_();if(!ctx)return;
+ const id=sh.getSheetId(),todo=[...new Set(rows)].filter(r=>r>=1&&!ctx.seen[id+':'+r]).sort((a,b)=>a-b);if(!todo.length)return;
+ const width=Math.max(sh.getLastColumn(),1);
+ runs_(todo).forEach(([r0,r1])=>{const rg=sh.getRange(r0,1,r1-r0+1,width);for(let r=r0;r<=r1;r++)ctx.seen[id+':'+r]=1;pushBlock_(ctx,sh,r0,rg.getValues(),rg.getFormulas(),auto);});
+ saveLight_(ctx);
+}
+/** 앱 탭 맨 아래에 줄을 붙이기 전에 마지막 줄 번호만 기억 */
+function guardTail_(sh){const ctx=lightCtx_();if(!ctx)return;const id=String(sh.getSheetId());if(ctx.meta.tails[id]!==undefined)return;ctx.meta.tails[id]=sh.getLastRow();saveLight_(ctx);}
+function appendOwn_(k,row){const sh=own_(k);guardTail_(sh);sh.appendRow(row);}
+function restoreLight_(meta){
+ const files={},load=b=>{if(!b.ref)return b;if(!files[b.ref])files[b.ref]=JSON.parse(DriveApp.getFileById(b.ref).getBlob().getDataAsString());return files[b.ref][b.at];};
+ (meta.blocks||[]).slice().reverse().forEach(b0=>{
+  const b=load(b0),sh=sheetById_(b.s),skip=new Set(b.a||[]),cols=[];
+  for(let c=1;c<=b.w;c++)if(!skip.has(c))cols.push(c); // 배열 수식이 채우는 칸은 건드리지 않음
+  runs_(cols).forEach(([c0,c1])=>{const rg=sh.getRange(b.r,c0,b.n,c1-c0+1);
+   if(b.e){rg.clearContent();return;}
+   rg.setValues(b.v.map((row,i)=>row.slice(c0-1,c1).map((v,j)=>{const f=b.f[i][c0-1+j];if(f)return f;v=unpackCell_(v);return typeof v==='string'&&v[0]==='='?"'"+v:v;})));});
+ });
+ Object.keys(meta.tails||{}).forEach(id=>{const sh=sheetById_(Number(id)),keep=Math.max(1,meta.tails[id]),last=sh.getLastRow();if(last>keep)sh.deleteRows(keep+1,last-keep);});
+ SpreadsheetApp.flush();
+}
+/** 여러 칸을 모아 두었다가 한 번에 씀. 목록에 없는 칸은 원래 내용(수식 포함) 그대로 둠 */
+function cellWriter_(sh,auto){
+ const cells=new Map();
+ return {
+  set:(row,col,val)=>{if(col&&!(auto&&auto[col]))cells.set(row+':'+col,{r:row,c:col,v:val});},
+  flush:()=>{
+   if(!cells.size)return;
+   const list=[...cells.values()],rows=[...new Set(list.map(x=>x.r))].sort((a,b)=>a-b),cols=[...new Set(list.map(x=>x.c))].sort((a,b)=>a-b);
+   guardRows_(sh,rows,auto);
+   runs_(rows).forEach(([r0,r1])=>runs_(cols).forEach(([c0,c1])=>{
+    const touched=list.filter(x=>x.r>=r0&&x.r<=r1&&x.c>=c0&&x.c<=c1);if(!touched.length)return;
+    const rg=sh.getRange(r0,c0,r1-r0+1,c1-c0+1),vals=rg.getValues(),fs=rg.getFormulas();
+    const out=vals.map((row,i)=>row.map((v,j)=>fs[i][j]||(typeof v==='string'&&v[0]==='='?"'"+v:v)));
+    touched.forEach(x=>{out[x.r-r0][x.c-c0]=x.v;});
+    rg.setValues(out);
+   }));
+   cells.clear();
+  }
+ };
 }
 function ensureRecordColumn_(key){const sh=sheet_(key),m=map_(key);if(!sh||!m)return;const head=sh.getRange(m.headerRow,1,1,sh.getLastColumn()).getDisplayValues()[0],hits=head.map((v,i)=>str_(v)==='앱기록ID'?i+1:0).filter(Boolean);if(hits.length>1)throw Error('앱기록ID 열이 중복됐어요.');let col=hits[0];if(!col){col=sh.getLastColumn()+1;if(sh.getMaxColumns()<col)sh.insertColumnsAfter(sh.getMaxColumns(),col-sh.getMaxColumns());sh.getRange(m.headerRow,col).setValue('앱기록ID');}if(m.cols.recordId!==col){m.cols.recordId=col;props_().setProperty('MAP_'+key,JSON.stringify(m));}}
 function appendDist_(id,rows){appendRows_('DIST',rows.map(o=>Object.assign({},o,{recordId:id})));}

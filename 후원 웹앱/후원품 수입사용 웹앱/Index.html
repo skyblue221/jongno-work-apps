@@ -110,6 +110,8 @@ function tabs(){ const c=S.boot.counts||{}; c.stock=expiring().length; return S.
   : [['home','가정 배분'],['hsign','가정 서명']].concat(S.boot.vouch?[['vouch','상품권']]:[]).concat([['stock','재고',c.stock]]); }
 function buildNav(){ $('#nav').innerHTML = tabs().map(([k,t,n])=>`\x3cbutton data-k="${k}">${t}${n?`\x3cspan class="dot">${n}\x3c/span>`:''}\x3c/button>`).join(''); $('#nav').onclick=e=>{const b=e.target.closest('button'); if(b) go(b.dataset.k);}; }
 async function refreshStock(fresh){ S.stock = await run('getStock', false,!!fresh); buildNav(); document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.k===S.tab)); }
+/* 저장 직후 재고는 뒤에서 새로 불러옴 (다음 화면이 재고를 쓰지 않을 때만) — 저장 완료 안내를 기다리지 않고 바로 보여 줌 */
+function refreshStockLater(){ refreshStock().catch(e=>console.warn('재고 새로고침 실패', e)); }
 function go(k){
   S.tab=k; $('#main').onclick=null; $('#main').oninput=null; document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.k===k));
   if(!S.boot.setupOk && k!=='setup'){ $('#main').innerHTML=`\x3cdiv class="card note">${S.boot.admin?'먼저 \x3cb>설정\x3c/b> 탭에서 시트 칸을 확인해 주세요.':'관리자가 아직 앱을 설정하고 있어요. 조금 뒤에 다시 열어 주세요.'}\x3c/div>`; return; }
@@ -437,14 +439,14 @@ function homeView(){
     if(!confirm('명단(이름·선택한 주소 또는 생년월일)을 서명이 끝날 때까지만 잠긴 임시 파일에 저장해요. 서명을 마치면 수령증 PDF만 남고 임시 명단 파일은 휴지통으로 보내요. 계속할까요?')) return;
     await run('requestHome',{later:true,manager:H.manager,date:H.date,count:people.length,items:H.sel.map(k=>({key:k,qty:total(k)})),
       people:people.map(r=>({name:r.name,addr:r.addr,idType:H.idType,qty:Object.fromEntries(H.sel.map(k=>[k,qOf(r,k)]))}))});
-    S.home=null; await refreshStock(); if(S.boot.admin) bumpCount('home',1);
+    S.home=null; refreshStockLater(); if(S.boot.admin) bumpCount('home',1);
     toast('저장했어요. 가정 서명 탭에서 이어서 서명받을 수 있어요.',3500); go('hsign');
   }, '저장 중...');
   $('#hSend').onclick=e=>act(e.target, async()=>{
     checkInputQuantities(H.rows);if(H.sent) throw '이미 요청했어요.'; if(!H.manager) throw '사례 담당자 이름을 골라 주세요.';
     const people=H.rows.filter(r=>r.name); if(!H.sel.length||!people.length) throw '물품과 명단을 넣어 주세요.';
     await run('requestHome',{manager:H.manager,date:H.date,count:people.length,items:H.sel.map(k=>({key:k,qty:total(k)}))});
-    H.sent=true; await refreshStock(); if(S.boot.admin) bumpCount('home',1);
+    H.sent=true; refreshStockLater(); if(S.boot.admin) bumpCount('home',1);
     $('#hMsg').innerHTML=`\x3cp class="note">min에게 확인 요청을 보냈어요. 기록에는 \x3cb>${people.length}명 · 수량\x3c/b>만 남았어요. 수령증을 다 뽑았으면 \x3cb>명단 지우기\x3c/b>를 눌러 주세요.\x3c/p>`;
   }, '보내는 중...');
   drawRows();
@@ -635,7 +637,7 @@ async function homeOkView(){
   \x3cdiv class="card">\x3ch2>최근 처리\x3c/h2>${done.length?`\x3ctable class="tbl">${done.map(x=>`\x3ctr>\x3ctd>${esc(x.manager)} · ${esc(x.date)} · ${x.count}명\x3cbr>\x3cspan class="muted">${line(x)}\x3c/span>\x3c/td>\x3ctd style="white-space:nowrap">\x3cspan class="tag ${x.status==='확인'?'ok':''}">${esc(x.status)}\x3c/span>${x.status==='확인'&&!x.sign?` \x3cbutton class="btn sm line" data-ed="${x.id}">수정\x3c/button>`:''}\x3c/td>\x3c/tr>`).join('')}\x3c/table>`:'\x3cp class="muted">없어요.\x3c/p>'}\x3c/div>`;
   $('#main').onclick=e=>{ const t=e.target; if(t.dataset.ed) return editHomeTotals(list.find(x=>x.id===t.dataset.ed)); const id=t.dataset.ok||t.dataset.no; if(!id) return;
     if(t.dataset.no && !confirm('이 요청을 취소할까요? 미리 빼 둔 재고가 돌아와요.')) return;
-    act(t, async()=>{ await run('confirmHome',id,!!t.dataset.ok); bumpCount('home',-1); await refreshStock(); toast(t.dataset.ok?'배분 기록에 넣었어요.':'취소했어요.'); homeOkView(); }); };
+    act(t, async()=>{ await run('confirmHome',id,!!t.dataset.ok); bumpCount('home',-1); refreshStockLater(); toast(t.dataset.ok?'배분 기록에 넣었어요.':'취소했어요.'); homeOkView(); }); };
 }
 
 
