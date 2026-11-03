@@ -52,13 +52,53 @@ function tab_(key){
 }
 function rows_(key){
   if(_ROWS[key])return _ROWS[key].map(r=>r.slice());
-  const sh=tab_(key),last=sh.getLastRow();if(last<2)return (_ROWS[key]=[]).slice();
+  // 저장해 둔 것이 있으면 시트를 읽지 않음 (그 탭에 저장하거나 시트에서 직접 고치면 새로 읽음)
+  if(!_SAVE_LOCK_HELD){const hit=cacheGet_(key);if(hit)return (_ROWS[key]=hit).map(r=>r.slice());}
+  _ROWS[key]=rowsRead_(key);
+  if(!_SAVE_LOCK_HELD)cachePut_(key,_ROWS[key]);
+  return _ROWS[key].map(r=>r.slice());
+}
+function rowsRead_(key){
+  const sh=tab_(key),last=sh.getLastRow();if(last<2)return [];
   const w=TABS[key].head.length;let raw;
   if(key==='CERT'){const columns=certDataColumns_(sh),actual=sh.getRange(2,1,last-1,columns.head.length).getValues();raw=actual.map(r=>TABS.CERT.head.map(h=>r[columns.index[h]]));}
   else raw=sh.getRange(2,1,last-1,w).getValues();
   fillMissingKeys_(key,sh,raw);
-  _ROWS[key]=raw.map(r=>r.map(v=>v instanceof Date?Utilities.formatDate(v,tz_(),'yyyy-MM-dd'):v));
-  return _ROWS[key].map(r=>r.slice());
+  return raw.map(r=>r.map(v=>v instanceof Date?Utilities.formatDate(v,tz_(),'yyyy-MM-dd'):v));
+}
+
+/* ── 읽기 임시 저장(캐시) ──
+   예전에는 화면을 열 때마다 CMS 누적 시트 전체를 새로 읽었어요.
+   이제 탭마다 '버전'을 두고, 그 탭에 저장하거나 시트에서 직접 고친 경우에만 다시 읽어요. (최대 6시간 보관) */
+let _REVS=null;
+function revs_(){if(_REVS)return _REVS;try{_REVS=PropertiesService.getDocumentProperties().getProperties();}catch(e){_REVS={};}return _REVS;}
+function cachePrefix_(key){return ss_().getId()+':rows-v1:'+key+':'+(revs_()['donationRev:'+key]||'0');}
+function cacheGet_(key){
+  try{const c=CacheService.getScriptCache(),prefix=cachePrefix_(key),m=JSON.parse(c.get(prefix)||'null');
+    if(!m||!(m.count>0))return null;
+    const keys=Array.from({length:m.count},(_,i)=>prefix+':'+m.token+':'+i),parts=c.getAll(keys);
+    if(!keys.every(k=>typeof parts[k]==='string'))return null;
+    return JSON.parse(keys.map(k=>parts[k]).join(''));
+  }catch(e){return null;}
+}
+function cachePut_(key,rows){
+  try{const c=CacheService.getScriptCache(),prefix=cachePrefix_(key),json=JSON.stringify(rows),count=Math.ceil(json.length/30000);
+    if(!count||count>120)return;   // 너무 크면 그냥 시트에서 읽음
+    const token=Utilities.getUuid().slice(0,8),parts={};
+    for(let i=0;i<count;i++)parts[prefix+':'+token+':'+i]=json.slice(i*30000,(i+1)*30000);
+    c.putAll(parts,21600);c.put(prefix,JSON.stringify({count,token}),21600);
+  }catch(e){/* 임시 저장은 실패해도 괜찮아요 */}
+}
+/** 이 탭들은 다음에 시트에서 새로 읽게 함 (안 주면 전부) */
+function invalidateRows_(keys){
+  const list=keys&&keys.length?keys:Object.keys(TABS),u=Utilities.getUuid().slice(0,8),o={};
+  list.forEach(k=>o['donationRev:'+k]=u);
+  try{PropertiesService.getDocumentProperties().setProperties(o);}catch(e){}
+  _REVS=null;
+}
+/** 시트에서 직접 고치면(붙여넣기 포함) 그 탭만 다시 읽게 함 */
+function onEdit(e){
+  try{const name=e&&e.range&&e.range.getSheet().getName(),key=Object.keys(TABS).find(k=>TABS[k].name===name);if(key)invalidateRows_([key]);}catch(err){}
 }
 /* 발급대장은 열 제목으로 읽고 씁니다. 아래 순서는 화면 정리용이며 저장 위치를 강제하지 않습니다. */
 const CERT_COLUMN_ORDER=['발급번호','발급일','종류','성명','기부기간','기부총액','후원내용','용도','담당자','비고','소속','계인','기록일시','출력보관내용(JSON)'];
@@ -117,8 +157,9 @@ function fillMissingKeys_(key,sh,raw){
 }
 /** 편집기에서 한 번 실행해도 돼요: 모든 탭의 빈 ID·키를 채움 */
 function fillMissingIds(){requireOwner_();return ['CMS','BANK','NEW'].map(k=>{const sh=tab_(k),last=sh.getLastRow();if(last<2)return k+': 0';
-  const raw=sh.getRange(2,1,last-1,TABS[k].head.length).getValues();return TABS[k].name+': '+fillMissingKeys_(k,sh,raw)+'칸 채움';}).join(' / ');}
-function withLock_(fn){const l=LockService.getScriptLock();l.waitLock(20000);clearMemo_();_SAVE_LOCK_HELD=true;try{const result=fn();SpreadsheetApp.flush();return result;}finally{clearMemo_();_SAVE_LOCK_HELD=false;l.releaseLock();}}
+  const raw=sh.getRange(2,1,last-1,TABS[k].head.length).getValues();const n=fillMissingKeys_(k,sh,raw);invalidateRows_([k]);return TABS[k].name+': '+n+'칸 채움';}).join(' / ');}
+/** tabs: 이 저장이 바꾸는 탭 (그 탭만 다음에 새로 읽음). 안 주면 전부 */
+function withLock_(fn,tabs){const l=LockService.getScriptLock();l.waitLock(20000);clearMemo_();_SAVE_LOCK_HELD=true;try{const result=fn();SpreadsheetApp.flush();return result;}finally{invalidateRows_(tabs);clearMemo_();_SAVE_LOCK_HELD=false;l.releaseLock();}}
 function num_(v){const n=Number(String(v==null?'':v).replace(/[,\s원]/g,''));return Number.isFinite(n)?n:0;}
 function text_(v,n){return String(v==null?'':v).trim().slice(0,n||200).replace(/^[=+@\-]/,m=>"'"+m);}
 function ymd_(v){
@@ -180,7 +221,7 @@ function importCms(rows){requireOwner_();return withLock_(()=>{
   const values=all.map(r=>r.map(v=>v==null?'':String(v)).map((v,i)=>[8,11,14].includes(i)?num_(v):v));
   const backup=replaceCmsSafely_(sh,values,w);
   return {dates,rows:byKey.size,backupSheet:backup};
-});}
+},['CMS']);}
 /** 기존 자료를 먼저 백업하고 새 전체 자료를 쓰며, 검증 실패 시 원본을 복원. */
 function sameCmsValues_(a,b){
  const value=v=>v instanceof Date?'date:'+v.getTime():String(v==null?'':v);
@@ -258,7 +299,7 @@ function repairPastedCms(){requireOwner_();return withLock_(()=>{
     .sort((a,b)=>String(a[1]).localeCompare(String(b[1]))||String(a[3]).localeCompare(String(b[3]),'ko'));
   replaceCmsSafely_(sh,all.map(r=>r.map(v=>v==null?'':v)),w);
   return '정리 '+fixed+'줄 (밀린 줄 바로잡음 '+shifted+'줄, 겹친 줄 '+(out.length-all.length)+'줄 정리)';
-});}
+},['CMS']);}
 
 function getCmsDates(){requireRead_();
   const m=new Map();
@@ -299,7 +340,7 @@ function saveDonor(o){requireOwner_();return withLock_(()=>{
   sh.getRange(at,1).setNumberFormat('@');sh.getRange(at,3).setNumberFormat('@');
   sh.getRange(at,1,1,row.length).setValues([row]);
   return true;
-});}
+},['DONOR']);}
 function isBusiness_(front){return String(front||'').replace(/\D/g,'').length>=10;}
 /** 금결원 앞자리가 7자리(생년월일 6 + 성별 1)면 성별 숫자를 그대로 씁니다. */
 function genderFromFront_(front){const f=String(front||'').replace(/\D/g,'');return f.length===7&&/[1-4]/.test(f[6])?f[6]:'';}
@@ -346,12 +387,12 @@ function addBank(o){requireOwner_();return withLock_(()=>{
   const b6=normBirth_(o.birth);if(o.birth&&!validBirthInput_(o.birth))throw Error('생년월일을 확인해 주세요. (예: 900101 또는 1990-01-01)');
   tab_('BANK').appendRow([Utilities.getUuid(),date,name,normBirth_(o.birth),g,amount,text_(o.platform,40),text_(o.memo,200),today_()]);
   return true;
-});}
+},['BANK']);}
 function deleteBank(id){requireOwner_();return withLock_(()=>{
   const sh=tab_('BANK'),values=rows_('BANK'),i=values.findIndex(r=>String(r[0])===String(id));
   if(i<0)throw Error('기록을 찾지 못했어요. 새로고침해 주세요.');
   sh.deleteRow(i+2);return true;
-});}
+},['BANK']);}
 
 /* ── 월별 정기후원 이체결과 (CMS 정상출금 + 통장 정기후원) ── */
 function getMonthlyTransfer(ym){requireRole_();
@@ -438,7 +479,7 @@ function saveMonthly(o){requireOwner_();return withLock_(()=>{
   if(i>=0)sh.getRange(i+2,1,1,width).setValues([row]);else sh.getRange(sh.getLastRow()+1,1,1,width).setValues([row]);
   colorMonthSheet_(sh);
   return {year,month,replaced:i>=0};
-});}
+},['MONTH']);}
 
 
 /* ── 신규후원자 (매달 입력 → 월별 현황표, 연간 신규 수) ── */
@@ -453,11 +494,11 @@ function addNew(o){requireOwner_();return withLock_(()=>{
   const date=ymd_(o&&o.date),name=text_(o&&o.name,120);
   if(!date)throw Error('등록일자를 입력해 주세요.');if(!name)throw Error('업체 및 후원자명을 입력해 주세요.');
   tab_('NEW').appendRow([Utilities.getUuid(),date,name,text_(o.content,300),today_()]);return true;
-});}
+},['NEW']);}
 function deleteNew(id){requireOwner_();return withLock_(()=>{
   const values=rows_('NEW'),i=values.findIndex(r=>String(r[0])===String(id));if(i<0)throw Error('기록을 찾지 못했어요. 새로고침해 주세요.');
   tab_('NEW').deleteRow(i+2);return true;
-});}
+},['NEW']);}
 
 /* ── 정기후원 지정 (CMS·통장 말고도 매년 정기적으로 오는 분) ── */
 function setRegular(o){requireOwner_();return withLock_(()=>{
@@ -466,7 +507,7 @@ function setRegular(o){requireOwner_();return withLock_(()=>{
   if(o.on){if(i<0)sh.appendRow([name,text_(o.memo,200),today_()]);}
   else if(i>=0)sh.deleteRow(i+2);
   return {name,on:!!o.on};
-});}
+},['REGULAR']);}
 
 /* ── 연간보고에 필요한 앱 안의 자료 모으기 ── */
 function getAnnualContext(year){requireRead_();
@@ -490,7 +531,7 @@ function saveAnnual(o){requireOwner_();return withLock_(()=>{
   const sh=tab_('YEAR'),values=rows_('YEAR'),i=values.findIndex(r=>Number(r[0])===y);
   if(i>=0)sh.getRange(i+2,1,1,row.length).setValues([row]);else sh.appendRow(row);
   return {year:y,replaced:i>=0,savedAt};
-});}
+},['YEAR']);}
 
 
 /* ── 권한 ──
@@ -521,11 +562,11 @@ function addAccess(o){requireOwner_();return withLock_(()=>{
   const values=rows_('ACCESS'),i=values.findIndex(r=>String(r[0]).trim().toLowerCase()===email),row=[email,text_(o.name,60),scope,today_(),until];
   if(i>=0)sh.getRange(i+2,1,1,5).setValues([row]);else sh.appendRow(row);   // 같은 이메일이면 범위·기한을 새로 바꿈
   return {replaced:i>=0};
-});}
+},['ACCESS']);}
 function removeAccess(email){requireOwner_();return withLock_(()=>{
   email=String(email||'').trim().toLowerCase();const values=rows_('ACCESS'),i=values.findIndex(r=>String(r[0]).trim().toLowerCase()===email);
   if(i<0)throw Error('목록에 없는 이메일이에요.');tab_('ACCESS').deleteRow(i+2);return true;
-});}
+},['ACCESS']);}
 
 
 /* ── 기부확인서 · 기부증서 ──
@@ -575,7 +616,7 @@ function issueCert(o){requireOwner_();return withLock_(()=>{
   const no=nextCertNo_(date.slice(0,4));
   appendCertRow_([no,date,text_(o.org,60),name,text_(o.purpose,80),o.stamp?'직인 출력':'',text_(o.memo,200),kind,text_(o.period,60),num_(o.total)||'',now_(),JSON.stringify(snapshot),text_(o.issuer,60),text_(snapshot.item,500)]);
   return {no,date,snapshot};
-});}
+},['CERT']);}
 function certLedgerRow_(r){
   let saved=null;if(r[11]){try{saved=JSON.parse(String(r[11]));}catch(e){}}
   const item=String(r[13]||'')||(saved&&typeof saved.item==='string'?saved.item:'');
@@ -614,7 +655,7 @@ function saveLegacyCertPrint(o){requireOwner_();return withLock_(()=>{
   if(!row[1])row[1]=date;if(!row[7])row[7]=kind==='증서'?'기부증서':'기부확인서';row[11]=JSON.stringify(snapshot);if(!row[12])row[12]=text_(snapshot.issuer,60);
   row[13]=text_(snapshot.item,500);writeCertRow_(i+2,row);
   return {no:key,legacy:false,snapshot};
-});}
+},['CERT']);}
 
 
 

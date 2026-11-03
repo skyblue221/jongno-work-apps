@@ -117,4 +117,4 @@ function setSmsPin(o){requireOwner_();return withLock_(()=>{
   if(o.on){if(i<0)sh.appendRow([name,text_(o.memo,200),today_()]);}
   else if(i>=0)sh.deleteRow(i+2);
   return {name,on:!!o.on};
-});}
+},['NONE']);}

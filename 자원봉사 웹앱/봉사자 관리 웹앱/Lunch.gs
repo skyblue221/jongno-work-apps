@@ -68,13 +68,13 @@ function addLunch_impl_(o){return withLock_(()=>{
  names.forEach(n=>{if(exist.has(date+'|'+n+'|'+start)){skipped.push(n);return;}rows.push([Utilities.getUuid(),date,n,lunchPersonId_(people,n),note,program,start,end,hours,amount,clean_(o.memo,200),today]);});
  if(rows.length){const sh=lunchSheet_();sh.getRange(sh.getLastRow()+1,1,rows.length,LUNCH_HEAD.length).setValues(rows);}
  return {added:rows.length,skipped};
-});}
+},['EXTRA']);}
 function deleteLunch_impl_(id){return withLock_(()=>{
  const sh=ss_().getSheetByName(LUNCH_TAB);if(!sh||sh.getLastRow()<2)throw Error('기록을 찾지 못했어요.');
  const ids=sh.getRange(2,1,sh.getLastRow()-1,1).getValues().map(r=>String(r[0]));
  const i=ids.indexOf(String(id));if(i<0)throw Error('기록을 찾지 못했어요. 다시 불러와 주세요.');
  sh.deleteRow(i+2);return true;
-});}
+},['EXTRA']);}
 
 /** 기존 중식비 구글시트에서 가져오기: 「중식비 내역」 탭 + 「○○○○년 ○월 … 중식비 명단 및 내역」 월별 탭.
     같은 일자·이름·시작시간 기록은 건너뜁니다. 원본 시트는 바꾸지 않습니다. */

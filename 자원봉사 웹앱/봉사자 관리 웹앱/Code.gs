@@ -22,7 +22,7 @@ function movePeopleStatusToB_impl_(){return withLock_(()=>{
  assertPeopleSchema_();const sh=tab_('PEOPLE'),headers=sh.getRange(1,1,1,sh.getLastColumn()).getDisplayValues()[0],col=headers.indexOf('상태')+1;
  if(col===2){ss_().toast('상태는 이미 B열입니다.');return;}
  backupSheet_(sh,'PEOPLE');sh.moveColumns(sh.getRange(1,col,sh.getMaxRows(),1),2);sh.setFrozenColumns(3);ss_().toast('상태를 B열로 옮겼습니다. 기존 데이터는 유지됩니다.');
-});}
+},['PEOPLE']);}
 function setup_impl_(){
  const ss=ss_();
  Object.keys(TABS).forEach(k=>{let sh=ss.getSheetByName(k);if(!sh) sh=ss.insertSheet(k);if(sh.getLastRow()===0){sh.getRange(1,1,1,TABS[k].length).setValues([TABS[k]]);sh.setFrozenRows(1);sh.getRange(1,1,1,TABS[k].length).setFontWeight('bold').setBackground('#143c48').setFontColor('#ffffff');sh.autoResizeColumns(1,TABS[k].length);}});
@@ -37,9 +37,9 @@ function clean_(v,n=500){return String(v==null?'':v).trim().slice(0,n).replace(/
 function date_(v){const s=clean_(v,10);if(s&&!/^\d{4}-\d{2}-\d{2}$/.test(s))throw Error('날짜는 YYYY-MM-DD 형식으로 입력하세요.');return s;}
 function today_(){return Utilities.formatDate(new Date(),Session.getScriptTimeZone(),'yyyy-MM-dd');}
 function onEdit(e){
- if(e&&e.range)invalidateReadCache_();
+ if(e&&e.range)invalidateReadCache_([e.range.getSheet().getName()]);
  if(!e||!e.range||e.range.getSheet().getName()!=='PEOPLE'||e.range.getLastRow()<2)return;
- withLock_(()=>{const sh=e.range.getSheet(),start=Math.max(2,e.range.getRow()),end=e.range.getLastRow();fillPeopleIds_(sh,start,end);fillPeopleAges_(sh,start,end);});
+ withLock_(()=>{const sh=e.range.getSheet(),start=Math.max(2,e.range.getRow()),end=e.range.getLastRow();fillPeopleIds_(sh,start,end);fillPeopleAges_(sh,start,end);},['PEOPLE']);
 }
 function fillPeopleIds_(sh,start,end){
  const headers=sh.getRange(1,1,1,sh.getLastColumn()).getDisplayValues()[0];
@@ -50,7 +50,7 @@ function fillPeopleIds_(sh,start,end){
  values.forEach((row,i)=>{if(String(row[nameCol]||'').trim()&&!row[idCol]){sh.getRange(start+i,idCol+1).setValue(Utilities.getUuid());added++;}});
  return added;
 }
-function assignMissingPeopleIds_impl_(){return withLock_(()=>{const sh=tab_('PEOPLE');return sh.getLastRow()<2?0:fillPeopleIds_(sh,2,sh.getLastRow());});}
+function assignMissingPeopleIds_impl_(){return withLock_(()=>{const sh=tab_('PEOPLE');return sh.getLastRow()<2?0:fillPeopleIds_(sh,2,sh.getLastRow());},['PEOPLE']);}
 function fillPeopleAges_(sh,start,end){
  const headers=sh.getRange(1,1,1,sh.getLastColumn()).getDisplayValues()[0];
  const birthCol=headers.indexOf('생년월일'),ageCol=headers.indexOf('연령'),nameCol=headers.indexOf('이름');
@@ -65,11 +65,12 @@ function fillPeopleAges_(sh,start,end){
  });
  return {updated,invalid};
 }
-function refreshPeopleAges_impl_(){return withLock_(()=>{const sh=tab_('PEOPLE');return sh.getLastRow()<2?{updated:0,invalid:0}:fillPeopleAges_(sh,2,sh.getLastRow());});}
+function refreshPeopleAges_impl_(){return withLock_(()=>{const sh=tab_('PEOPLE');return sh.getLastRow()<2?{updated:0,invalid:0}:fillPeopleAges_(sh,2,sh.getLastRow());},['PEOPLE']);}
 function append_(key,values){tab_(key).appendRow(values);}
-function withLock_(fn){const lock=LockService.getDocumentLock();lock.waitLock(15000);try{return fn();}finally{invalidateReadCache_();lock.releaseLock();}}
+/** tabs: 이 저장이 바꾸는 탭 (그 탭만 다시 읽게 함). 안 주면 전부 */
+function withLock_(fn,tabs){const lock=LockService.getDocumentLock();lock.waitLock(15000);try{return fn();}finally{invalidateReadCache_(tabs);lock.releaseLock();}}
 function personExists_(id){return records_('PEOPLE').some(p=>p.id===id);}
-function uniquePhone_(phone,excludeId){const digits=String(phone).replace(/\D/g,'');if(!digits)return false;return records_('PEOPLE').some(p=>p.id!==excludeId&&String(p.phone).replace(/\D/g,'')===digits);}
+function uniquePhone_(phone,excludeId,people){const digits=String(phone).replace(/\D/g,'');if(!digits)return false;return (people||records_('PEOPLE')).some(p=>p.id!==excludeId&&String(p.phone).replace(/\D/g,'')===digits);}
 function upsertPerson_impl_(p){return withLock_(()=>{assertPeopleSchema_();
  if(!p||!clean_(p.name,80))throw Error('이름을 입력해 주세요.');
  const id=clean_(p.id,60)||Utilities.getUuid(),sh=tab_('PEOPLE');
@@ -78,11 +79,11 @@ function upsertPerson_impl_(p){return withLock_(()=>{assertPeopleSchema_();
  const row=[id,clean_(p.name,80),birth,personAge,clean_(p.phone,40),clean_(p.vmsId,100),clean_(p.vol1365Id,100),clean_(p.affiliation,100),clean_(p.kind,30),date_(p.registrationDate),clean_(p.status||'확인 필요',30),date_(p.firstActivityDate),date_(p.lastActivityDate),clean_(p.talents,300),clean_(p.interests,300),clean_(p.availability,150),clean_(p.notes,1000),today_()];
  const dup=duplicates_(exists,{id,name:p.name,birthDate:birth,phone:p.phone,vmsId:p.vmsId,vol1365Id:p.vol1365Id});
  if(dup.length && !p.confirmDuplicate) throw Error('중복 의심 봉사자: '+dup.map(x=>x.name+' ('+x.reason+')').join(', ')+'. 기존 명단에서 먼저 확인하세요.');
- if(i<0&&uniquePhone_(p.phone,id)&&!p.confirmDuplicate)throw Error('같은 연락처의 봉사자가 이미 있습니다. 명단을 먼저 확인해 주세요.');
+ if(i<0&&uniquePhone_(p.phone,id,exists)&&!p.confirmDuplicate)throw Error('같은 연락처의 봉사자가 이미 있습니다. 명단을 먼저 확인해 주세요.');
  const headers=sh.getRange(1,1,1,sh.getLastColumn()).getDisplayValues()[0],idCol=headers.indexOf('ID');
  if(i>=0){const values=sh.getDataRange().getValues(),physical=values.findIndex((r,n)=>n>0&&r[idCol]===id);sh.getRange(physical+1,1,1,headers.length).setValues([personValuesForHeaders_(headers,row,values[physical])]);}else sh.appendRow(personValuesForHeaders_(headers,row));
  return {id};
-});}
+},['PEOPLE']);}
 function addActivity_impl_(a){return withLock_(()=>{
  if(!personExists_(a.personId))throw Error('봉사자를 먼저 등록해 주세요.');
  const date=date_(a.date);if(!date)throw Error('활동일이 필요합니다.');
@@ -91,21 +92,38 @@ function addActivity_impl_(a){return withLock_(()=>{
  const source=clean_(a.source||'직접 입력',40),ext=clean_(a.externalId,120);
  if(ext&&records_('ACTIVITY').some(x=>x.source===source&&x.externalId===ext))throw Error('같은 출처·외부기록ID의 활동이 이미 등록되어 있습니다.');
  append_('ACTIVITY',[Utilities.getUuid(),a.personId,date,clean_(a.category,100),count,hours,source,ext,clean_(a.note,500),today_()]);return true;
-});}
+},['ACTIVITY']);}
 function addAward_impl_(a){return withLock_(()=>{
  if(!personExists_(a.personId))throw Error('봉사자를 먼저 등록해 주세요.');
  if(!clean_(a.name))throw Error('배지·포상명을 입력해 주세요.');
  append_('AWARDS',[Utilities.getUuid(),a.personId,clean_(a.type,40),clean_(a.name,120),clean_(a.status,40),clean_(a.recommendedBy,80),date_(a.date),clean_(a.note,600),today_()]);return true;
-});}
-function addContact_impl_(c){return withLock_(()=>{if(!personExists_(c.personId))throw Error('봉사자를 먼저 등록해 주세요.');append_('CONTACT',[Utilities.getUuid(),c.personId,date_(c.date),clean_(c.type,50),clean_(c.note,800),today_()]);return true;});}
-function invalidateReadCache_(){
- try{PropertiesService.getDocumentProperties().setProperty('volunteerReadRevision',Utilities.getUuid());}catch(e){/* Caching is optional; data writes must still complete. */}
+},['AWARDS']);}
+function addContact_impl_(c){return withLock_(()=>{if(!personExists_(c.personId))throw Error('봉사자를 먼저 등록해 주세요.');append_('CONTACT',[Utilities.getUuid(),c.personId,date_(c.date),clean_(c.type,50),clean_(c.note,800),today_()]);return true;},['CONTACT']);}
+/* ── 읽기 임시 저장(캐시) ──
+   탭마다 '버전'을 따로 둬서, 저장한 탭만 다시 읽어요.
+   (예전에는 무엇이든 저장하면 진우·과거자료까지 모든 탭을 처음부터 다시 읽었어요) */
+const REV_KEYS=['PEOPLE','ACTIVITY','AWARDS','CONTACT','JINWOO','HISTORY','EXTRA'];   // EXTRA: 문자고정·권한·점심 등 그 밖의 탭
+let REVS_=null,ALL_MEMO_=null;
+function revKey_(k){return REV_KEYS.includes(k)?k:'EXTRA';}
+function revs_(){
+ if(REVS_)return REVS_;
+ let p={};try{p=PropertiesService.getDocumentProperties().getProperties();}catch(e){}
+ const base=p.volunteerReadRevision||'0';
+ return (REVS_=Object.fromEntries(REV_KEYS.map(k=>[k,p['volunteerRev:'+k]||base])));
 }
-function readCached_(label,load){
+/** tabs를 주면 그 탭만, 안 주면 전부 새로 읽게 함 */
+function invalidateReadCache_(tabs){
+ const keys=Array.from(new Set((tabs&&tabs.length?tabs:REV_KEYS).map(revKey_))),u=Utilities.getUuid().slice(0,8),o={};
+ keys.forEach(k=>o['volunteerRev:'+k]=u);
+ try{PropertiesService.getDocumentProperties().setProperties(o);}catch(e){/* Caching is optional; data writes must still complete. */}
+ REVS_=null;ALL_MEMO_=null;
+}
+function readCached_(label,load,deps){
  let cache,prefix;
  try{
   cache=CacheService.getScriptCache();
-  prefix=ss_().getId()+':read-v1:'+ (PropertiesService.getDocumentProperties().getProperty('volunteerReadRevision')||'0')+':'+label;
+  const r=revs_();
+  prefix=ss_().getId()+':read-v2:'+(deps||REV_KEYS).map(k=>r[revKey_(k)]).join('.')+':'+label;
   const manifest=JSON.parse(cache.get(prefix)||'null');
   if(manifest&&manifest.count>0&&manifest.count<=60){
    const keys=Array.from({length:manifest.count},(_,i)=>prefix+':'+manifest.token+':'+i),parts=cache.getAll(keys);
@@ -124,11 +142,18 @@ function readCached_(label,load){
  }catch(e){/* Eviction or quota failure falls back to normal reads. */}
  return result;
 }
-function allData_(){return readCached_('all',()=>({people:records_('PEOPLE'),activity:records_('ACTIVITY'),awards:records_('AWARDS'),contacts:records_('CONTACT'),jinwoo:safeRecords_('JINWOO'),history:safeRecords_('HISTORY')}));}
+/** 탭 하나의 기록 (그 탭 버전이 같으면 시트를 다시 읽지 않음) */
+function tabRecords_(key){return readCached_('tab:'+key,()=>['JINWOO','HISTORY'].includes(key)?safeRecords_(key):records_(key),[key]);}
+function allData_(){
+ const key=REV_KEYS.map(k=>revs_()[k]).join('.');
+ if(ALL_MEMO_&&ALL_MEMO_.key===key)return ALL_MEMO_.v;   // 한 번 실행하는 동안은 한 번만 꺼냄
+ const v={people:tabRecords_('PEOPLE'),activity:tabRecords_('ACTIVITY'),awards:tabRecords_('AWARDS'),contacts:tabRecords_('CONTACT'),jinwoo:tabRecords_('JINWOO'),history:tabRecords_('HISTORY')};
+ ALL_MEMO_={key,v};return v;
+}
 function getAppData_impl_(requestedYear){
  const all=allData_(),year=Number(requestedYear)||Number(today_().slice(0,4));
  const years=Array.from(new Set([...(all.history||[]).map(r=>Number(r.year)),...(all.jinwoo||[]).map(r=>Number(String(r.date).slice(0,4))),...(all.activity||[]).map(r=>Number(String(r.date).slice(0,4)))].filter(y=>Number.isInteger(y)&&y>=1900&&y<=2200)));
- return {people:all.people,awards:all.awards,activity:[],history:[],jinwoo:[],years,initialStats:dashboardStats_(all,year),initialYear:year};
+ return {people:all.people,awards:all.awards,activity:[],history:[],jinwoo:[],years,initialStats:getDashboardStats_impl_(year),initialYear:year};
 }
 function refreshAppData(year){invalidateReadCache_();return getAppData(year);}
 function safeRecords_(key){return ss_().getSheetByName(key)?records_(key):[];}
@@ -240,7 +265,7 @@ function mergeJinwooRecords_(existing,incoming){
  return {rows:Array.from(map.values()),inserted,updated};
 }
 
-function getJinwooYearStats_impl_(year){return jinwooYearStats_(safeRecords_('JINWOO'),Number(year));}
+function getJinwooYearStats_impl_(year){return jinwooYearStats_(tabRecords_('JINWOO'),Number(year));}
 function jinwooYearStats_(rows,year){
  if(!Number.isInteger(year)||year<1900||year>2200)throw Error('기준연도를 확인해 주세요.');
  const names=list=>new Set(list.map(r=>String(r.volunteerName||'').trim()).filter(Boolean));
@@ -659,7 +684,7 @@ function updateAwardStatus_impl_(a){return withLock_(()=>{
  const row=values.findIndex((r,i)=>i>0&&String(r[idCol])===id);
  if(row<0)throw Error('기록을 찾지 못했습니다. 새로고침해 주세요.');
  sh.getRange(row+1,statusCol+1).setValue(status);return true;
-});}
+},['AWARDS']);}
 
 /* ── 연말 감사명단 (감사패키지 대상) ──
    기준: 해당 연도 활동 5회 이상 → 활동시간 많은 순 → 같으면 횟수 많은 순 → 상위 30명
@@ -705,7 +730,7 @@ function recordThankAwards_impl_(o){return withLock_(()=>{
  ids.forEach(id=>{if(!people.has(id))skipped.push({id,reason:'명단에 없음'});else if(existing.has(id))skipped.push({id,reason:'이미 기록됨'});else rows.push([Utilities.getUuid(),id,'포상',name,status,'',today,'연말 감사명단에서 일괄 기록',today]);});
  if(rows.length){const sh=tab_('AWARDS');sh.getRange(sh.getLastRow()+1,1,rows.length,rows[0].length).setValues(rows);}
  return {added:rows.length,skipped};
-});}
+},['AWARDS']);}
 function recordThankAwards(o){requireOwner_();return recordThankAwards_impl_(o);}
 
 /* ── 대시보드 홈: ① 실적 반영 현황 ② 문자 대상 ③ 보고용 숫자·그래프 ── */
@@ -725,7 +750,7 @@ function setSmsPin_impl_(o){return withLock_(()=>{
  if(o.pinned){if(!rows.length)sh.appendRow([id,today_()]);}
  else rows.reverse().forEach(r=>sh.deleteRow(r));
  return {personId:id,pinned:!!o.pinned};
-});}
+},['EXTRA']);}
 function halfPeriod_(d){const [y,m,day]=d.split('-').map(Number),end=new Date(y,m,0).getDate();return day<=15?{y,m,from:1,to:15}:{y,m,from:16,to:end};}
 function nextHalf_(p){if(p.from===1)return {y:p.y,m:p.m,from:16,to:new Date(p.y,p.m,0).getDate()};const y=p.m===12?p.y+1:p.y,m=p.m===12?1:p.m+1;return {y,m,from:1,to:15};}
 function periodEnd_(p){return p.y+'-'+String(p.m).padStart(2,'0')+'-'+String(p.to).padStart(2,'0');}
@@ -835,11 +860,11 @@ function addAccess(o){requireOwner_();return withLock_(()=>{
  const row=[email,String(o.name||'').trim().slice(0,60),today_(),fmtDay_(o.until)];
  if(i>=0)sh.getRange(i+2,1,1,4).setValues([row]);else sh.appendRow(row);   // 같은 이메일이면 기한을 새로 바꿈
  return {replaced:i>=0};
-});}
+},['EXTRA']);}
 function removeAccess(email){requireOwner_();return withLock_(()=>{
  email=String(email||'').trim().toLowerCase();const i=accessRows_().findIndex(r=>r.email===email);
  if(i<0)throw Error('목록에 없는 이메일이에요.');accessSheet_().deleteRow(i+2);return true;
-});}
+},['EXTRA']);}
 function requireOwner_(){if(role_()!=='owner')throw Error('이 기능은 담당자만 사용할 수 있습니다.');}
 function requireRole_(){const r=role_();if(!r)throw Error('접근 권한이 없습니다.');return r;}
 function scrub_(v){
@@ -924,7 +949,7 @@ function recordBadge_impl_(o){return withLock_(()=>{
  const same=records_('AWARDS').filter(a=>String(a.personId)===id&&a.type==='배지'&&badgeNameLevel_(a.name)>=badgeNameLevel_(badge[0])&&a.status!=='미선정');
  if(same.length)throw Error('같거나 더 높은 배지의 신청·수령 기록이 있어요. 인정·포상 기록을 확인해주세요.');
  append_('AWARDS',[Utilities.getUuid(),id,'배지',badge[0],'신청 중','',today_(),'VMS 누적시간 확인 후 신청 기록 ('+badge[1]+'시간 기준)',today_()]);return true;
-});}
+},['AWARDS']);}
 
 /* ── 연간 자원봉사 현황 (구청 제출용) ──
    개인/단체 구분 (아래 설정은 필요할 때 직접 고치면 됩니다)
