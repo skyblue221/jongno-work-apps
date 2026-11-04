@@ -430,7 +430,7 @@ function homeView(){
   const total=k=>H.rows.filter(r=>r.name).reduce((s,r)=>s+qOf(r,k),0);
   const html=()=>{ const L=lots(); return receiptHtml({ dest:S.boot.dept||'일상동행팀', noTeam:true,
     items:L.map(l=>({name:l.name,inDate:l.inDate,donor:l.donor,inQty:l.inQty,give:total(l.key),remainAfter:H.sent?l.remain:l.remain-total(l.key)})),
-    rows:H.rows.filter(r=>r.name).map(r=>({name:r.name,team:'',addr:r.addr,idType:H.idType,date:(r.sig||H.dateMode==='fill')?H.date:'',sigUrl:r.sig,note:'',qty:L.map(l=>qOf(r,l.key))})) }); };
+    rows:H.rows.filter(r=>r.name).map(r=>({name:r.name,team:'',addr:r.addr,idType:H.idType,date:H.dateMode==='fill'?H.date:(r.sig?S.boot.today:''),sigUrl:r.sig,note:'',qty:L.map(l=>qOf(r,l.key))})) }); };
   $('#hXls').onclick=e=>{if(!checkHome())return; if(!H.sel.length||!H.rows.some(r=>r.name)) return toast('물품과 명단을 넣어 주세요.'); toExcel(e.target,html(),'가정배분수령증_'+H.date,true); };
   $('#hPrint').onclick=()=>{if(!checkHome())return; if(!H.sel.length||!H.rows.some(r=>r.name)) return toast('물품과 명단을 넣어 주세요.'); printHtml(html(),true); };
   $('#hLater').onclick=e=>act(e.target, async()=>{
@@ -477,19 +477,20 @@ async function homeSignOpen(id){
   $('#main').innerHTML='\x3cdiv class="card">명단을 불러오는 중이에요...\x3c/div>';
   let r=await run('getHomeSign',id);
   const html=()=>receiptHtml({ dest:S.boot.dept||'일상동행팀', noTeam:true, items:r.items,
-    rows:r.people.map(p=>({name:p.name,team:'',addr:p.addr,idType:p.idType||'주소',date:p.at||(r.dateMode==='fill'?r.date:''),sigUrl:p.sigUrl,note:'',qty:r.items.map(it=>num(p.qty[it.key]))})) });
+    rows:r.people.map(p=>({name:p.name,team:'',addr:p.addr,idType:p.idType||'주소',date:r.dateMode==='fill'?r.date:(p.at||''),sigUrl:p.sigUrl,note:'',qty:r.items.map(it=>num(p.qty[it.key]))})) });
   const draw=()=>{
     const left=r.people.filter(p=>!p.sigUrl).length;
     $('#main').innerHTML=`\x3cbutton class="btn line sm" id="hsBack">← 가정 서명\x3c/button>
     \x3cdiv class="card">\x3ch2>${esc(r.manager)} · ${esc(r.date)}\x3c/h2>\x3cp class="muted" style="margin:0">${left?`\x3cspan class="tag wait">서명 ${left}명 남음\x3c/span>`:'\x3cspan class="tag ok">모두 서명했어요\x3c/span>'}\x3c/p>
     \x3ctable class="tbl" style="margin-top:10px">${r.people.map((p,i)=>`\x3ctr>\x3ctd>\x3cb>${esc(p.name)}\x3c/b>\x3cbr>\x3cspan class="muted">${esc((p.idType||'주소')+': '+(p.addr||''))}\x3c/span>\x3c/td>\x3ctd style="text-align:right">${p.sigUrl?`\x3cimg src="${p.sigUrl}" style="height:30px">`:`\x3cbutton class="btn sm" data-s="${i}">서명하기\x3c/button>`}\x3c/td>\x3c/tr>`).join('')}\x3c/table>\x3c/div>
     \x3cdiv class="card">\x3ch2>수령증 미리보기\x3c/h2>\x3cdiv class="preview">${html()}\x3c/div>
-    \x3cdiv class="btns">\x3cbutton class="btn line" id="hsEdit">수량·명단 수정\x3c/button>\x3cbutton class="btn line" id="hsPrint">인쇄 / PDF\x3c/button>\x3cbutton class="btn line" id="hsXls">엑셀로 받기\x3c/button>\x3cbutton class="btn" id="hsDone">서명 마치기 (수령증 보관)\x3c/button>\x3c/div>
+    \x3cdiv class="btns">\x3clabel style="display:flex;gap:8px;align-items:center;color:var(--ink);margin:0;flex:1 0 100%">\x3cinput type="checkbox" id="hsFill" style="width:auto" ${r.dateMode==='fill'?'checked':''}> 수령일을 배분일(${esc(r.date)})로 채우기 \x3cspan class="muted">(끄면 서명한 날짜)\x3c/span>\x3c/label>\x3cbutton class="btn line" id="hsEdit">수량·명단 수정\x3c/button>\x3cbutton class="btn line" id="hsPrint">인쇄 / PDF\x3c/button>\x3cbutton class="btn line" id="hsXls">엑셀로 받기\x3c/button>\x3cbutton class="btn" id="hsDone">서명 마치기 (수령증 보관)\x3c/button>\x3c/div>
     \x3cp class="muted">서명 마치기를 누르면 수령증 PDF가 보관되고 임시 명단 파일은 휴지통으로 보내요.\x3c/p>\x3c/div>`;
     $('#hsBack').onclick=()=>go('hsign');
     $('#hsPrint').onclick=()=>printHtml(html(),true);
     $('#hsXls').onclick=e=>toExcel(e.target,html(),'가정배분수령증_'+r.date+'_'+r.manager,true);
     $('#hsEdit').onclick=()=>editHome();
+    $('#hsFill').onchange=e=>{ r.dateMode=e.target.checked?'fill':'blank'; draw(); };
     $('#hsDone').onclick=e=>{ if(left&&!confirm(`아직 ${left}명이 서명하지 않았어요. 빈칸으로 두고 마칠까요?`)) return;
       act(e.target, async()=>{ const h=html(); await run('finishHome',r.id,fitPage(h,true)); printHtml(h,true); toast('수령증을 보관했어요. 인쇄 창이 열려요.',3500); setTimeout(()=>go('hsign'),1500); }, '보관 중...'); };
   };
