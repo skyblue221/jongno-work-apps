@@ -301,7 +301,7 @@ function bumpCount(k,d){ const c=S.boot.counts||(S.boot.counts={}); c[k]=Math.ma
 
 
 function rcptHtml(r){ return receiptHtml({ items:r.items, dest:S.boot.dept||'일상동행팀', noTeam:r.type==='상품권'&&r.people.every(p=>p.who==='당사자'),
-    rows:r.people.map(p=>({name:p.name,team:p.team,idType:p.who==='당사자'?(p.idType||'주소'):'주소',addr:p.who==='당사자'?(p.addr||''):S.boot.org,date:p.at||(r.type==='팀'?r.date:''),sigUrl:p.sigUrl,note:(p.serials||[]).length?p.serials.join(', '):(p.note||''),noteSmall:!!(p.serials||[]).length,qty:r.items.map(it=>num(p.qty[it.key]))})) }); }
+    rows:r.people.map(p=>({name:p.name,team:p.team,idType:p.who==='당사자'?(p.idType||'주소'):'주소',addr:p.who==='당사자'?(p.addr||''):S.boot.org,date:r.type==='팀'?r.date:(p.at||''),sigUrl:p.sigUrl,note:(p.serials||[]).length?p.serials.join(', '):(p.note||''),noteSmall:!!(p.serials||[]).length,qty:r.items.map(it=>num(p.qty[it.key]))})) }); }
 async function rcptExcel(btn,id){ const r=await run('getReceipt',id); return toExcel(btn,rcptHtml(r),'수령증_'+r.no,true); }
 async function signView(id, data){
   $('#main').innerHTML='\x3cdiv class="card">수령증을 불러오는 중이에요...\x3c/div>';
