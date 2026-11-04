@@ -115,7 +115,7 @@ const OWN_HEAD = {
 /* ───────── 웹 앱 ───────── */
 function doGet(e) {
   if (e && e.parameter && e.parameter.s) return HtmlService.createHtmlOutputFromFile('Sign').setTitle('수령 서명').addMetaTag('viewport', 'width=device-width, initial-scale=1');
-  if (!me_()) return HtmlService.createHtmlOutput('<meta charset="utf-8"><div style="font:17px/1.6 sans-serif;max-width:480px;margin:40px auto;padding:20px;border:1px solid #dfe5df;border-radius:14px"><b>후원품 수령 확인</b><p>이 주소는 복지관에서 문자로 보내드린 <b>서명 링크</b>로만 열 수 있어요. 받은 문자의 링크를 눌러 주세요.</p><p style="color:#5f6b64;font-size:14px">직원은 기관용 앱 주소로 들어가 주세요.</p></div>').setTitle('후원품 수령 확인').addMetaTag('viewport', 'width=device-width, initial-scale=1');
+  if (!me_()) return HtmlService.createHtmlOutput('<meta charset="utf-8"><div style="font:17px/1.6 sans-serif;max-width:480px;margin:40px auto;padding:20px;border:1px solid #dfe5df;border-radius:14px"><b>후원품 수령 확인</b><p>이 주소는 복지관에서 문자나 카톡으로 보내드린 <b>서명 링크</b>로만 열 수 있어요. 받은 메시지의 링크를 눌러 주세요.</p><p style="color:#5f6b64;font-size:14px">직원은 기관용 앱 주소로 들어가 주세요.</p></div>').setTitle('후원품 수령 확인').addMetaTag('viewport', 'width=device-width, initial-scale=1');
   return HtmlService.createHtmlOutputFromFile('Index')
     .setTitle(APP.title)
     .addMetaTag('viewport', 'width=device-width, initial-scale=1')
@@ -1045,11 +1045,14 @@ function makeSignLink(id, idx, phone) {
     if (phone !== undefined && digits_(phone)) p.phone = digits_(phone);
     if (!p.birth && p.idType === '생년월일') p.birth = birth6_(p.addr);
     if (!p.birth && !(p.phone && p.phone.length >= 4)) throw new Error('본인 확인용 생년월일이나 연락처가 없어요. 연락처를 넣어 주세요.');
-    if (p.tok) props_().deleteProperty('TOK_' + p.tok);
-    p.tok = Utilities.getUuid().replace(/-/g, '');
-    p.tokExp = Date.now() + SIGN_DAYS * 864e5; p.tries = 0;
+    const alive = p.tok && (!p.tokExp || Date.now() < p.tokExp) && (p.tries || 0) < 5 && props_().getProperty('TOK_' + p.tok);
+    if (!alive) {
+      if (p.tok) props_().deleteProperty('TOK_' + p.tok);
+      p.tok = Utilities.getUuid().replace(/-/g, '');
+      p.tokExp = Date.now() + SIGN_DAYS * 864e5; p.tries = 0;
+      props_().setProperty('TOK_' + p.tok, x.r[0]);
+    }
     h.f.setContent(JSON.stringify(h.d));
-    props_().setProperty('TOK_' + p.tok, x.r[0]);
     const url = base + '?s=' + p.tok;
     return { url: url, phone: p.phone || '', check: p.birth ? '생년월일 6자리' : '연락처 뒤 4자리',
       msg: '[' + APP.org + '] ' + p.name + '님, 보내드린 후원품 잘 받으셨나요? 아래 링크에서 수령 확인 서명을 부탁드려요. (' + (p.birth ? '생년월일 6자리' : '연락처 뒤 4자리') + '로 확인해요)\n' + url };
@@ -1083,7 +1086,7 @@ function publicSign(token, code, dataUrl) {
     const c = signTarget_(token);
     checkWho_(c, code);
     if (!/^data:image\/png;base64,/.test(String(dataUrl)) || String(dataUrl).length > 400000) throw new Error('서명을 다시 해 주세요.');
-    c.p.sig = dataUrl; c.p.at = today_(); c.p.via = '문자 링크';
+    c.p.sig = dataUrl; c.p.at = today_(); c.p.via = '링크 서명';
     props_().deleteProperty('TOK_' + c.t); c.p.tok = ''; c.p.tries = 0;
     c.h.f.setContent(JSON.stringify(c.h.d));
     return true;

@@ -503,7 +503,7 @@ async function homeSignOpen(id){
     const left=r.people.filter(p=>!p.sigUrl).length;
     $('#main').innerHTML=`\x3cbutton class="btn line sm" id="hsBack">← 가정 서명\x3c/button>
     \x3cdiv class="card">\x3ch2>${esc(r.manager)} · ${esc(r.date)}\x3c/h2>\x3cp class="muted" style="margin:0">${left?`\x3cspan class="tag wait">서명 ${left}명 남음\x3c/span>`:'\x3cspan class="tag ok">모두 서명했어요\x3c/span>'}\x3c/p>
-    \x3ctable class="tbl" style="margin-top:10px">${r.people.map((p,i)=>`\x3ctr>\x3ctd>\x3cb>${esc(p.name)}\x3c/b>\x3cbr>\x3cspan class="muted">${esc((p.idType||'주소')+': '+(p.addr||''))}\x3c/span>\x3c/td>\x3ctd style="text-align:right">${p.sigUrl?`\x3cimg src="${p.sigUrl}" style="height:30px">${p.via?'\x3cbr>\x3cspan class="tag ok">'+esc(p.via)+'\x3c/span>':''}`:`\x3cbutton class="btn sm" data-s="${i}">서명하기\x3c/button> \x3cbutton class="btn sm line" data-ln="${i}">${p.linked?'링크 다시 보내기':'문자 링크'}\x3c/button>${p.linked?'\x3cbr>\x3cspan class="tag wait">링크 보냄\x3c/span>':''}`}\x3c/td>\x3c/tr>`).join('')}\x3c/table>\x3cdiv class="btns">\x3cbutton class="btn line sm" id="hsReload">↻ 문자로 받은 서명 확인\x3c/button>\x3c/div>\x3c/div>
+    \x3ctable class="tbl" style="margin-top:10px">${r.people.map((p,i)=>`\x3ctr>\x3ctd>\x3cb>${esc(p.name)}\x3c/b>\x3cbr>\x3cspan class="muted">${esc((p.idType||'주소')+': '+(p.addr||''))}\x3c/span>\x3c/td>\x3ctd style="text-align:right">${p.sigUrl?`\x3cimg src="${p.sigUrl}" style="height:30px">${p.via?'\x3cbr>\x3cspan class="tag ok">'+esc(p.via)+'\x3c/span>':''}`:`\x3cbutton class="btn sm" data-s="${i}">서명하기\x3c/button> \x3cbutton class="btn sm line" data-ln="${i}">${p.linked?'링크 다시 복사':'서명 링크'}\x3c/button>${p.linked?'\x3cbr>\x3cspan class="tag wait">링크 만듦\x3c/span>':''}`}\x3c/td>\x3c/tr>`).join('')}\x3c/table>\x3cdiv class="btns">\x3cbutton class="btn line sm" id="hsReload">↻ 링크로 받은 서명 확인\x3c/button>\x3c/div>\x3c/div>
     \x3cdiv class="card">\x3ch2>수령증 미리보기\x3c/h2>\x3cdiv class="preview">${html()}\x3c/div>
     \x3cdiv class="btns">\x3clabel style="display:flex;gap:8px;align-items:center;color:var(--ink);margin:0;flex:1 0 100%">\x3cinput type="checkbox" id="hsFill" style="width:auto" ${r.dateMode==='fill'?'checked':''}> 수령일을 배분일(${esc(r.date)})로 채우기 \x3cspan class="muted">(끄면 서명한 날짜)\x3c/span>\x3c/label>\x3cbutton class="btn line" id="hsEdit">수량·명단 수정\x3c/button>\x3cbutton class="btn line" id="hsPrint">인쇄 / PDF\x3c/button>\x3cbutton class="btn line" id="hsXls">엑셀로 받기\x3c/button>\x3cbutton class="btn" id="hsDone">서명 마치기 (수령증 보관)\x3c/button>\x3c/div>
     \x3cp class="muted">서명 마치기를 누르면 수령증 PDF가 보관되고 임시 명단 파일은 휴지통으로 보내요.\x3c/p>\x3c/div>`;
@@ -543,17 +543,13 @@ async function homeSignOpen(id){
       try{ L=await run('makeSignLink',r.id,i,v.replace(/\D/g,'')); }catch(e2){ return alert(e2); } }
     p.phone=L.phone; p.linked=true;
     const m=$('#modal'), box=$('#modalBox');
-    box.innerHTML=`\x3ch2 style="margin:0 0 6px;font-size:17px">${esc(p.name)}님께 서명 링크 보내기\x3c/h2>
-      \x3cp class="muted" style="margin:0 0 6px">받는 분은 링크를 열고 \x3cb>${esc(L.check)}\x3c/b>로 본인 확인 후 서명해요. 링크는 서명하면 닫히고, 안 하면 14일 뒤 닫혀요.\x3c/p>
-      \x3clabel>받는 번호 (문자로 보낼 때)\x3c/label>\x3cinput id="lp" value="${esc(L.phone)}" inputmode="tel">
-      \x3clabel>보낼 문자\x3c/label>\x3ctextarea id="lm" style="min-height:120px">${esc(L.msg)}\x3c/textarea>
-      \x3cp class="muted" style="margin:8px 0 0">카톡으로 보낼 땐 \x3cb>안내 문구 복사\x3c/b> 후 카톡 대화방에 붙여넣기 하면 돼요. 폰에서는 \x3cb>공유\x3c/b>로 카톡을 바로 고를 수도 있어요.\x3c/p>\x3cdiv class="btns">\x3cbutton class="btn line" id="lc">안내 문구 복사\x3c/button>\x3cbutton class="btn line" id="lu">링크만 복사\x3c/button>${navigator.share?'\x3cbutton class="btn line" id="lsh">공유 (카톡 등)\x3c/button>':''}\x3cspan style="flex:1">\x3c/span>\x3cbutton class="btn line" id="lx">닫기\x3c/button>\x3ca class="btn" id="ls" href="#">문자 앱 열기\x3c/a>\x3c/div>`;
+    box.innerHTML=`\x3ch2 style="margin:0 0 6px;font-size:17px">${esc(p.name)}님 서명 링크\x3c/h2>
+      \x3cp class="muted" style="margin:0 0 6px">받는 분은 링크를 열고 \x3cb>${esc(L.check)}\x3c/b>로 본인 확인 후 서명해요. 서명하면 링크가 닫히고, 안 하면 14일 뒤 닫혀요. 다시 복사해도 \x3cb>같은 링크\x3c/b>예요.\x3c/p>
+      \x3clabel>안내 문구 (고쳐서 복사해도 돼요)\x3c/label>\x3ctextarea id="lm" style="min-height:120px">${esc(L.msg)}\x3c/textarea>
+      \x3cdiv class="btns">\x3cbutton class="btn" id="lc">안내 문구 복사\x3c/button>\x3cbutton class="btn sub" id="lu">링크만 복사\x3c/button>\x3cspan style="flex:1">\x3c/span>\x3cbutton class="btn line" id="lx">닫기\x3c/button>\x3c/div>`;
     m.style.display='flex';
-    const upd=()=>{ $('#ls').href=smsHref($('#lp').value.replace(/\D/g,''),$('#lm').value); }; upd();
-    $('#lp').oninput=upd; $('#lm').oninput=upd;
     $('#lc').onclick=()=>copyText($('#lm').value);
     $('#lu').onclick=()=>copyText(L.url);
-    if($('#lsh')) $('#lsh').onclick=()=>navigator.share({text:$('#lm').value}).catch(()=>{});
     $('#lx').onclick=()=>{ m.style.display='none'; box.innerHTML=''; draw(); };
   };
   const bind=()=>{ $('#main').onclick=async e=>{ const ln=e.target.closest('[data-ln]'); if(ln) return sendLink(+ln.dataset.ln); const b=e.target.closest('[data-s]'); if(!b) return; const p=r.people[+b.dataset.s];
@@ -833,7 +829,7 @@ async function setupView(){
   \x3ctextarea id="vuIn" placeholder="hong@example.org" style="min-height:70px">\x3c/textarea>\x3cdiv class="btns">\x3cbutton class="btn sm" id="vuSave">저장\x3c/button>\x3c/div>\x3c/div>
   \x3cdiv class="card">\x3ch2>이용인 명단 사용 권한\x3c/h2>\x3cp class="muted" style="margin:0 0 6px">가정 배분·상품권에서 \x3cb>「이용인 명단」 탭\x3c/b>을 불러와 골라 넣을 수 있는 직원의 \x3cb>기관 메일\x3c/b>을 한 줄에 하나씩 넣어 주세요. 관리자는 항상 쓸 수 있어요. 탭은 숨기거나 잠가도 불러와져요.\x3c/p>
   \x3ctextarea id="fuIn" placeholder="teamlead@example.org" style="min-height:60px">\x3c/textarea>\x3cdiv class="btns">\x3cbutton class="btn sm" id="fuSave">저장\x3c/button>\x3c/div>\x3c/div>
-  \x3cdiv class="card">\x3ch2>외부 서명용 주소 (문자 링크)\x3c/h2>\x3cp class="muted" style="margin:0 0 6px">택배로 받은 분께 문자로 서명 링크를 보낼 때 쓰는 주소예요. 배포를 하나 더 만들어(액세스: \x3cb>모든 사용자\x3c/b>) 그 웹 앱 주소(…/exec)를 넣어 주세요. 이 주소로는 \x3cb>서명 화면만\x3c/b> 열리고 다른 기능은 막혀 있어요.\x3c/p>
+  \x3cdiv class="card">\x3ch2>외부 서명용 주소 (서명 링크)\x3c/h2>\x3cp class="muted" style="margin:0 0 6px">택배로 받은 분께 문자·카톡으로 서명 링크를 보낼 때 쓰는 주소예요. 배포를 하나 더 만들어(액세스: \x3cb>모든 사용자\x3c/b>) 그 웹 앱 주소(…/exec)를 넣어 주세요. 이 주소로는 \x3cb>서명 화면만\x3c/b> 열리고 다른 기능은 막혀 있어요.\x3c/p>
   \x3cdiv class="row">\x3cdiv>\x3cinput id="puIn" value="${esc(S.boot.publicUrl||'')}" placeholder="https://script.google.com/…/exec">\x3c/div>\x3cdiv style="flex:0 0 auto">\x3cbutton class="btn sm" id="puSave">저장\x3c/button>\x3c/div>\x3c/div>\x3c/div>
   \x3cdiv id="cards">\x3c/div>`;
   run('getFamUsers').then(v=>{ if($('#fuIn')) $('#fuIn').value=v.join('\n'); });
