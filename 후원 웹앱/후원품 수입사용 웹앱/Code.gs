@@ -12,7 +12,7 @@ const APP = {
   title: '후원품 나눔 도우미',
   org: '종로장애인복지관',
   tz: 'Asia/Seoul',
-  sheets: { REG: '후원물품등록', DIST: '배분 기록', DISP: '폐기 목록', STAFF: '직원 명부', STOCK: '재고 현황', VOUCH: '상품권 관리대장' },
+  sheets: { REG: '후원물품등록', DIST: '배분 기록', DISP: '폐기 목록', STAFF: '직원 명부', STOCK: '재고 현황', VOUCH: '상품권 관리대장', FAM: '이용인 명단' },
   own: { RCPT: '앱_수령증', ORG: '앱_유관기관', HOME: '앱_가정배분', DLOG: '앱_폐기' },
   rootFolder: '후원품 나눔 도우미',
   alertDays: 30   // 유통기한이 이 날짜 안으로 남으면 알림
@@ -83,6 +83,13 @@ const FIELDS = {
     note: ['비고'],
     outBy: ['출고담당자']
   },
+  FAM: {
+    name: ['성명', '이름'],
+    birth: ['생년월일'],
+    addr: ['주소'],
+    phone: ['연락처', '전화번호', '휴대폰', '핸드폰'],
+    manager: ['담당자']
+  },
   STAFF: {
     name: ['이름', '성명', '직원명'],
     team: ['소속', '소속팀', '팀', '부서']
@@ -94,9 +101,10 @@ const LABELS = {
   DISP: { recordId:'앱기록ID (자동)', date: '폐기일', name: '품명', inDate: '입고일', donor: '후원처', total: '총 수량', given: '지원수량', u1: '단위 (총 수량 옆)', u2: '단위 (지원수량 옆)', u3: '단위 (폐기 수량 옆)', qty: '폐기 수량', reason: '사유', photo: '사진' },
   STOCK: { name: '품명', inDate: '입고일', remain: '남은 수량', inQty: '입고 수량', out: '배분 수량', disp: '폐기 수량' },
   VOUCH: { no: '연번', serial: '일련번호', kind: '상품권 종류', face: '면액', inDate: '입고일', src: '입고처', inBy: '입고담당자', target: '지정내용', outDate: '출고일', purpose: '사용목적', person: '수령자', check: '수령확인', status: '상태', note: '비고', outBy: '출고담당자' },
+  FAM: { name: '성명', birth: '생년월일', addr: '주소', phone: '연락처', manager: '담당자' },
   STAFF: { name: '이름', team: '소속팀' }
 };
-const REQUIRED = { REG: ['name', 'date', 'qty'], DIST: ['date', 'name', 'person', 'qty'], DISP: ['name', 'qty'], STOCK: ['name', 'remain'], VOUCH: ['serial', 'kind', 'face', 'status'], STAFF: ['name'] };
+const REQUIRED = { REG: ['name', 'date', 'qty'], DIST: ['date', 'name', 'person', 'qty'], DISP: ['name', 'qty'], STOCK: ['name', 'remain'], VOUCH: ['serial', 'kind', 'face', 'status'], FAM: ['name'], STAFF: ['name'] };
 const OWN_HEAD = {
   RCPT: ['ID', '유형', '배분번호', '배분일', '등록자', '상태', '품목', '받는곳', '파일', '메모', '등록시각'],
   ORG: ['기관명', '대표자', '주소', '연락처', '담당자', '메모'],
@@ -106,6 +114,7 @@ const OWN_HEAD = {
 
 /* ───────── 웹 앱 ───────── */
 function doGet(e) {
+  if (e && e.parameter && e.parameter.s) return HtmlService.createHtmlOutputFromFile('Sign').setTitle('수령 서명').addMetaTag('viewport', 'width=device-width, initial-scale=1');
   return HtmlService.createHtmlOutputFromFile('Index')
     .setTitle(APP.title)
     .addMetaTag('viewport', 'width=device-width, initial-scale=1')
@@ -140,6 +149,13 @@ function vouchUsers_() { return str_(props_().getProperty('VUSERS')).toLowerCase
 function canVouch_() { return isAdmin_() || vouchUsers_().indexOf(me_()) >= 0; }
 function needVouch_() { if (!canVouch_()) throw new Error('상품권 권한이 없어요. 관리자에게 요청해 주세요.'); }
 function getVoucherUsers() { needAdmin_(); return vouchUsers_(); }
+/** 「이용인 명단」을 불러올 수 있는 직원 (관리자 + 설정에서 추가한 사람) */
+function famUsers_() { return str_(props_().getProperty('FUSERS')).toLowerCase().split(/[,\s]+/).filter(Boolean); }
+function canFam_() { return isAdmin_() || famUsers_().indexOf(me_()) >= 0; }
+function getFamUsers() { needAdmin_(); return famUsers_(); }
+function saveFamUsers(list) { needAdmin_(); const v = String(list || '').toLowerCase().split(/[,\s]+/).filter(x => /@/.test(x)); props_().setProperty('FUSERS', v.join(',')); return v; }
+/** 기관 계정이 아니면(외부 서명용 배포로 들어온 경우) 서명 화면 말고는 아무것도 못 하게 막음 */
+function needOrg_() { if (!me_()) throw new Error('기관 계정으로 로그인해야 쓸 수 있어요.'); }
 function saveVoucherUsers(list) { needAdmin_(); const v = String(list || '').toLowerCase().split(/[,\s]+/).filter(x => /@/.test(x)); props_().setProperty('VUSERS', v.join(',')); return v; }
 function withLock_(fn) { const l = LockService.getScriptLock(); l.waitLock(30000); clearCache_(); try { return fn(); } finally { clearCache_(); l.releaseLock(); } }
 /* 속도: 한 번 실행 안에서 같은 탭을 여러 번 읽지 않게(MEMO), 재고 계산은 몇 분간 저장(CacheService) */
@@ -223,7 +239,7 @@ function sheetInfo_(key, headerRow) {
     fields: fields
   };
 }
-function getSetup() { needAdmin_(); return ['REG', 'DIST', 'DISP', 'STOCK', 'VOUCH', 'STAFF'].map(k => sheetInfo_(k)); }
+function getSetup() { needAdmin_(); return ['REG', 'DIST', 'DISP', 'STOCK', 'VOUCH', 'FAM', 'STAFF'].map(k => sheetInfo_(k)); }
 function getSheetInfo(key, headerRow) { needAdmin_(); return sheetInfo_(key, Number(headerRow) || 0); }
 /** 수령증 위쪽 '배분처'에 들어갈 후원 담당 팀 */
 function saveDept(name) { needAdmin_(); props_().setProperty('DEPT', str_(name) || '일상동행팀'); return str_(name) || '일상동행팀'; }
@@ -388,6 +404,7 @@ const wIn_ = l => l.inDate;
 function stockMap_() { const o = {}; stock_().forEach(l => { o[l.key] = l; }); return o; }
 function stockCached_() { return cached_('stock', () => stock_(false)); }
 function getStock(all, fresh) {
+  needOrg_();
   if (!setupDone_()) return [];
   if (fresh) clearCache_();
   const full = !!(all && isAdmin_()), list = full ? stock_(true) : stockCached_();
@@ -396,6 +413,7 @@ function getStock(all, fresh) {
 
 /* ───────── 시작 정보 ───────── */
 function getBoot(receiptId) {
+  needOrg_();
   const admin = isAdmin_(), ok = setupDone_();
   const out = { admin: admin, me: me_(), setupOk: ok, today: today_(), org: APP.org, url: ScriptApp.getService().getUrl() };
   if (ok) {
@@ -404,6 +422,8 @@ function getBoot(receiptId) {
     out.alertDays = APP.alertDays;
     out.dept = props_().getProperty('DEPT') || '일상동행팀';
     out.vouch = canVouch_();
+    out.fam = canFam_() && !!map_('FAM');
+    if (admin) out.publicUrl = str_(props_().getProperty('PUBLIC_URL'));
     if (admin) out.counts = { sign: ownRows_('RCPT').filter(x => x.r[5] === '서명 대기').length, home: ownRows_('HOME').filter(x => x.r[6] === '확인 대기').length, org: ownRows_('RCPT').filter(x => x.r[5] === '회수 대기').length };
   }
   if (receiptId) out.receipt = getReceipt(receiptId);
@@ -455,7 +475,7 @@ function rcptObj_(x, withSig) {
   } else o.orgInfo = JSON.parse(r[7] || '{}');
   return o;
 }
-function getReceipt(id) { return rcptObj_(findRcpt_(id), true); }
+function getReceipt(id) { needOrg_(); return rcptObj_(findRcpt_(id), true); }
 function signReceipt(id, idx, dataUrl,requestId) {
   return withMutation_('signReceipt',requestId,[id,idx,dataUrl],() => {
     const x = findRcpt_(id), ppl = JSON.parse(x.r[7] || '[]'), p = ppl[idx];
@@ -520,7 +540,7 @@ function requestHome(p,requestId) {
       if (!people.length) throw new Error('받는 분 명단을 넣어 주세요.');
       const data = { id: id, date: row[1], manager: row[2], dateMode: p.dateMode === 'fill' ? 'fill' : 'blank',
         items: lots.filter(l => need[l.key] > 0).map(l => ({ key: l.key, name: l.name, inDate: l.inDate, donor: l.donor, inQty: l.inQty, give: need[l.key], remainAfter: l.remain - need[l.key] })),
-        people: people.map(x => ({ name: str_(x.name), addr: str_(x.addr), idType:x.idType==='생년월일'?'생년월일':'주소', qty: x.qty || {}, sig: '', at: '' })) };
+        people: people.map(x => ({ name: str_(x.name), addr: str_(x.addr), idType:x.idType==='생년월일'?'생년월일':'주소', phone: digits_(x.phone), birth: birth6_(x.birth), qty: x.qty || {}, sig: '', at: '' })) };
       const f = trackedFile_(folder_(['가정배분_임시명단']),id + '.json', JSON.stringify(data), 'application/json');
       row[9] = '서명 대기'; row[11] = f.getId();
     }
@@ -567,6 +587,7 @@ function homeData_(x) {
   return { f: f, d: JSON.parse(f.getBlob().getDataAsString()) };
 }
 function listHomeSign() {
+  needOrg_();
   const rows = ownRows_('HOME').filter(x => (x.r[9] === '서명 대기' || x.r[9] === '서명 완료') && homeAccess_(x)).reverse();
   return rows.slice(0, 30).map(x => {
     const o = { id: x.r[0], date: ymd_(x.r[1]), manager: x.r[2], count: x.r[4], state: x.r[9], items: JSON.parse(x.r[5] || '[]') };
@@ -577,7 +598,7 @@ function listHomeSign() {
 }
 function getHomeSign(id) {
   const x = findHome_(id), d = homeData_(x).d;
-  return { id: d.id, date: d.date, manager: d.manager, dateMode: d.dateMode || 'blank', items: d.items, people: d.people.map(p => ({ name: p.name, addr: p.addr, idType:p.idType==='생년월일'?'생년월일':'주소', qty: p.qty, at: p.at, sigUrl: p.sig })) };
+  return { id: d.id, date: d.date, manager: d.manager, dateMode: d.dateMode || 'blank', items: d.items, people: d.people.map(p => ({ name: p.name, addr: p.addr, idType:p.idType==='생년월일'?'생년월일':'주소', qty: p.qty, at: p.at, sigUrl: p.sig, phone: p.phone || '', linked: !!(p.tok && (!p.tokExp || Date.now() < p.tokExp)), via: p.via || '' })) };
 }
 function signHome(id, idx, dataUrl,requestId) {
   return withMutation_('signHome',requestId,[id,idx,dataUrl],() => {
@@ -604,7 +625,7 @@ function updateHomeSign(id, list,requestId) {
     d.people = people.map(p => {
       const o = p.i >= 0 ? d.people[p.i] : null;
       const same = o && o.sig && str_(o.name)===str_(p.name) && str_(o.addr)===str_(p.addr) && (o.idType||'주소')===(p.idType||'주소') && d.items.every(it => num_(o.qty[it.key]) === num_(p.qty && p.qty[it.key]));
-      return { name: str_(p.name), addr: str_(p.addr), idType:p.idType==='생년월일'?'생년월일':'주소', qty: p.qty || {}, sig: same ? o.sig : '', at: same ? o.at : '' };
+      return { name: str_(p.name), addr: str_(p.addr), idType:p.idType==='생년월일'?'생년월일':'주소', phone: p.phone !== undefined ? digits_(p.phone) : (o ? o.phone || '' : ''), birth: o ? o.birth || '' : '', tok: o ? o.tok || '' : '', qty: p.qty || {}, sig: same ? o.sig : '', at: same ? o.at : '' };
     });
     d.items.forEach(it => { it.give = need[it.key] || 0; });
     h.f.setContent(JSON.stringify(d));
@@ -650,6 +671,7 @@ function finishHome(id, html,requestId) {
     const pdf = trackedFile_(folder_(['가정배분 수령증', d.date.slice(0, 4), d.date.slice(5, 7)]),blob);
     const sh = own_('HOME'); guardRows_(sh, [x.row]);
     sh.getRange(x.row, 10, 1, 3).setValues([['서명 완료', pdf.getId(), '']]);
+    d.people.forEach(p => { if (p.tok) props_().deleteProperty('TOK_' + p.tok); });
     h.f.setTrashed(true);
     return true;
   });
@@ -982,9 +1004,92 @@ function cancelVoucherGive(id,requestId) {
 }
 
 
+
+/* ───────── F. 이용인 명단 / 문자 링크로 원격 서명 ───────── */
+const digits_ = v => String(v == null ? '' : v).replace(/\D/g, '');
+function birth6_(v) {
+  if (v instanceof Date && !isNaN(v)) return Utilities.formatDate(v, APP.tz, 'yyMMdd');
+  const d = digits_(v); return d.length === 8 ? d.slice(2) : d.length === 6 ? d : '';
+}
+function birthShow_(v) {
+  if (v instanceof Date && !isNaN(v)) return Utilities.formatDate(v, APP.tz, 'yyyy.MM.dd');
+  const d = digits_(v); return d.length === 8 ? d.slice(0, 4) + '.' + d.slice(4, 6) + '.' + d.slice(6) : str_(v);
+}
+/** 숨기거나 잠근 탭이어도 앱(min 권한)이 읽어 옴. 캐시에 남기지 않음 */
+function getFamilies() {
+  needOrg_();
+  if (!canFam_()) throw new Error('이용인 명단 권한이 없어요. 관리자에게 요청해 주세요.');
+  if (!map_('FAM')) throw new Error('설정 탭에서 「이용인 명단」 칸을 먼저 확인해 주세요.');
+  return readSheet_('FAM').filter(r => str_(r.name)).map(r => ({ name: str_(r.name), birth: birthShow_(r.birth), birth6: birth6_(r.birth), addr: str_(r.addr), phone: digits_(r.phone), manager: str_(r.manager) }));
+}
+function savePublicUrl(url) {
+  needAdmin_();
+  const u = str_(url);
+  if (u && !/^https:\/\/script\.google\.com\/.+\/exec$/.test(u)) throw new Error('「…/exec」로 끝나는 웹 앱 주소를 넣어 주세요.');
+  props_().setProperty('PUBLIC_URL', u); return u;
+}
+const SIGN_DAYS = 14;
+/** 가정 서명 명단의 한 분에게 보낼 서명 링크 (한 분 = 링크 하나, 서명하면 닫힘) */
+function makeSignLink(id, idx, phone) {
+  needOrg_();
+  return withLock_(() => {
+    const base = str_(props_().getProperty('PUBLIC_URL'));
+    if (!base) throw new Error('설정 탭에서 「외부 서명용 주소」를 먼저 넣어 주세요.');
+    const x = findHome_(id), h = homeData_(x), p = h.d.people[idx];
+    if (x.r[9] !== '서명 대기') throw new Error('서명이 끝난 명단이에요.');
+    if (!p) throw new Error('받는 분을 찾을 수 없어요.');
+    if (p.sig) throw new Error(p.name + '님은 이미 서명했어요.');
+    if (phone !== undefined && digits_(phone)) p.phone = digits_(phone);
+    if (!p.birth && !(p.phone && p.phone.length >= 4)) throw new Error('본인 확인용 생년월일이나 연락처가 없어요. 연락처를 넣어 주세요.');
+    if (p.tok) props_().deleteProperty('TOK_' + p.tok);
+    p.tok = Utilities.getUuid().replace(/-/g, '');
+    p.tokExp = Date.now() + SIGN_DAYS * 864e5; p.tries = 0;
+    h.f.setContent(JSON.stringify(h.d));
+    props_().setProperty('TOK_' + p.tok, x.r[0]);
+    const url = base + '?s=' + p.tok;
+    return { url: url, phone: p.phone || '', check: p.birth ? '생년월일 6자리' : '연락처 뒤 4자리',
+      msg: '[' + APP.org + '] ' + p.name + '님, 보내드린 후원품 잘 받으셨나요? 아래 링크에서 수령 확인 서명을 부탁드려요. (' + (p.birth ? '생년월일 6자리' : '연락처 뒤 4자리') + '로 확인해요)\n' + url };
+  });
+}
+/** 외부 서명 화면에서 쓰는 함수: 토큰 + 본인 확인. 이 두 함수만 기관 계정 없이 부를 수 있음 */
+function signTarget_(token) {
+  const t = String(token || '').replace(/[^a-f0-9]/gi, ''); if (t.length < 20) throw new Error('링크가 올바르지 않아요.');
+  const homeId = props_().getProperty('TOK_' + t); if (!homeId) throw new Error('이미 서명했거나 만료된 링크예요. 복지관에 문의해 주세요.');
+  const x = ownRows_('HOME').find(y => y.r[0] === homeId); if (!x || x.r[9] !== '서명 대기') throw new Error('이미 마감된 링크예요. 복지관에 문의해 주세요.');
+  const h = homeData_(x), p = h.d.people.find(q => q.tok === t);
+  if (!p) throw new Error('이미 서명했거나 만료된 링크예요. 복지관에 문의해 주세요.');
+  if (p.tokExp && Date.now() > p.tokExp) throw new Error('링크 사용 기간이 지났어요. 복지관에 문의해 주세요.');
+  return { x: x, h: h, p: p, t: t };
+}
+function checkWho_(c, code) {
+  const p = c.p, want = p.birth || (p.phone || '').slice(-4), got = digits_(code);
+  if ((p.tries || 0) >= 5) throw new Error('확인을 여러 번 틀려서 링크가 잠겼어요. 복지관에 문의해 주세요.');
+  if (!want || got !== want) { p.tries = (p.tries || 0) + 1; c.h.f.setContent(JSON.stringify(c.h.d)); throw new Error('입력한 번호가 맞지 않아요. (' + (5 - p.tries) + '번 남음)'); }
+}
+function publicSignInfo(token, code) {
+  return withLock_(() => {
+    const c = signTarget_(token);
+    if (code === undefined) return { name: c.p.name.slice(0, 1) + '○' + c.p.name.slice(2), check: c.p.birth ? '생년월일 6자리 (예: 1965년 3월 12일생 → 650312)' : '연락처 뒤 4자리' };
+    checkWho_(c, code);
+    return { name: c.p.name, org: APP.org, date: c.h.d.date, items: c.h.d.items.map(it => ({ name: it.name, qty: num_(c.p.qty[it.key]) })).filter(i => i.qty > 0) };
+  });
+}
+function publicSign(token, code, dataUrl) {
+  return withLock_(() => {
+    const c = signTarget_(token);
+    checkWho_(c, code);
+    if (!/^data:image\/png;base64,/.test(String(dataUrl)) || String(dataUrl).length > 400000) throw new Error('서명을 다시 해 주세요.');
+    c.p.sig = dataUrl; c.p.at = today_(); c.p.via = '문자 링크';
+    props_().deleteProperty('TOK_' + c.t); c.p.tok = ''; c.p.tries = 0;
+    c.h.f.setContent(JSON.stringify(c.h.d));
+    return true;
+  });
+}
+
 /* ───────── 엑셀로 내보내기 (모양 살려서) ───────── */
 /** 화면에서 읽은 양식 모양(표·칸 너비·합치기·색·서명/사진)을 임시 시트에 그려 .xlsx로 */
 function exportXlsx(model, name) {
+  needOrg_();
   const fname = String(name || '문서').replace(/[\\/:*?"<>|]/g, '_');
   const ss = SpreadsheetApp.create(fname), sh = ss.getSheets()[0];
   try {
@@ -1066,6 +1171,7 @@ function layoutTable_(t) {
 /* ───────── 편집기에서 직접 실행하는 도구 ───────── */
 /** 앱이 안 열릴 때: 편집기에서 실행 → 아래 '실행 로그'에 어디서 오래 걸리는지 나옴 */
 function checkApp() {
+  needAdmin_();
   const t0 = Date.now(), lap = m => console.log((Date.now() - t0) + 'ms  ' + m);
   lap('시작');
   ['REG', 'DIST', 'DISP', 'STOCK', 'STAFF'].forEach(k => {
@@ -1080,6 +1186,7 @@ function checkApp() {
 }
 /** 칸 설정을 지우고 처음부터 다시 짐작하게 함 (시트 내용은 그대로) */
 function resetSetup() {
+  needAdmin_();
   ['REG', 'DIST', 'DISP', 'STOCK', 'STAFF'].forEach(k => props_().deleteProperty('MAP_' + k));
   console.log('칸 설정을 지웠어요. 앱을 열면 설정 탭부터 나와요.');
 }
@@ -1154,6 +1261,7 @@ function cleanupOperation_(meta){for(const id of meta.stash||[]){try{DriveApp.ge
 function resultRef_(kind,result){if(result&&result.id){if(['updateHomeSign','signHome'].includes(kind))return {ref:'home',id:result.id};if(['dispose','updateDisposal'].includes(kind))return {ref:'disposal',id:result.id};if(['createOrgReceipt','updateOrgReceipt','updateTeamReceipt','updateVoucherGive','signReceipt'].includes(kind))return {ref:'receipt',id:result.id};}return {value:result};}
 function resolveResult_(r){return r.ref==='receipt'?getReceipt(r.id):r.ref==='home'?getHomeSign(r.id):r.ref==='disposal'?getDisposal(r.id):r.value;}
 function withMutation_(kind,requestId,args,fn){
+ needOrg_();
  if(!/^[A-Za-z0-9_-]{8,100}$/.test(String(requestId||'')))throw Error('앱을 새로고침한 뒤 다시 시도해주세요.');
  validateMutation_(kind,args);
  return withLock_(()=>{const sh=journal_(),id=hash_(me_()+'|'+kind+'|'+requestId),fingerprint=hash_(JSON.stringify(args));

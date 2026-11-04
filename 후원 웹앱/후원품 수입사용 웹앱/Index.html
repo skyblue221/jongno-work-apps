@@ -208,6 +208,26 @@ const xlsBtn=id=>`\x3cbutton class="btn line" id="${id}">엑셀로 받기\x3c/bu
 function printHtml(html, landscape){ $('#printArea').innerHTML=fitPage(html, landscape); setTimeout(()=>window.print(),150); }
 
 
+
+async function famPick(title, onPick){
+  const m=$('#modal'), box=$('#modalBox');
+  box.innerHTML='\x3cp class="muted">명단을 불러오는 중이에요...\x3c/p>'; m.style.display='flex';
+  let L; try{ L=S.fam||(S.fam=await run('getFamilies')); }catch(e){ m.style.display='none'; return alert(e); }
+  const sel=new Set();
+  box.innerHTML=`\x3ch2 style="margin:0 0 6px;font-size:17px">${esc(title)}\x3c/h2>\x3cinput id="fq" placeholder="이름·담당자·주소로 찾기">
+    \x3cdiv id="fl" class="lots" style="max-height:52vh;margin-top:6px">\x3c/div>\x3cp id="fn" class="muted" style="margin:6px 0 0">\x3c/p>
+    \x3cdiv class="btns">\x3cbutton class="btn line" id="fx">닫기\x3c/button>\x3cspan style="flex:1">\x3c/span>\x3cbutton class="btn" id="fo">선택한 분 넣기\x3c/button>\x3c/div>`;
+  const draw=()=>{ const q=$('#fq').value.trim();
+    const V=L.map((f,i)=>({f,i})).filter(o=>!q||[o.f.name,o.f.manager,o.f.addr].join(' ').includes(q));
+    $('#fl').innerHTML=V.length?V.map(o=>`\x3clabel class="lot ${sel.has(o.i)?'on':''}" style="align-items:center">\x3cspan>\x3cinput type="checkbox" data-fi="${o.i}" ${sel.has(o.i)?'checked':''} style="width:auto"> \x3cb>${esc(o.f.name)}\x3c/b> \x3cspan class="muted">${esc(o.f.birth)}${o.f.manager?' · 담당 '+esc(o.f.manager):''}\x3c/span>\x3cbr>\x3cspan class="muted">${esc(o.f.addr)}\x3c/span>\x3c/span>\x3c/label>`).join(''):'\x3cp class="muted">명단이 없어요.\x3c/p>';
+    $('#fn').textContent=`${sel.size}명 선택`; };
+  $('#fq').oninput=draw;
+  $('#fl').onchange=e=>{ const i=e.target.dataset.fi; if(i===undefined) return; e.target.checked?sel.add(+i):sel.delete(+i); draw(); };
+  $('#fx').onclick=()=>{ m.style.display='none'; box.innerHTML=''; };
+  $('#fo').onclick=()=>{ if(!sel.size) return toast('한 분 이상 골라 주세요.'); onPick([...sel].map(i=>L[i])); m.style.display='none'; box.innerHTML=''; };
+  draw();
+}
+function smsHref(phone,msg){ return `sms:${phone}${/iPhone|iPad|iPod/.test(navigator.userAgent)?'&':'?'}body=${encodeURIComponent(msg)}`; }
 function signPad(title){
   return new Promise(res=>{
     const m=$('#modal'), box=$('#modalBox');
@@ -404,7 +424,7 @@ function homeView(){
   \x3clabel>가져갈 물품\x3c/label>\x3cdiv id="hPick">\x3c/div>\x3c/div>
   \x3cdiv class="card">\x3ch2>2. 받는 분 명단\x3c/h2>
   \x3clabel>명단 전체에 사용할 정보\x3cselect id="hIdentity">\x3coption>주소\x3c/option>\x3coption>생년월일\x3c/option>\x3c/select>\x3c/label>\x3clabel>한 줄에 한 분씩 「이름, 선택한 식별정보」 (엑셀에서 복사해 붙여도 돼요)\x3c/label>\x3ctextarea id="hPaste" placeholder="홍길동, 종로구 예시로 1&#10;김예시, 종로구 예시로 2">\x3c/textarea>
-  \x3cdiv class="btns">\x3cbutton class="btn sub" id="hParse">명단 넣기\x3c/button>\x3cbutton class="btn line" id="hOne">한 분 추가\x3c/button>\x3c/div>
+  \x3cdiv class="btns">\x3cbutton class="btn sub" id="hParse">명단 넣기\x3c/button>\x3cbutton class="btn line" id="hOne">한 분 추가\x3c/button>${S.boot.fam?'\x3cbutton class="btn sub" id="hFam">이용인 명단에서 고르기\x3c/button>':''}\x3c/div>
   \x3cdiv id="hRows" style="margin-top:10px">\x3c/div>\x3c/div>
   \x3cdiv class="card">\x3ch2>3. 수령증\x3c/h2>
   \x3clabel>수령증의 수령일 칸\x3c/label>
@@ -422,6 +442,7 @@ function homeView(){
   $('#hDate').onchange=e=>H.date=e.target.value; $('#hDateMode').onchange=e=>{ if(e.target.name==='dm') H.dateMode=e.target.value; }; $('#hPhone').onchange=e=>{ H.phoneSign=e.target.checked; drawRows(); };
   picker($('#hPick'), H.sel, drawRows);
   $('#hParse').onclick=()=>{ $('#hPaste').value.split(/\r?\n/).map(s=>s.trim()).filter(Boolean).forEach(line=>{ const p=line.split(/\t|,/).map(x=>x.trim()); H.rows.push({idType:H.idType||'주소',name:p[0],addr:p.slice(1).filter(Boolean).join(' '),qty:{},sig:''}); }); $('#hPaste').value=''; drawRows(); };
+  if($('#hFam')) $('#hFam').onclick=()=>famPick('가정 배분 받는 분 고르기',list=>{ list.forEach(f=>H.rows.push({name:f.name,addr:H.idType==='생년월일'?f.birth:f.addr,idType:H.idType,phone:f.phone,birth:f.birth6,qty:{},sig:''})); drawRows(); toast(`${list.length}명을 넣었어요.`); });
   $('#hOne').onclick=()=>{ H.rows.push({name:'',addr:'',idType:H.idType||'주소',qty:{},sig:''}); drawRows(); };
   $('#hClear').onclick=()=>{ if(confirm('명단과 서명을 모두 지울까요?')){ S.home=null; homeView(); } };
   const checkHome=()=>{try{checkInputQuantities(H.rows);return true;}catch(e){alert(e.message);return false;}};
@@ -438,7 +459,7 @@ function homeView(){
     const people=H.rows.filter(r=>r.name); if(!H.sel.length||!people.length) throw '물품과 명단을 넣어 주세요.';
     if(!confirm('명단(이름·선택한 주소 또는 생년월일)을 서명이 끝날 때까지만 잠긴 임시 파일에 저장해요. 서명을 마치면 수령증 PDF만 남고 임시 명단 파일은 휴지통으로 보내요. 계속할까요?')) return;
     await run('requestHome',{later:true,dateMode:H.dateMode,manager:H.manager,date:H.date,count:people.length,items:H.sel.map(k=>({key:k,qty:total(k)})),
-      people:people.map(r=>({name:r.name,addr:r.addr,idType:H.idType,qty:Object.fromEntries(H.sel.map(k=>[k,qOf(r,k)]))}))});
+      people:people.map(r=>({name:r.name,addr:r.addr,idType:H.idType,phone:r.phone||'',birth:r.birth||'',qty:Object.fromEntries(H.sel.map(k=>[k,qOf(r,k)]))}))});
     S.home=null; refreshStockLater(); if(S.boot.admin) bumpCount('home',1);
     toast('저장했어요. 가정 서명 탭에서 이어서 서명받을 수 있어요.',3500); go('hsign');
   }, '저장 중...');
@@ -482,7 +503,7 @@ async function homeSignOpen(id){
     const left=r.people.filter(p=>!p.sigUrl).length;
     $('#main').innerHTML=`\x3cbutton class="btn line sm" id="hsBack">← 가정 서명\x3c/button>
     \x3cdiv class="card">\x3ch2>${esc(r.manager)} · ${esc(r.date)}\x3c/h2>\x3cp class="muted" style="margin:0">${left?`\x3cspan class="tag wait">서명 ${left}명 남음\x3c/span>`:'\x3cspan class="tag ok">모두 서명했어요\x3c/span>'}\x3c/p>
-    \x3ctable class="tbl" style="margin-top:10px">${r.people.map((p,i)=>`\x3ctr>\x3ctd>\x3cb>${esc(p.name)}\x3c/b>\x3cbr>\x3cspan class="muted">${esc((p.idType||'주소')+': '+(p.addr||''))}\x3c/span>\x3c/td>\x3ctd style="text-align:right">${p.sigUrl?`\x3cimg src="${p.sigUrl}" style="height:30px">`:`\x3cbutton class="btn sm" data-s="${i}">서명하기\x3c/button>`}\x3c/td>\x3c/tr>`).join('')}\x3c/table>\x3c/div>
+    \x3ctable class="tbl" style="margin-top:10px">${r.people.map((p,i)=>`\x3ctr>\x3ctd>\x3cb>${esc(p.name)}\x3c/b>\x3cbr>\x3cspan class="muted">${esc((p.idType||'주소')+': '+(p.addr||''))}\x3c/span>\x3c/td>\x3ctd style="text-align:right">${p.sigUrl?`\x3cimg src="${p.sigUrl}" style="height:30px">${p.via?'\x3cbr>\x3cspan class="tag ok">'+esc(p.via)+'\x3c/span>':''}`:`\x3cbutton class="btn sm" data-s="${i}">서명하기\x3c/button> \x3cbutton class="btn sm line" data-ln="${i}">${p.linked?'링크 다시 보내기':'문자 링크'}\x3c/button>${p.linked?'\x3cbr>\x3cspan class="tag wait">링크 보냄\x3c/span>':''}`}\x3c/td>\x3c/tr>`).join('')}\x3c/table>\x3cdiv class="btns">\x3cbutton class="btn line sm" id="hsReload">↻ 문자로 받은 서명 확인\x3c/button>\x3c/div>\x3c/div>
     \x3cdiv class="card">\x3ch2>수령증 미리보기\x3c/h2>\x3cdiv class="preview">${html()}\x3c/div>
     \x3cdiv class="btns">\x3clabel style="display:flex;gap:8px;align-items:center;color:var(--ink);margin:0;flex:1 0 100%">\x3cinput type="checkbox" id="hsFill" style="width:auto" ${r.dateMode==='fill'?'checked':''}> 수령일을 배분일(${esc(r.date)})로 채우기 \x3cspan class="muted">(끄면 서명한 날짜)\x3c/span>\x3c/label>\x3cbutton class="btn line" id="hsEdit">수량·명단 수정\x3c/button>\x3cbutton class="btn line" id="hsPrint">인쇄 / PDF\x3c/button>\x3cbutton class="btn line" id="hsXls">엑셀로 받기\x3c/button>\x3cbutton class="btn" id="hsDone">서명 마치기 (수령증 보관)\x3c/button>\x3c/div>
     \x3cp class="muted">서명 마치기를 누르면 수령증 PDF가 보관되고 임시 명단 파일은 휴지통으로 보내요.\x3c/p>\x3c/div>`;
@@ -490,6 +511,7 @@ async function homeSignOpen(id){
     $('#hsPrint').onclick=()=>printHtml(html(),true);
     $('#hsXls').onclick=e=>toExcel(e.target,html(),'가정배분수령증_'+r.date+'_'+r.manager,true);
     $('#hsEdit').onclick=()=>editHome();
+    $('#hsReload').onclick=e=>act(e.target,async()=>{ r=await run('getHomeSign',r.id); draw(); toast('새로 불러왔어요.'); },'불러오는 중...');
     $('#hsFill').onchange=e=>{ r.dateMode=e.target.checked?'fill':'blank'; draw(); };
     $('#hsDone').onclick=e=>{ if(left&&!confirm(`아직 ${left}명이 서명하지 않았어요. 빈칸으로 두고 마칠까요?`)) return;
       act(e.target, async()=>{ const h=html(); await run('finishHome',r.id,fitPage(h,true)); printHtml(h,true); toast('수령증을 보관했어요. 인쇄 창이 열려요.',3500); setTimeout(()=>go('hsign'),1500); }, '보관 중...'); };
@@ -514,7 +536,23 @@ async function homeSignOpen(id){
     };
     ed();
   };
-  const bind=()=>{ $('#main').onclick=async e=>{ const b=e.target.closest('[data-s]'); if(!b) return; const p=r.people[+b.dataset.s];
+  const sendLink=async i=>{ const p=r.people[i];
+    let phone=p.phone||''; if(!phone){ phone=(prompt(`${p.name}님 연락처를 넣어 주세요 (본인 확인과 문자 보내기에 써요)`,'')||'').replace(/\D/g,''); if(!phone) return; }
+    let L; try{ L=await run('makeSignLink',r.id,i,phone); }catch(e){ return alert(e); }
+    p.phone=L.phone; p.linked=true;
+    const m=$('#modal'), box=$('#modalBox');
+    box.innerHTML=`\x3ch2 style="margin:0 0 6px;font-size:17px">${esc(p.name)}님께 서명 링크 보내기\x3c/h2>
+      \x3cp class="muted" style="margin:0 0 6px">받는 분은 링크를 열고 \x3cb>${esc(L.check)}\x3c/b>로 본인 확인 후 서명해요. 링크는 서명하면 닫히고, 안 하면 14일 뒤 닫혀요.\x3c/p>
+      \x3clabel>받는 번호\x3c/label>\x3cinput id="lp" value="${esc(L.phone)}" inputmode="tel">
+      \x3clabel>보낼 문자\x3c/label>\x3ctextarea id="lm" style="min-height:120px">${esc(L.msg)}\x3c/textarea>
+      \x3cdiv class="btns">\x3cbutton class="btn line" id="lc">문자 복사\x3c/button>\x3cspan style="flex:1">\x3c/span>\x3cbutton class="btn line" id="lx">닫기\x3c/button>\x3ca class="btn" id="ls" href="#">문자 앱 열기\x3c/a>\x3c/div>`;
+    m.style.display='flex';
+    const upd=()=>{ $('#ls').href=smsHref($('#lp').value.replace(/\D/g,''),$('#lm').value); }; upd();
+    $('#lp').oninput=upd; $('#lm').oninput=upd;
+    $('#lc').onclick=()=>copyText($('#lm').value);
+    $('#lx').onclick=()=>{ m.style.display='none'; box.innerHTML=''; draw(); };
+  };
+  const bind=()=>{ $('#main').onclick=async e=>{ const ln=e.target.closest('[data-ln]'); if(ln) return sendLink(+ln.dataset.ln); const b=e.target.closest('[data-s]'); if(!b) return; const p=r.people[+b.dataset.s];
     const sig=await signPad(`${p.name}님 서명`); if(!sig) return;
     await act(b, async()=>{ r=await run('signHome',r.id,+b.dataset.s,sig); toast('서명했어요.'); draw(); }, '저장 중...'); }; };
   draw(); bind();
@@ -556,7 +594,7 @@ async function vouchView(){
   \x3cdiv class="row">\x3cdiv>\x3cselect id="vKind">\x3coption value="">모든 종류\x3c/option>${V.kinds.map(k=>`\x3coption ${k===G.kind?'selected':''}>${esc(k)}\x3c/option>`).join('')}\x3c/select>\x3c/div>\x3cdiv>\x3cinput id="vQ" placeholder="번호 끝자리로 찾기">\x3c/div>\x3c/div>
   \x3cdiv class="row" style="margin-top:6px">\x3cdiv style="flex:0 0 auto">\x3cinput id="vN" class="q" inputmode="numeric" placeholder="장수">\x3c/div>\x3cdiv style="flex:0 0 auto">\x3cbutton class="btn sub sm" id="vFirst">앞에서부터 선택\x3c/button> \x3cbutton class="btn line sm" id="vClear">선택 해제\x3c/button>\x3c/div>\x3c/div>
   \x3cdiv class="lots" id="vList" style="max-height:260px;margin-top:6px">\x3c/div>\x3cp id="vSel" class="muted">\x3c/p>
-  \x3clabel>2. 받는 사람과 장수 (고른 순서대로 나눠 담겨요)\x3c/label>\x3cdiv id="vPeople">\x3c/div>\x3cdiv class="btns" style="margin-top:6px">\x3cbutton class="btn line sm" id="vAddP">한 명 추가\x3c/button>\x3cbutton class="btn line sm" id="vPasteOpen">당사자 명단 붙여넣기\x3c/button>\x3c/div>\x3cdiv id="vPaste">\x3c/div>
+  \x3clabel>2. 받는 사람과 장수 (고른 순서대로 나눠 담겨요)\x3c/label>\x3cdiv id="vPeople">\x3c/div>\x3cdiv class="btns" style="margin-top:6px">\x3cbutton class="btn line sm" id="vAddP">한 명 추가\x3c/button>\x3cbutton class="btn line sm" id="vPasteOpen">당사자 명단 붙여넣기\x3c/button>${S.boot.fam?'\x3cbutton class="btn line sm" id="vFam">이용인 명단에서 고르기\x3c/button>':''}\x3c/div>\x3cdiv id="vPaste">\x3c/div>
   \x3cdiv id="vAssign">\x3c/div>
   \x3cdiv class="row">\x3cdiv>\x3clabel>지급일\x3c/label>\x3cinput type="date" id="vDate" value="${G.date}">\x3c/div>\x3cdiv>\x3clabel>사용목적 (사업·행사)\x3c/label>\x3cinput id="vPur" value="${esc(G.purpose)}">\x3c/div>\x3c/div>
   \x3cdiv class="row">\x3cdiv>\x3clabel>출고담당자\x3c/label>\x3cinput id="vBy" value="${esc(G.outBy)}">\x3c/div>\x3cdiv>\x3clabel>수령확인\x3c/label>\x3cinput id="vChk" value="${esc(G.check)}">\x3c/div>\x3c/div>
@@ -587,6 +625,7 @@ async function vouchView(){
     drawAssign(); };
   $('#vPeople').onchange=e=>{ if(e.target.dataset.f==='type'){ G.people[e.target.dataset.pi].type=e.target.value; drawPeople(); } };
   $('#vPeople').onclick=e=>{ if(e.target.dataset.px){ G.people.splice(+e.target.dataset.px,1); if(!G.people.length) G.people.push({type:'직원',name:'',team:'',addr:'',n:''}); drawPeople(); } };
+  if($('#vFam')) $('#vFam').onclick=()=>famPick('상품권 받는 분 고르기',list=>{ G.people=G.people.filter(p=>p.name.trim()).concat(list.map(f=>({type:'당사자',idType:'주소',name:f.name,addr:f.addr,team:'',n:'1'}))); drawPeople(); toast(`${list.length}명을 넣었어요. 장수를 확인해 주세요.`,3500); });
   $('#vPasteOpen').onclick=()=>{ $('#vPaste').innerHTML=`\x3clabel>명단 전체에 사용할 정보\x3cselect id="vPasteType">\x3coption>주소\x3c/option>\x3coption>생년월일\x3c/option>\x3c/select>\x3c/label>\x3clabel>한 줄에 한 분씩 「이름, 선택한 식별정보, 장수」 (장수가 없으면 1장)\x3c/label>\x3ctextarea id="vPasteT" placeholder="홍길동, 종로구 예시로 1, 2&#10;김예시, 종로구 예시로 2, 1">\x3c/textarea>\x3cdiv class="btns">\x3cbutton class="btn sub sm" id="vPasteGo">명단 넣기\x3c/button>\x3c/div>`;
     $('#vPasteGo').onclick=()=>{ const rows=$('#vPasteT').value.split(/\r?\n/).map(x=>x.trim()).filter(Boolean).map(line=>{ const t=line.split(/\t|,/).map(x=>x.trim()); let n=1; if(t.length>1&&/^\d+$/.test(t[t.length-1])) n=+t.pop(); return {type:'당사자',idType:$('#vPasteType').value,name:t[0],addr:t.slice(1).filter(Boolean).join(' '),team:'',n:String(n)}; });
       if(!rows.length) return toast('명단을 넣어 주세요.');
@@ -788,7 +827,14 @@ async function setupView(){
   \x3cdiv class="card">\x3ch2>수령증 배분처\x3c/h2>\x3cp class="muted" style="margin:0 0 6px">수령증 위쪽 「배분처」 칸에 들어가는 후원 담당 팀이에요.\x3c/p>\x3cdiv class="row">\x3cdiv>\x3cinput id="deptIn" value="${esc(S.boot.dept||'일상동행팀')}">\x3c/div>\x3cdiv style="flex:0 0 auto">\x3cbutton class="btn sm" id="deptSave">저장\x3c/button>\x3c/div>\x3c/div>\x3c/div>
   \x3cdiv class="card">\x3ch2>상품권 사용 권한\x3c/h2>\x3cp class="muted" style="margin:0 0 6px">상품권 탭을 쓸 직원의 \x3cb>기관 메일\x3c/b>을 한 줄에 하나씩 넣어 주세요. 이 직원들은 상품권 \x3cb>지급·수령증·본인이 지급한 것 수정/취소\x3c/b>만 할 수 있어요. 입고와 다른 탭 관리는 관리자만 해요.\x3c/p>
   \x3ctextarea id="vuIn" placeholder="hong@example.org" style="min-height:70px">\x3c/textarea>\x3cdiv class="btns">\x3cbutton class="btn sm" id="vuSave">저장\x3c/button>\x3c/div>\x3c/div>
+  \x3cdiv class="card">\x3ch2>이용인 명단 사용 권한\x3c/h2>\x3cp class="muted" style="margin:0 0 6px">가정 배분·상품권에서 \x3cb>「이용인 명단」 탭\x3c/b>을 불러와 골라 넣을 수 있는 직원의 \x3cb>기관 메일\x3c/b>을 한 줄에 하나씩 넣어 주세요. 관리자는 항상 쓸 수 있어요. 탭은 숨기거나 잠가도 불러와져요.\x3c/p>
+  \x3ctextarea id="fuIn" placeholder="teamlead@example.org" style="min-height:60px">\x3c/textarea>\x3cdiv class="btns">\x3cbutton class="btn sm" id="fuSave">저장\x3c/button>\x3c/div>\x3c/div>
+  \x3cdiv class="card">\x3ch2>외부 서명용 주소 (문자 링크)\x3c/h2>\x3cp class="muted" style="margin:0 0 6px">택배로 받은 분께 문자로 서명 링크를 보낼 때 쓰는 주소예요. 배포를 하나 더 만들어(액세스: \x3cb>모든 사용자\x3c/b>) 그 웹 앱 주소(…/exec)를 넣어 주세요. 이 주소로는 \x3cb>서명 화면만\x3c/b> 열리고 다른 기능은 막혀 있어요.\x3c/p>
+  \x3cdiv class="row">\x3cdiv>\x3cinput id="puIn" value="${esc(S.boot.publicUrl||'')}" placeholder="https://script.google.com/…/exec">\x3c/div>\x3cdiv style="flex:0 0 auto">\x3cbutton class="btn sm" id="puSave">저장\x3c/button>\x3c/div>\x3c/div>\x3c/div>
   \x3cdiv id="cards">\x3c/div>`;
+  run('getFamUsers').then(v=>{ if($('#fuIn')) $('#fuIn').value=v.join('\n'); });
+  $('#fuSave').onclick=e=>act(e.target, async()=>{ const v=await run('saveFamUsers',$('#fuIn').value); $('#fuIn').value=v.join('\n'); toast(`${v.length}명에게 명단 권한을 줬어요.`); });
+  $('#puSave').onclick=e=>act(e.target, async()=>{ S.boot.publicUrl=await run('savePublicUrl',$('#puIn').value); toast('저장했어요.'); });
   run('getVoucherUsers').then(v=>{ if($('#vuIn')) $('#vuIn').value=v.join('\n'); });
   $('#vuSave').onclick=e=>act(e.target, async()=>{ const v=await run('saveVoucherUsers',$('#vuIn').value); $('#vuIn').value=v.join('\n'); toast(`${v.length}명에게 상품권 권한을 줬어요.`); });
   $('#deptSave').onclick=e=>act(e.target, async()=>{ S.boot.dept=await run('saveDept',$('#deptIn').value); toast('저장했어요.'); });
