@@ -426,6 +426,8 @@ function getBoot(receiptId) {
     out.fam = canFam_() && !!map_('FAM');
     if (admin) out.publicUrl = str_(props_().getProperty('PUBLIC_URL'));
     if (admin) out.counts = { sign: ownRows_('RCPT').filter(x => x.r[5] === '서명 대기').length, home: ownRows_('HOME').filter(x => x.r[6] === '확인 대기').length, org: ownRows_('RCPT').filter(x => x.r[5] === '회수 대기').length };
+    out.counts = out.counts || {};
+    out.counts.hsign = ownRows_('HOME').filter(x => x.r[9] === '서명 대기' && homeAccess_(x)).length;
   }
   if (receiptId) out.receipt = getReceipt(receiptId);
   return out;

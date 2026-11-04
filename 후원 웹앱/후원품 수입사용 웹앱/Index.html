@@ -106,8 +106,8 @@ function expiring(){ const n=S.boot.alertDays||30; return S.stock.filter(l=>l.re
 function expiryCard(){ const L=expiring(); if(!L.length) return '';
   return `\x3cdiv class="card note warn" style="margin-bottom:12px">\x3cb>⏰ 유통기한이 지났거나 ${S.boot.alertDays||30}일 안에 끝나는 물품 ${L.length}개\x3c/b>\x3cbr>${L.map(l=>{const d=daysTo(l.expiry);return `· ${esc(l.name)} — 남은 ${l.remain}${esc(l.unit||'')} · 유통 ${esc(l.expiry)} \x3cb>${d<0?`(${-d}일 지남)`:d===0?'(오늘까지)':`(${d}일 남음)`}\x3c/b>`;}).join('\x3cbr>')}\x3c/div>`; }
 function tabs(){ const c=S.boot.counts||{}; c.stock=expiring().length; return S.boot.admin
-  ? [['dist','팀 배분'],['sign','서명 현황',c.sign],['home','가정 배분'],['hsign','가정 서명'],['homeok','가정 확인',c.home],['org','유관기관',c.org],['vouch','상품권'],['disp','폐기'],['stock','재고',c.stock],['setup','설정']]
-  : [['home','가정 배분'],['hsign','가정 서명']].concat(S.boot.vouch?[['vouch','상품권']]:[]).concat([['stock','재고',c.stock]]); }
+  ? [['dist','팀 배분'],['sign','서명 현황',c.sign],['home','가정 배분'],['hsign','가정 서명',c.hsign],['homeok','가정 확인',c.home],['org','유관기관',c.org],['vouch','상품권'],['disp','폐기'],['stock','재고',c.stock],['setup','설정']]
+  : [['home','가정 배분'],['hsign','가정 서명',c.hsign]].concat(S.boot.vouch?[['vouch','상품권']]:[]).concat([['stock','재고',c.stock]]); }
 function buildNav(){ $('#nav').innerHTML = tabs().map(([k,t,n])=>`\x3cbutton data-k="${k}">${t}${n?`\x3cspan class="dot">${n}\x3c/span>`:''}\x3c/button>`).join(''); $('#nav').onclick=e=>{const b=e.target.closest('button'); if(b) go(b.dataset.k);}; }
 async function refreshStock(fresh){ S.stock = await run('getStock', false,!!fresh); buildNav(); document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.k===S.tab)); }
 /* 저장 직후 재고는 뒤에서 새로 불러옴 (다음 화면이 재고를 쓰지 않을 때만) — 저장 완료 안내를 기다리지 않고 바로 보여 줌 */
@@ -460,7 +460,7 @@ function homeView(){
     if(!confirm('명단(이름·선택한 주소 또는 생년월일)을 서명이 끝날 때까지만 잠긴 임시 파일에 저장해요. 서명을 마치면 수령증 PDF만 남고 임시 명단 파일은 휴지통으로 보내요. 계속할까요?')) return;
     await run('requestHome',{later:true,dateMode:H.dateMode,manager:H.manager,date:H.date,count:people.length,items:H.sel.map(k=>({key:k,qty:total(k)})),
       people:people.map(r=>({name:r.name,addr:r.addr,idType:H.idType,phone:r.phone||'',birth:r.birth||'',qty:Object.fromEntries(H.sel.map(k=>[k,qOf(r,k)]))}))});
-    S.home=null; refreshStockLater(); if(S.boot.admin) bumpCount('home',1);
+    S.home=null; refreshStockLater(); if(S.boot.admin) bumpCount('home',1); bumpCount('hsign',1);
     toast('저장했어요. 가정 서명 탭에서 이어서 서명받을 수 있어요.',3500); go('hsign');
   }, '저장 중...');
   $('#hSend').onclick=e=>act(e.target, async()=>{
@@ -514,7 +514,7 @@ async function homeSignOpen(id){
     $('#hsReload').onclick=e=>act(e.target,async()=>{ r=await run('getHomeSign',r.id); draw(); toast('새로 불러왔어요.'); },'불러오는 중...');
     $('#hsFill').onchange=e=>{ r.dateMode=e.target.checked?'fill':'blank'; draw(); };
     $('#hsDone').onclick=e=>{ if(left&&!confirm(`아직 ${left}명이 서명하지 않았어요. 빈칸으로 두고 마칠까요?`)) return;
-      act(e.target, async()=>{ const h=html(); await run('finishHome',r.id,fitPage(h,true)); printHtml(h,true); toast('수령증을 보관했어요. 인쇄 창이 열려요.',3500); setTimeout(()=>go('hsign'),1500); }, '보관 중...'); };
+      act(e.target, async()=>{ const h=html(); await run('finishHome',r.id,fitPage(h,true)); bumpCount('hsign',-1); printHtml(h,true); toast('수령증을 보관했어요. 인쇄 창이 열려요.',3500); setTimeout(()=>go('hsign'),1500); }, '보관 중...'); };
   };
   const editHome=()=>{
     const E=r.people.map((p,i)=>({i,name:p.name,addr:p.addr,idType:p.idType||'주소',qty:Object.assign({},p.qty),signed:!!p.sigUrl}));
