@@ -431,12 +431,12 @@ function createTeamReceipt(p,requestId) {
     const rows = [];
     people.forEach(x => lots.forEach(l => {
       const q = num_(x.qty[l.key]);
-      if (q > 0) rows.push({ no: no, date: date, name: l.name, label: l.name, person: str_(x.name), team: str_(x.team), addr: APP.org, qty: q, inDate: wIn_(l), note: str_(p.note) });
+      if (q > 0) rows.push({ no: no, date: date, name: l.name, label: l.name, person: str_(x.name), team: str_(x.team), addr: APP.org, qty: q, inDate: wIn_(l), note: str_(x.note) || str_(p.note) });
     }));
     appendDist_(id, rows);
 
     const items = lots.map(l => ({ key: l.key, name: l.name, inDate: l.inDate, donor: l.donor, unit: l.unit, inQty: l.inQty, give: need[l.key] || 0, remainAfter: l.remain - (need[l.key] || 0) }));
-    const ppl = people.map(x => ({ name: str_(x.name), team: str_(x.team), qty: x.qty, sig: '', at: '' }));
+    const ppl = people.map(x => ({ name: str_(x.name), team: str_(x.team), note: str_(x.note), qty: x.qty, sig: '', at: '' }));
     appendOwn_('RCPT', [id, '팀', no, date, me_(), '서명 대기', JSON.stringify(items), JSON.stringify(ppl), '', str_(p.note), new Date()]);
     return { id: id, url: ScriptApp.getService().getUrl() + '?r=' + id };
   });
@@ -448,7 +448,7 @@ function rcptObj_(x, withSig) {
     const raw = JSON.parse(r[7] || '[]'); let addrs = [];
     if (withSig && raw[0] && raw[0].af) { try { addrs = JSON.parse(DriveApp.getFileById(raw[0].af).getBlob().getDataAsString()); } catch (e) { addrs = []; } }
     o.people = raw.map((p, i) => {
-      const q = { name: p.name, team: p.team, qty: p.qty, at: p.at, signed: !!p.sig, serials: p.serials || [], who: p.who || '직원', idType:p.idType==='생년월일'?'생년월일':'주소', addr: addrs[i] || '' };
+      const q = { name: p.name, team: p.team, note: p.note || '', qty: p.qty, at: p.at, signed: !!p.sig, serials: p.serials || [], who: p.who || '직원', idType:p.idType==='생년월일'?'생년월일':'주소', addr: addrs[i] || '' };
       if (withSig && p.sig) { try { const b = DriveApp.getFileById(p.sig).getBlob(); q.sigUrl = 'data:' + b.getContentType() + ';base64,' + Utilities.base64Encode(b.getBytes()); } catch (e) { q.sigUrl = ''; } }
       return q;
     });
@@ -734,11 +734,11 @@ function updateTeamReceipt(id, p,requestId) {
     const ppl = people.map(q => {
       const o = old.find(y => y.name === q.from) || old.find(y => y.name === q.name) || {};
       const same = o.sig && str_(o.name)===str_(q.name) && str_(o.team)===str_(q.team) && (ymd_(p.date)||ymd_(x.r[3]))===ymd_(x.r[3]) && items.every(it => num_(o.qty && o.qty[it.key]) === num_(q.qty[it.key]));
-      return { name: str_(q.name), team: str_(q.team), qty: q.qty, sig: same ? o.sig : '', at: same ? o.at : '' };
+      return { name: str_(q.name), team: str_(q.team), note: str_(q.note), qty: q.qty, sig: same ? o.sig : '', at: same ? o.at : '' };
     });
     const rename = {}; people.forEach(q => { if (q.from && q.from !== q.name) rename[q.name] = q.from; });
     const oldPairs = []; old.forEach(o => items.forEach(it => oldPairs.push({ person: o.name, name: it.name,inDate:it.inDate })));
-    const rows = []; ppl.forEach(q => items.forEach(it => rows.push({ no: x.r[2], date: date, name: it.name, label: it.name, person: q.name, team: q.team, addr: APP.org, qty: num_(q.qty[it.key]), inDate: it.inDate, note: str_(p.note) })));
+    const rows = []; ppl.forEach(q => items.forEach(it => rows.push({ no: x.r[2], date: date, name: it.name, label: it.name, person: q.name, team: q.team, addr: APP.org, qty: num_(q.qty[it.key]), inDate: it.inDate, note: str_(q.note) || str_(p.note) })));
     syncDist_(x.r[2], oldPairs, rows, rename,id);
     items.forEach(it => { it.give = need[it.key] || 0; });
     const done = ppl.every(q => q.sig);

@@ -242,13 +242,13 @@ function distView(){
   \x3cdiv class="row">\x3cdiv>\x3clabel>받는 직원\x3c/label>\x3cinput id="dWho" list="staffList" placeholder="이름 입력·선택">\x3c/div>\x3cdiv style="flex:0 0 auto;align-self:end">\x3cbutton class="btn sub" id="dAdd">추가\x3c/button>\x3c/div>\x3c/div>
   \x3cdatalist id="staffList">${S.staff.map(s=>`\x3coption value="${esc(s.name)}">${esc(s.team)}\x3c/option>`).join('')}\x3c/datalist>
   \x3cdiv id="dPeople">\x3c/div>
-  \x3clabel>비고 (선택)\x3c/label>\x3cinput id="dNote" value="${esc(D.note)}">\x3c/div>
+  \x3clabel>공통 비고 (선택 · 사람별 비고가 빈 줄에만 들어가요)\x3c/label>\x3cinput id="dNote" value="${esc(D.note)}">\x3c/div>
   \x3cdiv class="btns">\x3cbutton class="btn" id="dGo">배분 등록하고 수령증 만들기\x3c/button>\x3cbutton class="btn line" id="dReset">새로 쓰기\x3c/button>\x3c/div>
   \x3cdiv id="dDone">\x3c/div>`;
   $('#dDate').onchange=e=>D.date=e.target.value; $('#dNote').oninput=e=>D.note=e.target.value;
   picker($('#dPick'), D.sel, drawPeople);
   const add=()=>{ const n=$('#dWho').value.trim(); if(!n) return; const s=S.staff.find(x=>x.name===n);
-    D.people.push({name:n,team:s?s.team:'',qty:{}}); $('#dWho').value=''; drawPeople(); };
+    D.people.push({name:n,team:s?s.team:'',note:'',qty:{}}); $('#dWho').value=''; drawPeople(); };
   $('#dAdd').onclick=add; $('#dWho').onkeydown=e=>{ if(e.key==='Enter') add(); };
   $('#dReset').onclick=()=>{ if(confirm('입력한 내용을 지울까요?')){ S.dist=null; distView(); } };
   $('#dGo').onclick=e=>act(e.target, async()=>{
@@ -267,12 +267,12 @@ function distView(){
     const lots=D.sel.map(lotOf).filter(Boolean);
     if(!D.people.length){ $('#dPeople').innerHTML='\x3cp class="muted">받는 직원을 추가해 주세요.\x3c/p>'; return; }
     const tot=k=>D.people.reduce((s,p)=>s+num(p.qty[k]),0);
-    $('#dPeople').innerHTML=`\x3cdiv class="scroll">\x3ctable class="tbl">\x3ctr>\x3cth>이름\x3c/th>\x3cth>소속\x3c/th>${lots.map(l=>`\x3cth>${esc(l.name)}\x3cbr>\x3cspan class="muted">남은 ${l.remain}\x3c/span>\x3c/th>`).join('')}\x3cth>\x3c/th>\x3c/tr>
-      ${D.people.map((p,i)=>`\x3ctr>\x3ctd>${esc(p.name)}\x3c/td>\x3ctd>\x3cinput value="${esc(p.team)}" data-t="${i}" style="width:110px">\x3c/td>${lots.map(l=>`\x3ctd>\x3cinput class="q" inputmode="numeric" data-i="${i}" data-k="${esc(l.key)}" value="${p.qty[l.key]||''}">\x3c/td>`).join('')}\x3ctd>\x3cbutton class="btn line sm" data-x="${i}">빼기\x3c/button>\x3c/td>\x3c/tr>`).join('')}
-      \x3ctr>\x3cth colspan="2">합계\x3c/th>${lots.map(l=>{const t=tot(l.key);return `\x3cth class="${t>l.remain?'exp':''}">${t}\x3c/th>`;}).join('')}\x3cth>\x3c/th>\x3c/tr>\x3c/table>\x3c/div>
+    $('#dPeople').innerHTML=`\x3cdiv class="scroll">\x3ctable class="tbl">\x3ctr>\x3cth>이름\x3c/th>\x3cth>소속\x3c/th>${lots.map(l=>`\x3cth>${esc(l.name)}\x3cbr>\x3cspan class="muted">남은 ${l.remain}\x3c/span>\x3c/th>`).join('')}\x3cth>비고 \x3cspan class="muted">(세부 품목 등)\x3c/span>\x3c/th>\x3cth>\x3c/th>\x3c/tr>
+      ${D.people.map((p,i)=>`\x3ctr>\x3ctd>${esc(p.name)}\x3c/td>\x3ctd>\x3cinput value="${esc(p.team)}" data-t="${i}" style="width:110px">\x3c/td>${lots.map(l=>`\x3ctd>\x3cinput class="q" inputmode="numeric" data-i="${i}" data-k="${esc(l.key)}" value="${p.qty[l.key]||''}">\x3c/td>`).join('')}\x3ctd>\x3cinput data-n="${i}" value="${esc(p.note||'')}" placeholder="비워 둬도 돼요" style="min-width:160px">\x3c/td>\x3ctd>\x3cbutton class="btn line sm" data-x="${i}">빼기\x3c/button>\x3c/td>\x3c/tr>`).join('')}
+      \x3ctr>\x3cth colspan="2">합계\x3c/th>${lots.map(l=>{const t=tot(l.key);return `\x3cth class="${t>l.remain?'exp':''}">${t}\x3c/th>`;}).join('')}\x3cth>\x3c/th>\x3cth>\x3c/th>\x3c/tr>\x3c/table>\x3c/div>
       ${lots.length?`\x3cdiv class="row" style="margin-top:8px">${lots.map(l=>`\x3cdiv>\x3clabel>${esc(l.name)} 한 사람당\x3c/label>\x3cdiv class="row">\x3cinput class="q" inputmode="numeric" data-all="${esc(l.key)}">\x3cbutton class="btn sub sm" data-fill="${esc(l.key)}" style="flex:0 0 auto">모두에게\x3c/button>\x3c/div>\x3c/div>`).join('')}\x3c/div>`:''}`;
     const box=$('#dPeople');
-    box.oninput=e=>{ const t=e.target; if(t.dataset.k){ D.people[t.dataset.i].qty[t.dataset.k]=t.value; const th=box.querySelectorAll('tr:last-child th')[1+D.sel.indexOf(t.dataset.k)]; if(th){const v=tot(t.dataset.k); th.textContent=v; th.className=v>lotOf(t.dataset.k).remain?'exp':'';} } if(t.dataset.t) D.people[t.dataset.t].team=t.value; };
+    box.oninput=e=>{ const t=e.target; if(t.dataset.k){ D.people[t.dataset.i].qty[t.dataset.k]=t.value; const th=box.querySelectorAll('tr:last-child th')[1+D.sel.indexOf(t.dataset.k)]; if(th){const v=tot(t.dataset.k); th.textContent=v; th.className=v>lotOf(t.dataset.k).remain?'exp':'';} } if(t.dataset.t) D.people[t.dataset.t].team=t.value; if(t.dataset.n) D.people[t.dataset.n].note=t.value; };
     box.onclick=e=>{ const t=e.target; if(t.dataset.x){ D.people.splice(+t.dataset.x,1); drawPeople(); }
       if(t.dataset.fill){ const v=box.querySelector(`[data-all="${CSS.escape(t.dataset.fill)}"]`).value; D.people.forEach(p=>p.qty[t.dataset.fill]=v); drawPeople(); } };
   }
@@ -281,7 +281,7 @@ function bumpCount(k,d){ const c=S.boot.counts||(S.boot.counts={}); c[k]=Math.ma
 
 
 function rcptHtml(r){ return receiptHtml({ items:r.items, dest:S.boot.dept||'일상동행팀', noTeam:r.type==='상품권'&&r.people.every(p=>p.who==='당사자'),
-    rows:r.people.map(p=>({name:p.name,team:p.team,idType:p.who==='당사자'?(p.idType||'주소'):'주소',addr:p.who==='당사자'?(p.addr||''):S.boot.org,date:p.at||'',sigUrl:p.sigUrl,note:(p.serials||[]).join(', '),noteSmall:!!(p.serials||[]).length,qty:r.items.map(it=>num(p.qty[it.key]))})) }); }
+    rows:r.people.map(p=>({name:p.name,team:p.team,idType:p.who==='당사자'?(p.idType||'주소'):'주소',addr:p.who==='당사자'?(p.addr||''):S.boot.org,date:p.at||'',sigUrl:p.sigUrl,note:(p.serials||[]).length?p.serials.join(', '):(p.note||''),noteSmall:!!(p.serials||[]).length,qty:r.items.map(it=>num(p.qty[it.key]))})) }); }
 async function rcptExcel(btn,id){ const r=await run('getReceipt',id); return toExcel(btn,rcptHtml(r),'수령증_'+r.no,true); }
 async function signView(id, data){
   $('#main').innerHTML='\x3cdiv class="card">수령증을 불러오는 중이에요...\x3c/div>';
@@ -315,26 +315,26 @@ async function signView(id, data){
 
 
 function editTeam(r){
-  const E={date:r.date, note:r.note||'', people:r.people.map(p=>({from:p.name,name:p.name,team:p.team,qty:Object.assign({},p.qty),signed:p.signed}))};
+  const E={date:r.date, note:r.note||'', people:r.people.map(p=>({from:p.name,name:p.name,team:p.team,note:p.note||'',qty:Object.assign({},p.qty),signed:p.signed}))};
   const draw=()=>{
     $('#main').innerHTML=`\x3cbutton class="btn line sm" id="eBack">← 수령증으로\x3c/button>
     \x3cdiv class="card">\x3ch2>수령증 내용 수정\x3c/h2>\x3cp class="note">고치면 \x3cb>배분 기록\x3c/b>도 같이 바뀌어요. 수령인·소속·배분일·수량이 바뀐 사람은 \x3cb>서명을 다시\x3c/b> 받아야 해요. 수량을 0으로 하면 그 줄은 배분 기록에서 빠져요.\x3c/p>
-    \x3cdiv class="row">\x3cdiv>\x3clabel>배분일\x3c/label>\x3cinput type="date" id="eDate" value="${E.date}">\x3c/div>\x3cdiv>\x3clabel>비고\x3c/label>\x3cinput id="eNote" value="${esc(E.note)}">\x3c/div>\x3c/div>
-    \x3cdiv class="scroll" style="margin-top:10px">\x3ctable class="tbl">\x3ctr>\x3cth>이름\x3c/th>\x3cth>소속\x3c/th>${r.items.map(it=>`\x3cth>${esc(it.name)}\x3c/th>`).join('')}\x3cth>\x3c/th>\x3c/tr>
+    \x3cdiv class="row">\x3cdiv>\x3clabel>배분일\x3c/label>\x3cinput type="date" id="eDate" value="${E.date}">\x3c/div>\x3cdiv>\x3clabel>공통 비고 (사람별 비고가 빈 줄에만)\x3c/label>\x3cinput id="eNote" value="${esc(E.note)}">\x3c/div>\x3c/div>
+    \x3cdiv class="scroll" style="margin-top:10px">\x3ctable class="tbl">\x3ctr>\x3cth>이름\x3c/th>\x3cth>소속\x3c/th>${r.items.map(it=>`\x3cth>${esc(it.name)}\x3c/th>`).join('')}\x3cth>비고\x3c/th>\x3cth>\x3c/th>\x3c/tr>
     ${E.people.map((p,i)=>`\x3ctr>\x3ctd>\x3cinput data-i="${i}" data-f="name" value="${esc(p.name)}" list="staffList" style="width:90px">${p.signed?'\x3cbr>\x3cspan class="tag ok">서명함\x3c/span>':''}\x3c/td>\x3ctd>\x3cinput data-i="${i}" data-f="team" value="${esc(p.team)}" style="width:100px">\x3c/td>
-      ${r.items.map(it=>`\x3ctd>\x3cinput class="q" inputmode="numeric" data-i="${i}" data-k="${esc(it.key)}" value="${p.qty[it.key]||''}">\x3c/td>`).join('')}\x3ctd>\x3cbutton class="btn line sm" data-x="${i}">빼기\x3c/button>\x3c/td>\x3c/tr>`).join('')}\x3c/table>\x3c/div>
+      ${r.items.map(it=>`\x3ctd>\x3cinput class="q" inputmode="numeric" data-i="${i}" data-k="${esc(it.key)}" value="${p.qty[it.key]||''}">\x3c/td>`).join('')}\x3ctd>\x3cinput data-i="${i}" data-f="note" value="${esc(p.note||'')}" style="min-width:160px">\x3c/td>\x3ctd>\x3cbutton class="btn line sm" data-x="${i}">빼기\x3c/button>\x3c/td>\x3c/tr>`).join('')}\x3c/table>\x3c/div>
     \x3cdatalist id="staffList">${S.staff.map(x=>`\x3coption value="${esc(x.name)}">${esc(x.team)}\x3c/option>`).join('')}\x3c/datalist>
     \x3cdiv class="btns">\x3cbutton class="btn sub" id="eAdd">받는 사람 추가\x3c/button>\x3cspan style="flex:1">\x3c/span>\x3cbutton class="btn" id="eSave">저장\x3c/button>\x3c/div>
     \x3cp class="muted">물품을 더 넣으려면 팀 배분에서 새로 등록해 주세요.\x3c/p>\x3c/div>`;
     $('#eBack').onclick=()=>signView(r.id,r);
     $('#eDate').onchange=e=>E.date=e.target.value; $('#eNote').oninput=e=>E.note=e.target.value;
-    $('#eAdd').onclick=()=>{ E.people.push({from:'',name:'',team:'',qty:{}}); draw(); };
+    $('#eAdd').onclick=()=>{ E.people.push({from:'',name:'',team:'',note:'',qty:{}}); draw(); };
     $('#main').oninput=e=>{ const t=e.target, p=E.people[t.dataset.i]; if(!p) return;
       if(t.dataset.f){ p[t.dataset.f]=t.value; if(t.dataset.f==='name'){ const st=S.staff.find(x=>x.name===t.value); if(st&&!p.team){ p.team=st.team; const tm=$(`[data-i="${t.dataset.i}"][data-f="team"]`); if(tm) tm.value=st.team; } } }
       if(t.dataset.k) p.qty[t.dataset.k]=t.value; };
     $('#main').onclick=e=>{ const t=e.target; if(t.dataset.x){ E.people.splice(+t.dataset.x,1); draw(); } };
     $('#eSave').onclick=e=>act(e.target, async()=>{
-      const nr=await run('updateTeamReceipt',r.id,{date:E.date,note:E.note,people:E.people.filter(p=>p.name.trim()).map(p=>({from:p.from,name:p.name.trim(),team:p.team,qty:p.qty}))});
+      const nr=await run('updateTeamReceipt',r.id,{date:E.date,note:E.note,people:E.people.filter(p=>p.name.trim()).map(p=>({from:p.from,name:p.name.trim(),team:p.team,note:p.note||'',qty:p.qty}))});
       await refreshStock(); toast('고쳤어요. 배분 기록도 같이 바뀌었어요.',3000); signView(r.id,nr);
     }, '저장 중...');
   };
