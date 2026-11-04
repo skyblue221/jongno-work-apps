@@ -518,7 +518,7 @@ function requestHome(p,requestId) {
       // 나중에 서명받기: 명단은 min 드라이브의 잠긴 임시 파일에만 둠 (시트에는 안 씀)
       const people = (p.people || []).filter(x => str_(x.name));
       if (!people.length) throw new Error('받는 분 명단을 넣어 주세요.');
-      const data = { id: id, date: row[1], manager: row[2],
+      const data = { id: id, date: row[1], manager: row[2], dateMode: p.dateMode === 'fill' ? 'fill' : 'blank',
         items: lots.filter(l => need[l.key] > 0).map(l => ({ key: l.key, name: l.name, inDate: l.inDate, donor: l.donor, inQty: l.inQty, give: need[l.key], remainAfter: l.remain - need[l.key] })),
         people: people.map(x => ({ name: str_(x.name), addr: str_(x.addr), idType:x.idType==='생년월일'?'생년월일':'주소', qty: x.qty || {}, sig: '', at: '' })) };
       const f = trackedFile_(folder_(['가정배분_임시명단']),id + '.json', JSON.stringify(data), 'application/json');
@@ -577,7 +577,7 @@ function listHomeSign() {
 }
 function getHomeSign(id) {
   const x = findHome_(id), d = homeData_(x).d;
-  return { id: d.id, date: d.date, manager: d.manager, items: d.items, people: d.people.map(p => ({ name: p.name, addr: p.addr, idType:p.idType==='생년월일'?'생년월일':'주소', qty: p.qty, at: p.at, sigUrl: p.sig })) };
+  return { id: d.id, date: d.date, manager: d.manager, dateMode: d.dateMode || 'blank', items: d.items, people: d.people.map(p => ({ name: p.name, addr: p.addr, idType:p.idType==='생년월일'?'생년월일':'주소', qty: p.qty, at: p.at, sigUrl: p.sig })) };
 }
 function signHome(id, idx, dataUrl,requestId) {
   return withMutation_('signHome',requestId,[id,idx,dataUrl],() => {

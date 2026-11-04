@@ -437,7 +437,7 @@ function homeView(){
     checkInputQuantities(H.rows);if(H.sent) throw '이미 요청했어요.'; if(!H.manager) throw '사례 담당자 이름을 골라 주세요.';
     const people=H.rows.filter(r=>r.name); if(!H.sel.length||!people.length) throw '물품과 명단을 넣어 주세요.';
     if(!confirm('명단(이름·선택한 주소 또는 생년월일)을 서명이 끝날 때까지만 잠긴 임시 파일에 저장해요. 서명을 마치면 수령증 PDF만 남고 임시 명단 파일은 휴지통으로 보내요. 계속할까요?')) return;
-    await run('requestHome',{later:true,manager:H.manager,date:H.date,count:people.length,items:H.sel.map(k=>({key:k,qty:total(k)})),
+    await run('requestHome',{later:true,dateMode:H.dateMode,manager:H.manager,date:H.date,count:people.length,items:H.sel.map(k=>({key:k,qty:total(k)})),
       people:people.map(r=>({name:r.name,addr:r.addr,idType:H.idType,qty:Object.fromEntries(H.sel.map(k=>[k,qOf(r,k)]))}))});
     S.home=null; refreshStockLater(); if(S.boot.admin) bumpCount('home',1);
     toast('저장했어요. 가정 서명 탭에서 이어서 서명받을 수 있어요.',3500); go('hsign');
@@ -477,7 +477,7 @@ async function homeSignOpen(id){
   $('#main').innerHTML='\x3cdiv class="card">명단을 불러오는 중이에요...\x3c/div>';
   let r=await run('getHomeSign',id);
   const html=()=>receiptHtml({ dest:S.boot.dept||'일상동행팀', noTeam:true, items:r.items,
-    rows:r.people.map(p=>({name:p.name,team:'',addr:p.addr,idType:p.idType||'주소',date:p.at||'',sigUrl:p.sigUrl,note:'',qty:r.items.map(it=>num(p.qty[it.key]))})) });
+    rows:r.people.map(p=>({name:p.name,team:'',addr:p.addr,idType:p.idType||'주소',date:p.at||(r.dateMode==='fill'?r.date:''),sigUrl:p.sigUrl,note:'',qty:r.items.map(it=>num(p.qty[it.key]))})) });
   const draw=()=>{
     const left=r.people.filter(p=>!p.sigUrl).length;
     $('#main').innerHTML=`\x3cbutton class="btn line sm" id="hsBack">← 가정 서명\x3c/button>
