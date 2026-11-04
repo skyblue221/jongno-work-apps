@@ -51,6 +51,8 @@ textarea{min-height:90px}
 #pad{border:2px dashed #b9c4bc;border-radius:10px;touch-action:none;background:#fff;display:block;width:100%}
 .preview{border:1px solid var(--line);border-radius:10px;padding:10px;background:#fff;overflow:auto}
 #printArea{display:none}
+body.viewer .frm,
+body.viewer :is(#dGo,#oGo,#xGo,#vGo,#vAddOpen,#sEdit,#sLink,#sPdf,#oEdit,#oPdf,#dEdit,#hsEdit,#hsDone,#oScan,[data-s],[data-ln],[data-ok],[data-no],[data-ed],[data-r],[data-x],[data-l]){display:none!important}
 @media print{
   @page{margin:10mm}
   body{background:#fff}
@@ -97,15 +99,17 @@ function daysTo(d){ const m=String(d||'').match(/^(\d{4})-(\d{2})-(\d{2})$/); if
 const slow=setTimeout(()=>{ const c=$('#main .card'); if(c&&!S.boot) c.innerHTML='아직 불러오는 중이에요. 시트를 읽는 데 시간이 걸리고 있어요.\x3cbr>\x3cspan class="muted">1분이 넘으면 Apps Script → 실행 기록의 맨 위 줄을 캡처해서 알려 주세요.\x3c/span>'; },30000);
 new Promise(res=>{ try{ google.script.url.getLocation(l=>res((l&&l.parameter&&l.parameter.r)||'')); }catch(e){ res(''); } }).then(r=>{ RECEIPT_ID=r; return run('getBoot', RECEIPT_ID); }).then(b=>{ clearTimeout(slow);
   S.boot=b; S.stock=b.stock||[]; S.staff=b.staff||[];
-  $('#who').textContent = (b.admin?'관리자 · ':'')+(b.me||'');
+  $('#who').textContent = (b.admin?'관리자 · ':b.viewer?`보기 전용 (${b.viewer}까지) · `:'')+(b.me||'');
+  if(b.viewer) document.body.classList.add('viewer');
   if (RECEIPT_ID) { $('#nav').style.display='none'; return signView(RECEIPT_ID, b.receipt); }
-  buildNav(); go(b.admin ? (b.setupOk?'dist':'setup') : 'home');
+  buildNav(); go(b.admin ? (b.setupOk?'dist':'setup') : b.viewer ? 'sign' : 'home');
 }).catch(e=>{ clearTimeout(slow); $('#main').innerHTML=`\x3cdiv class="card note warn">${esc(e)}\x3c/div>`; });
 
 function expiring(){ const n=S.boot.alertDays||30; return S.stock.filter(l=>l.remain>0&&l.expiry&&daysTo(l.expiry)!=null&&daysTo(l.expiry)<=n).sort((a,b)=>daysTo(a.expiry)-daysTo(b.expiry)); }
 function expiryCard(){ const L=expiring(); if(!L.length) return '';
   return `\x3cdiv class="card note warn" style="margin-bottom:12px">\x3cb>⏰ 유통기한이 지났거나 ${S.boot.alertDays||30}일 안에 끝나는 물품 ${L.length}개\x3c/b>\x3cbr>${L.map(l=>{const d=daysTo(l.expiry);return `· ${esc(l.name)} — 남은 ${l.remain}${esc(l.unit||'')} · 유통 ${esc(l.expiry)} \x3cb>${d<0?`(${-d}일 지남)`:d===0?'(오늘까지)':`(${d}일 남음)`}\x3c/b>`;}).join('\x3cbr>')}\x3c/div>`; }
-function tabs(){ const c=S.boot.counts||{}; c.stock=expiring().length; return S.boot.admin
+function tabs(){ const c=S.boot.counts||{}; c.stock=expiring().length; if(S.boot.viewer) return [['sign','서명 현황',c.sign],['hsign','가정 서명',c.hsign],['homeok','가정 확인',c.home],['org','유관기관',c.org],['vouch','상품권'],['disp','폐기'],['stock','재고',c.stock]];
+  return S.boot.admin
   ? [['dist','팀 배분'],['sign','서명 현황',c.sign],['home','가정 배분'],['hsign','가정 서명',c.hsign],['homeok','가정 확인',c.home],['org','유관기관',c.org],['vouch','상품권'],['disp','폐기'],['stock','재고',c.stock],['setup','설정']]
   : [['home','가정 배분'],['hsign','가정 서명',c.hsign]].concat(S.boot.vouch?[['vouch','상품권']]:[]).concat([['stock','재고',c.stock]]); }
 function buildNav(){ $('#nav').innerHTML = tabs().map(([k,t,n])=>`\x3cbutton data-k="${k}">${t}${n?`\x3cspan class="dot">${n}\x3c/span>`:''}\x3c/button>`).join(''); $('#nav').onclick=e=>{const b=e.target.closest('button'); if(b) go(b.dataset.k);}; }
@@ -589,7 +593,7 @@ async function vouchView(){
   \x3cdiv class="card">\x3ch2>상품권 보유 현황\x3c/h2>\x3ctable class="tbl">\x3ctr>\x3cth>종류\x3c/th>\x3cth>보유\x3c/th>\x3cth>보유 금액\x3c/th>\x3cth>지급완료\x3c/th>\x3c/tr>
   ${V.summary.map(x=>`\x3ctr>\x3ctd>${esc(x.kind)}\x3c/td>\x3ctd>\x3cb>${x.held}\x3c/b>장\x3c/td>\x3ctd>${won(x.heldAmt)}원\x3c/td>\x3ctd class="muted">${x.out}장\x3c/td>\x3c/tr>`).join('')}\x3c/table>
   \x3cdiv class="btns">\x3cbutton class="btn line sm" id="vCheck">월말 점검표 인쇄 (보유 목록)\x3c/button>\x3cbutton class="btn line sm" id="vCheckX">점검표 엑셀\x3c/button>${S.boot.admin?'\x3cbutton class="btn line sm" id="vAddOpen">상품권 입고 등록\x3c/button>':''}\x3c/div>\x3cdiv id="vAdd">\x3c/div>\x3c/div>
-  \x3cdiv class="card">\x3ch2>지급하기\x3c/h2>
+  \x3cdiv class="card frm">\x3ch2>지급하기\x3c/h2>
   \x3clabel>1. 나가는 상품권 고르기 (실물 번호를 보고 체크)\x3c/label>
   \x3cdiv class="row">\x3cdiv>\x3cselect id="vKind">\x3coption value="">모든 종류\x3c/option>${V.kinds.map(k=>`\x3coption ${k===G.kind?'selected':''}>${esc(k)}\x3c/option>`).join('')}\x3c/select>\x3c/div>\x3cdiv>\x3cinput id="vQ" placeholder="번호 끝자리로 찾기">\x3c/div>\x3c/div>
   \x3cdiv class="row" style="margin-top:6px">\x3cdiv style="flex:0 0 auto">\x3cinput id="vN" class="q" inputmode="numeric" placeholder="장수">\x3c/div>\x3cdiv style="flex:0 0 auto">\x3cbutton class="btn sub sm" id="vFirst">앞에서부터 선택\x3c/button> \x3cbutton class="btn line sm" id="vClear">선택 해제\x3c/button>\x3c/div>\x3c/div>
@@ -687,10 +691,10 @@ async function orgView(){
   const [orgs, rc] = await Promise.all([run('listOrgs'), run('listReceipts')]);
   const wait=rc.filter(r=>r.type==='기관'&&r.status==='회수 대기'), done=rc.filter(r=>r.type==='기관'&&r.status!=='회수 대기').slice(0,10);
   $('#main').innerHTML=`
-  \x3cdiv class="card">\x3ch2>받는 기관\x3c/h2>\x3clabel>저장된 기관에서 고르기\x3c/label>\x3cselect id="oPick">\x3coption value="">새 기관 입력\x3c/option>${orgs.map((o,i)=>`\x3coption value="${i}" ${o.name===O.org.name?'selected':''}>${esc(o.name)}\x3c/option>`).join('')}\x3c/select>
+  \x3cdiv class="card frm">\x3ch2>받는 기관\x3c/h2>\x3clabel>저장된 기관에서 고르기\x3c/label>\x3cselect id="oPick">\x3coption value="">새 기관 입력\x3c/option>${orgs.map((o,i)=>`\x3coption value="${i}" ${o.name===O.org.name?'selected':''}>${esc(o.name)}\x3c/option>`).join('')}\x3c/select>
   \x3cdiv class="row">\x3cdiv>\x3clabel>기관명\x3c/label>\x3cinput id="o_name">\x3c/div>\x3cdiv>\x3clabel>대표자\x3c/label>\x3cinput id="o_ceo">\x3c/div>\x3c/div>
   \x3clabel>주소\x3c/label>\x3cinput id="o_addr">\x3cdiv class="row">\x3cdiv>\x3clabel>연락처\x3c/label>\x3cinput id="o_tel">\x3c/div>\x3cdiv>\x3clabel>수령자 (모르면 비워 두세요)\x3c/label>\x3cinput id="o_contact">\x3c/div>\x3c/div>\x3c/div>
-  \x3cdiv class="card">\x3ch2>물품\x3c/h2>\x3cdiv class="row">\x3cdiv>\x3clabel>전달일\x3c/label>\x3cinput type="date" id="oDate" value="${O.date}">\x3c/div>\x3c/div>\x3clabel>물품 고르기\x3c/label>\x3cdiv id="oPick2">\x3c/div>\x3cdiv id="oQty">\x3c/div>
+  \x3cdiv class="card frm">\x3ch2>물품\x3c/h2>\x3cdiv class="row">\x3cdiv>\x3clabel>전달일\x3c/label>\x3cinput type="date" id="oDate" value="${O.date}">\x3c/div>\x3c/div>\x3clabel>물품 고르기\x3c/label>\x3cdiv id="oPick2">\x3c/div>\x3cdiv id="oQty">\x3c/div>
   \x3clabel>비고 (선택)\x3c/label>\x3cinput id="oNote" value="${esc(O.note)}">\x3c/div>
   \x3cdiv class="btns">\x3cbutton class="btn" id="oGo">배분 기록하고 인수증 만들기\x3c/button>\x3c/div>
   \x3cdiv class="card" style="margin-top:12px">\x3ch2>직인 받을 인수증\x3c/h2>${wait.length?`\x3ctable class="tbl">${wait.map(r=>`\x3ctr>\x3ctd>\x3cb>${esc(r.orgInfo.name)}\x3c/b> · ${esc(r.date)}\x3cbr>\x3cspan class="muted">${r.items.map(i=>`${esc(i.name)} ${i.give}${esc(i.unit)}`).join(', ')}\x3c/span>\x3c/td>\x3ctd style="text-align:right;white-space:nowrap">\x3cbutton class="btn sm line" data-p="${r.id}">출력\x3c/button> \x3cbutton class="btn sm line" data-ox="${r.id}">엑셀\x3c/button> \x3cbutton class="btn sm" data-r="${r.id}">회수 완료\x3c/button>\x3c/td>\x3c/tr>`).join('')}\x3c/table>`:'\x3cp class="muted">기다리는 인수증이 없어요.\x3c/p>'}
@@ -746,7 +750,7 @@ function dispHtml(d){
 }
 async function dispView(){
   const P = S.disp || (S.disp={sel:[], qty:{}, reason:'유통기한 지남', etc:'', date:S.boot.today, photo:null});
-  $('#main').innerHTML=`\x3cdiv class="card">\x3ch2>폐기 등록\x3c/h2>\x3clabel>폐기할 물품 (여러 개 고를 수 있어요)\x3c/label>\x3cdiv id="xPick">\x3c/div>\x3cdiv id="xQty">\x3c/div>
+  $('#main').innerHTML=`\x3cdiv class="card frm">\x3ch2>폐기 등록\x3c/h2>\x3clabel>폐기할 물품 (여러 개 고를 수 있어요)\x3c/label>\x3cdiv id="xPick">\x3c/div>\x3cdiv id="xQty">\x3c/div>
   \x3cdiv class="row">\x3cdiv>\x3clabel>폐기일\x3c/label>\x3cinput type="date" id="xDate" value="${P.date}">\x3c/div>\x3c/div>
   \x3clabel>사유\x3c/label>\x3cselect id="xWhy">${['유통기한 지남','파손·변질','보존연한 경과','사용 불가','기타'].map(t=>`\x3coption ${t===P.reason?'selected':''}>${t}\x3c/option>`).join('')}\x3c/select>
   \x3cinput id="xEtc" placeholder="자세한 사유 (예: 습도가 높은 창고 보관으로 부식이 발견됨)" value="${esc(P.etc)}" style="margin-top:6px">
@@ -804,14 +808,14 @@ async function stockView(){
     const L=list.filter(l=>!q||l.name.includes(q)||(l.donor||'').includes(q));
     $('#kList').innerHTML=L.length?L.map(l=>{ const d=daysTo(l.expiry);
       return `\x3cdiv class="lot" style="cursor:default">\x3cspan>\x3cb>${esc(l.name)}\x3c/b>\x3cbr>\x3cspan class="muted">${esc(l.inDate)} 입고${l.donor?' · '+esc(l.donor):''}${l.expiry?` · \x3cspan class="${d!=null&&d<=30?'exp':''}">유통 ${esc(l.expiry)}${d!=null&&d<0?' (지남)':d!=null&&d<=30?` (${d}일 남음)`:''}\x3c/span>`:''}\x3c/span>
-      ${S.boot.admin?`\x3cbr>\x3cspan class="muted">입고 ${l.inQty} · 나감 ${l.out} · 폐기 ${l.disp}${l.pending?` · 확인 대기 ${l.pending}`:''}\x3c/span>`:''}${l.photo&&/^https?:/.test(l.photo)?` \x3ca href="${esc(l.photo)}" target="_blank" class="muted">사진\x3c/a>`:''}\x3c/span>
+      ${(S.boot.admin||S.boot.viewer)?`\x3cbr>\x3cspan class="muted">입고 ${l.inQty} · 나감 ${l.out} · 폐기 ${l.disp}${l.pending?` · 확인 대기 ${l.pending}`:''}\x3c/span>`:''}${l.photo&&/^https?:/.test(l.photo)?` \x3ca href="${esc(l.photo)}" target="_blank" class="muted">사진\x3c/a>`:''}\x3c/span>
       \x3cspan style="white-space:nowrap">남은 \x3cb>${l.remain}\x3c/b>${esc(l.unit||'')}\x3c/span>\x3c/div>`;}).join(''):'\x3cp class="muted">없어요.\x3c/p>'; };
   let check='';
-  if(S.boot.admin){ const full=await run('getStock',true);
+  if((S.boot.admin||S.boot.viewer)){ const full=await run('getStock',true);
     const odd=full.filter(l=>l.remain<0||(l.done&&l.remain>0));
     if(odd.length) check=`\x3cdiv class="card note warn">\x3cb>확인이 필요한 물품 ${odd.length}개\x3c/b>\x3cbr>${odd.map(l=>`· ${esc(l.name)} (${esc(l.inDate)} 입고) — ${l.remain<0?`남은 수량 ${l.remain}: 등록 시트 지원수량(M열)과 배분 기록에 \x3cb>두 번\x3c/b> 들어갔는지 확인`:`사용완료 체크인데 ${l.remain}개 남음: 지원수량(M열)에 나간 수량 입력`}`).join('\x3cbr>')}\x3c/div>`; }
   $('#main').innerHTML=expiryCard()+check+`\x3cdiv class="card">\x3ch2>재고 \x3cbutton class="btn line sm" id="kFresh" style="float:right">↻ 최신으로\x3c/button>\x3c/h2>\x3cinput id="kq" placeholder="품명이나 후원처로 찾기">
-  ${S.boot.admin?'\x3clabel style="display:flex;gap:8px;align-items:center;color:var(--ink)">\x3cinput type="checkbox" id="kAll" style="width:auto"> 다 나간 물품도 보기\x3c/label>':''}\x3cdiv id="kList">\x3c/div>\x3cp style="margin-top:12px">\x3ca href="https://docs.google.com/forms/d/e/1FAIpQLSdFv6PF9OE8ac1YFcNvo2Q-MVCW1wAA5lnunsR5EDa6tuQZww/viewform" target="_blank" rel="noopener noreferrer">목록에 없는 후원품 등록 ↗\x3c/a>\x3c/p>\x3c/div>`;
+  ${(S.boot.admin||S.boot.viewer)?'\x3clabel style="display:flex;gap:8px;align-items:center;color:var(--ink)">\x3cinput type="checkbox" id="kAll" style="width:auto"> 다 나간 물품도 보기\x3c/label>':''}\x3cdiv id="kList">\x3c/div>\x3cp style="margin-top:12px">\x3ca href="https://docs.google.com/forms/d/e/1FAIpQLSdFv6PF9OE8ac1YFcNvo2Q-MVCW1wAA5lnunsR5EDa6tuQZww/viewform" target="_blank" rel="noopener noreferrer">목록에 없는 후원품 등록 ↗\x3c/a>\x3c/p>\x3c/div>`;
   $('#kq').oninput=draw;
   $('#kFresh').onclick=e=>act(e.target, async()=>{ S.stock=await run('getStock',false,true); list=all?await run('getStock',true):S.stock; buildNav(); draw(); toast('시트를 다시 읽었어요.'); }, '읽는 중...');
   $('#kAll')&&($('#kAll').onchange=async e=>{ all=e.target.checked; $('#kList').innerHTML='\x3cp class="muted">불러오는 중...\x3c/p>'; list=all?await run('getStock',true):S.stock; draw(); });
@@ -827,11 +831,18 @@ async function setupView(){
   \x3cdiv class="card">\x3ch2>수령증 배분처\x3c/h2>\x3cp class="muted" style="margin:0 0 6px">수령증 위쪽 「배분처」 칸에 들어가는 후원 담당 팀이에요.\x3c/p>\x3cdiv class="row">\x3cdiv>\x3cinput id="deptIn" value="${esc(S.boot.dept||'일상동행팀')}">\x3c/div>\x3cdiv style="flex:0 0 auto">\x3cbutton class="btn sm" id="deptSave">저장\x3c/button>\x3c/div>\x3c/div>\x3c/div>
   \x3cdiv class="card">\x3ch2>상품권 사용 권한\x3c/h2>\x3cp class="muted" style="margin:0 0 6px">상품권 탭을 쓸 직원의 \x3cb>기관 메일\x3c/b>을 한 줄에 하나씩 넣어 주세요. 이 직원들은 상품권 \x3cb>지급·수령증·본인이 지급한 것 수정/취소\x3c/b>만 할 수 있어요. 입고와 다른 탭 관리는 관리자만 해요.\x3c/p>
   \x3ctextarea id="vuIn" placeholder="hong@example.org" style="min-height:70px">\x3c/textarea>\x3cdiv class="btns">\x3cbutton class="btn sm" id="vuSave">저장\x3c/button>\x3c/div>\x3c/div>
+  \x3cdiv class="card">\x3ch2>보기 전용 권한 (팀장님·국장님 등)\x3c/h2>\x3cp class="muted" style="margin:0 0 6px">모든 탭을 \x3cb>볼 수만\x3c/b> 있어요(수령증 열기·인쇄·엑셀 가능). 등록·수정·취소는 관리자만 해요. \x3cb>만료일\x3c/b>이 지나면 저절로 닫혀요.\x3c/p>
+  \x3cdiv id="vwList">\x3c/div>\x3cdiv class="row" style="margin-top:6px">\x3cdiv>\x3cinput id="vwMail" placeholder="기관 메일">\x3c/div>\x3cdiv style="flex:0 0 150px">\x3cinput type="date" id="vwUntil">\x3c/div>\x3cdiv style="flex:0 0 auto">\x3cbutton class="btn sm" id="vwAdd">추가\x3c/button>\x3c/div>\x3c/div>\x3c/div>
   \x3cdiv class="card">\x3ch2>이용인 명단 사용 권한\x3c/h2>\x3cp class="muted" style="margin:0 0 6px">가정 배분·상품권에서 \x3cb>「이용인 명단」 탭\x3c/b>을 불러와 골라 넣을 수 있는 직원의 \x3cb>기관 메일\x3c/b>을 한 줄에 하나씩 넣어 주세요. 관리자는 항상 쓸 수 있어요. 탭은 숨기거나 잠가도 불러와져요.\x3c/p>
   \x3ctextarea id="fuIn" placeholder="teamlead@example.org" style="min-height:60px">\x3c/textarea>\x3cdiv class="btns">\x3cbutton class="btn sm" id="fuSave">저장\x3c/button>\x3c/div>\x3c/div>
   \x3cdiv class="card">\x3ch2>외부 서명용 주소 (서명 링크)\x3c/h2>\x3cp class="muted" style="margin:0 0 6px">택배로 받은 분께 문자·카톡으로 서명 링크를 보낼 때 쓰는 주소예요. 배포를 하나 더 만들어(액세스: \x3cb>모든 사용자\x3c/b>) 그 웹 앱 주소(…/exec)를 넣어 주세요. 이 주소로는 \x3cb>서명 화면만\x3c/b> 열리고 다른 기능은 막혀 있어요.\x3c/p>
   \x3cdiv class="row">\x3cdiv>\x3cinput id="puIn" value="${esc(S.boot.publicUrl||'')}" placeholder="https://script.google.com/…/exec">\x3c/div>\x3cdiv style="flex:0 0 auto">\x3cbutton class="btn sm" id="puSave">저장\x3c/button>\x3c/div>\x3c/div>\x3c/div>
   \x3cdiv id="cards">\x3c/div>`;
+  let VW=[]; const drawVw=()=>{ $('#vwList').innerHTML=VW.length?`\x3ctable class="tbl">${VW.map((v,i)=>`\x3ctr>\x3ctd>${esc(v.email)}\x3c/td>\x3ctd>${esc(v.until)}까지 ${v.until>=S.boot.today?'\x3cspan class="tag ok">사용 중\x3c/span>':'\x3cspan class="tag">만료\x3c/span>'}\x3c/td>\x3ctd style="text-align:right">\x3cbutton class="btn line sm" data-vw="${i}">빼기\x3c/button>\x3c/td>\x3c/tr>`).join('')}\x3c/table>`:'\x3cp class="muted">아직 없어요.\x3c/p>'; };
+  const saveVw=async btn=>act(btn,async()=>{ VW=await run('saveViewers',VW); drawVw(); toast('저장했어요.'); },'저장 중...');
+  run('getViewers').then(v=>{ VW=v; if($('#vwList')) drawVw(); });
+  $('#vwList').onclick=e=>{ const i=e.target.dataset.vw; if(i===undefined) return; VW.splice(+i,1); saveVw(e.target); };
+  $('#vwAdd').onclick=e=>{ const m=$('#vwMail').value.trim(), u=$('#vwUntil').value; if(!/@/.test(m)||!u) return toast('메일과 만료일을 넣어 주세요.'); VW=VW.filter(v=>v.email!==m.toLowerCase()).concat([{email:m,until:u}]); $('#vwMail').value=''; saveVw(e.target); };
   run('getFamUsers').then(v=>{ if($('#fuIn')) $('#fuIn').value=v.join('\n'); });
   $('#fuSave').onclick=e=>act(e.target, async()=>{ const v=await run('saveFamUsers',$('#fuIn').value); $('#fuIn').value=v.join('\n'); toast(`${v.length}명에게 명단 권한을 줬어요.`); });
   $('#puSave').onclick=e=>act(e.target, async()=>{ S.boot.publicUrl=await run('savePublicUrl',$('#puIn').value); toast('저장했어요.'); });

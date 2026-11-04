@@ -155,6 +155,18 @@ function famUsers_() { return str_(props_().getProperty('FUSERS')).toLowerCase()
 function canFam_() { return isAdmin_() || famUsers_().indexOf(me_()) >= 0; }
 function getFamUsers() { needAdmin_(); return famUsers_(); }
 function saveFamUsers(list) { needAdmin_(); const v = String(list || '').toLowerCase().split(/[,\s]+/).filter(x => /@/.test(x)); props_().setProperty('FUSERS', v.join(',')); return v; }
+/** 보기 전용 권한 (팀장님·국장님 등): 만료일까지 모든 탭을 볼 수만 있음. 등록·수정은 관리자만 */
+function viewers_() { try { return JSON.parse(props_().getProperty('VIEWERS') || '[]'); } catch (e) { return []; } }
+function viewerUntil_() { const me = me_(); if (!me) return ''; const v = viewers_().find(x => x.email === me); return v && v.until >= today_() ? v.until : ''; }
+function isViewer_() { return !!viewerUntil_(); }
+function canView_() { return isAdmin_() || isViewer_(); }
+function needView_() { if (!canView_()) throw new Error('관리자만 볼 수 있어요.'); }
+function getViewers() { needAdmin_(); return viewers_(); }
+function saveViewers(list) {
+  needAdmin_();
+  const v = (list || []).map(x => ({ email: str_(x.email).toLowerCase(), until: ymd_(x.until) })).filter(x => /@/.test(x.email) && /^\d{4}-\d{2}-\d{2}$/.test(x.until));
+  props_().setProperty('VIEWERS', JSON.stringify(v)); return v;
+}
 /** 기관 계정이 아니면(외부 서명용 배포로 들어온 경우) 서명 화면 말고는 아무것도 못 하게 막음 */
 function needOrg_() { if (!me_()) throw new Error('기관 계정으로 로그인해야 쓸 수 있어요.'); }
 function saveVoucherUsers(list) { needAdmin_(); const v = String(list || '').toLowerCase().split(/[,\s]+/).filter(x => /@/.test(x)); props_().setProperty('VUSERS', v.join(',')); return v; }
@@ -408,7 +420,7 @@ function getStock(all, fresh) {
   needOrg_();
   if (!setupDone_()) return [];
   if (fresh) clearCache_();
-  const full = !!(all && isAdmin_()), list = full ? stock_(true) : stockCached_();
+  const full = !!(all && canView_()), list = full ? stock_(true) : stockCached_();
   return full ? list : list.filter(l => l.remain > 0);
 }
 
@@ -424,8 +436,9 @@ function getBoot(receiptId) {
     out.dept = props_().getProperty('DEPT') || '일상동행팀';
     out.vouch = canVouch_();
     out.fam = canFam_() && !!map_('FAM');
+    if (!admin && isViewer_()) { out.viewer = viewerUntil_(); out.vouch = out.vouch || !!map_('VOUCH'); }
     if (admin) out.publicUrl = str_(props_().getProperty('PUBLIC_URL'));
-    if (admin) out.counts = { sign: ownRows_('RCPT').filter(x => x.r[5] === '서명 대기').length, home: ownRows_('HOME').filter(x => x.r[6] === '확인 대기').length, org: ownRows_('RCPT').filter(x => x.r[5] === '회수 대기').length };
+    if (admin || out.viewer) out.counts = { sign: ownRows_('RCPT').filter(x => x.r[5] === '서명 대기').length, home: ownRows_('HOME').filter(x => x.r[6] === '확인 대기').length, org: ownRows_('RCPT').filter(x => x.r[5] === '회수 대기').length };
     out.counts = out.counts || {};
     out.counts.hsign = ownRows_('HOME').filter(x => x.r[9] === '서명 대기' && homeAccess_(x)).length;
   }
@@ -511,13 +524,13 @@ function saveReceiptPdf(id, html, version,requestId) {
  });
 }
 function listVoucherGives() {
-  needVouch_();
-  const admin = isAdmin_(), me = me_();
+  if (!canVouch_()) needView_();
+  const admin = canView_(), me = me_();
   return ownRows_('RCPT').filter(x => x.r[1] === '상품권' && x.r[5] !== '취소' && (admin || String(x.r[4]).toLowerCase() === me)).slice(-30).reverse().map(x => {
     const o = rcptObj_(x, false); o.total = o.people.length; o.done = o.people.filter(p => p.signed).length; o.names = o.people.map(p => p.name).join(', '); delete o.people; return o; });
 }
 function listReceipts() {
-  needAdmin_();
+  needView_();
   return ownRows_('RCPT').slice(-80).reverse().map(x => {
     const o = rcptObj_(x, false);
     if (o.people) { o.total = o.people.length; o.done = o.people.filter(p => p.signed).length; o.names = o.people.map(p => p.name).join(', '); delete o.people; }
@@ -552,7 +565,7 @@ function requestHome(p,requestId) {
   });
 }
 function listHome() {
-  needAdmin_();
+  needView_();
   return ownRows_('HOME').slice(-60).reverse().map(x => ({ id: x.r[0], date: ymd_(x.r[1]), manager: x.r[2], by: x.r[3], count: x.r[4], items: JSON.parse(x.r[5] || '[]'), status: x.r[6], done: ymd_(x.r[7]), sign: x.r[9] }));
 }
 function confirmHome(id, ok,requestId) {
@@ -578,10 +591,10 @@ function confirmHome(id, ok,requestId) {
 
 /* ───────── B-2. 가정 배분 나중에 서명받기 ───────── */
 function homeAccess_(x) { return isAdmin_() || String(x.r[3]).toLowerCase() === me_(); }
-function findHome_(id) {
+function findHome_(id, read) {
   const x = ownRows_('HOME').find(y => y.r[0] === id);
   if (!x) throw new Error('명단을 찾을 수 없어요.');
-  if (!homeAccess_(x)) throw new Error('만든 사람과 관리자만 볼 수 있어요.');
+  if (!homeAccess_(x) && !(read && isViewer_())) throw new Error('만든 사람과 관리자만 볼 수 있어요.');
   return x;
 }
 function homeData_(x) {
@@ -591,16 +604,16 @@ function homeData_(x) {
 }
 function listHomeSign() {
   needOrg_();
-  const rows = ownRows_('HOME').filter(x => (x.r[9] === '서명 대기' || x.r[9] === '서명 완료') && homeAccess_(x)).reverse();
+  const rows = ownRows_('HOME').filter(x => (x.r[9] === '서명 대기' || x.r[9] === '서명 완료') && (homeAccess_(x) || isViewer_())).reverse();
   return rows.slice(0, 30).map(x => {
     const o = { id: x.r[0], date: ymd_(x.r[1]), manager: x.r[2], count: x.r[4], state: x.r[9], items: JSON.parse(x.r[5] || '[]') };
     if (x.r[9] === '서명 대기') { try { const d = homeData_(x).d; o.done = d.people.filter(p => p.sig).length; o.total = d.people.length; } catch (e) { o.done = 0; o.total = x.r[4]; } }
-    else if (isAdmin_() && x.r[10]) o.file = 'https://drive.google.com/file/d/' + x.r[10] + '/view';
+    else if (canView_() && x.r[10]) o.file = 'https://drive.google.com/file/d/' + x.r[10] + '/view';
     return o;
   });
 }
 function getHomeSign(id) {
-  const x = findHome_(id), d = homeData_(x).d;
+  const x = findHome_(id, true), d = homeData_(x).d;
   return { id: d.id, date: d.date, manager: d.manager, dateMode: d.dateMode || 'blank', items: d.items, people: d.people.map(p => ({ name: p.name, addr: p.addr, idType:p.idType==='생년월일'?'생년월일':'주소', qty: p.qty, at: p.at, sigUrl: p.sig, phone: p.phone || '', linked: !!(p.tok && (!p.tokExp || Date.now() < p.tokExp)), via: p.via || '' })) };
 }
 function signHome(id, idx, dataUrl,requestId) {
@@ -681,7 +694,7 @@ function finishHome(id, html,requestId) {
 }
 
 /* ───────── C. 유관기관 인수증 ───────── */
-function listOrgs() { needAdmin_(); return ownRows_('ORG').map(x => ({ name: x.r[0], ceo: x.r[1], addr: x.r[2], tel: x.r[3], contact: x.r[4] })).filter(o => o.name); }
+function listOrgs() { needView_(); return ownRows_('ORG').map(x => ({ name: x.r[0], ceo: x.r[1], addr: x.r[2], tel: x.r[3], contact: x.r[4] })).filter(o => o.name); }
 function saveOrg_(o) {
   const sh = own_('ORG'), x = ownRows_('ORG').find(y => y.r[0] === o.name);
   const row = [o.name, o.ceo || '', o.addr || '', o.tel || '', o.contact || '', ''];
@@ -819,11 +832,11 @@ function dispRow_(it, date, reason, link) {
 }
 function findDlog_(id) { const x = ownRows_('DLOG').find(y => y.r[0] === id); if (!x) throw new Error('폐기 기록을 찾을 수 없어요.'); return x; }
 function listDisposals() {
-  needAdmin_();
+  needView_();
   return ownRows_('DLOG').slice(-50).reverse().map(x => ({ id: x.r[0], date: ymd_(x.r[1]), items: JSON.parse(x.r[2] || '[]').map(i => ({ name: i.name, qty: i.qty, unit: i.unit })), reason: x.r[3] }));
 }
 function getDisposal(id) {
-  needAdmin_();
+  needView_();
   const x = findDlog_(id), o = { id: x.r[0], date: ymd_(x.r[1]), items: JSON.parse(x.r[2] || '[]'), reason: x.r[3], photo: '' };
   if (x.r[4]) { try { const b = DriveApp.getFileById(x.r[4]).getBlob(); o.photo = 'data:' + b.getContentType() + ';base64,' + Utilities.base64Encode(b.getBytes()); } catch (e) {} }
   return o;
@@ -869,7 +882,7 @@ function vouchers_() {
 }
 const vGroup_ = v => v.kind + '|' + v.face + '|' + v.inDate;
 function getVouchers() {
-  needVouch_();
+  if (!canVouch_()) needView_();
   if (!map_('VOUCH')) return { ready: false };
   const all = vouchers_(), held = all.filter(v => v.status === '보유'), sum = {};
   all.forEach(v => { const s = sum[v.kind] || (sum[v.kind] = { kind: v.kind, held: 0, heldAmt: 0, out: 0, outAmt: 0 });
