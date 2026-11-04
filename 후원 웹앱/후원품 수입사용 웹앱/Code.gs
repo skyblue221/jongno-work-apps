@@ -543,7 +543,7 @@ function requestHome(p,requestId) {
       if (!people.length) throw new Error('받는 분 명단을 넣어 주세요.');
       const data = { id: id, date: row[1], manager: row[2], dateMode: p.dateMode === 'fill' ? 'fill' : 'blank',
         items: lots.filter(l => need[l.key] > 0).map(l => ({ key: l.key, name: l.name, inDate: l.inDate, donor: l.donor, inQty: l.inQty, give: need[l.key], remainAfter: l.remain - need[l.key] })),
-        people: people.map(x => ({ name: str_(x.name), addr: str_(x.addr), idType:x.idType==='생년월일'?'생년월일':'주소', phone: digits_(x.phone), birth: birth6_(x.birth), qty: x.qty || {}, sig: '', at: '' })) };
+        people: people.map(x => ({ name: str_(x.name), addr: str_(x.addr), idType:x.idType==='생년월일'?'생년월일':'주소', phone: digits_(x.phone), birth: birth6_(x.birth) || (x.idType === '생년월일' ? birth6_(x.addr) : ''), qty: x.qty || {}, sig: '', at: '' })) };
       const f = trackedFile_(folder_(['가정배분_임시명단']),id + '.json', JSON.stringify(data), 'application/json');
       row[9] = '서명 대기'; row[11] = f.getId();
     }
@@ -628,7 +628,7 @@ function updateHomeSign(id, list,requestId) {
     d.people = people.map(p => {
       const o = p.i >= 0 ? d.people[p.i] : null;
       const same = o && o.sig && str_(o.name)===str_(p.name) && str_(o.addr)===str_(p.addr) && (o.idType||'주소')===(p.idType||'주소') && d.items.every(it => num_(o.qty[it.key]) === num_(p.qty && p.qty[it.key]));
-      return { name: str_(p.name), addr: str_(p.addr), idType:p.idType==='생년월일'?'생년월일':'주소', phone: p.phone !== undefined ? digits_(p.phone) : (o ? o.phone || '' : ''), birth: o ? o.birth || '' : '', tok: o ? o.tok || '' : '', qty: p.qty || {}, sig: same ? o.sig : '', at: same ? o.at : '' };
+      return { name: str_(p.name), addr: str_(p.addr), idType:p.idType==='생년월일'?'생년월일':'주소', phone: p.phone !== undefined ? digits_(p.phone) : (o ? o.phone || '' : ''), birth: (o && o.birth && str_(o.addr) === str_(p.addr)) ? o.birth : (p.idType === '생년월일' ? birth6_(p.addr) : (o ? o.birth || '' : '')), tok: o ? o.tok || '' : '', qty: p.qty || {}, sig: same ? o.sig : '', at: same ? o.at : '' };
     });
     d.items.forEach(it => { it.give = need[it.key] || 0; });
     h.f.setContent(JSON.stringify(d));
@@ -1043,6 +1043,7 @@ function makeSignLink(id, idx, phone) {
     if (!p) throw new Error('받는 분을 찾을 수 없어요.');
     if (p.sig) throw new Error(p.name + '님은 이미 서명했어요.');
     if (phone !== undefined && digits_(phone)) p.phone = digits_(phone);
+    if (!p.birth && p.idType === '생년월일') p.birth = birth6_(p.addr);
     if (!p.birth && !(p.phone && p.phone.length >= 4)) throw new Error('본인 확인용 생년월일이나 연락처가 없어요. 연락처를 넣어 주세요.');
     if (p.tok) props_().deleteProperty('TOK_' + p.tok);
     p.tok = Utilities.getUuid().replace(/-/g, '');

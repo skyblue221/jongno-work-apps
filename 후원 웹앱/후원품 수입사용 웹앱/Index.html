@@ -537,8 +537,10 @@ async function homeSignOpen(id){
     ed();
   };
   const sendLink=async i=>{ const p=r.people[i];
-    let phone=p.phone||''; if(!phone){ const v=prompt(`${p.name}님 연락처 (문자로 보낼 때·생년월일이 없을 때 본인 확인에 써요. 카톡으로만 보내고 생년월일이 있으면 비워 둬도 돼요)`,''); if(v===null) return; phone=v.replace(/\D/g,''); }
-    let L; try{ L=await run('makeSignLink',r.id,i,phone); }catch(e){ return alert(e); }
+    let L; try{ L=await run('makeSignLink',r.id,i,p.phone||''); }catch(e){
+      if(!String(e).includes('연락처')) return alert(e);
+      const v=prompt(`${p.name}님은 생년월일이 없어서 본인 확인에 연락처 뒤 4자리를 써요. 연락처를 넣어 주세요.`,''); if(!v) return;
+      try{ L=await run('makeSignLink',r.id,i,v.replace(/\D/g,'')); }catch(e2){ return alert(e2); } }
     p.phone=L.phone; p.linked=true;
     const m=$('#modal'), box=$('#modalBox');
     box.innerHTML=`\x3ch2 style="margin:0 0 6px;font-size:17px">${esc(p.name)}님께 서명 링크 보내기\x3c/h2>
