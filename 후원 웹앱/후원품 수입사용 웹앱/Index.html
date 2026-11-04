@@ -660,7 +660,7 @@ async function vouchView(){
     \x3cdiv class="row">\x3cdiv>\x3clabel>상품권 종류\x3c/label>\x3cinput id="aKind" list="kindList">\x3cdatalist id="kindList">${V.kinds.map(k=>`\x3coption value="${esc(k)}">`).join('')}\x3c/datalist>\x3c/div>\x3cdiv>\x3clabel>면액 (원)\x3c/label>\x3cinput id="aFace" inputmode="numeric" placeholder="10000">\x3c/div>\x3c/div>
     \x3cdiv class="row">\x3cdiv>\x3clabel>입고일 (후원물품등록과 같은 날짜로)\x3c/label>\x3cinput type="date" id="aDate" value="${S.boot.today}">\x3c/div>\x3cdiv>\x3clabel>입고처\x3c/label>\x3cinput id="aSrc" list="srcList">\x3cdatalist id="srcList">${V.srcs.map(k=>`\x3coption value="${esc(k)}">`).join('')}\x3c/datalist>\x3c/div>\x3c/div>
     \x3cdiv class="row">\x3cdiv>\x3clabel>입고담당자\x3c/label>\x3cinput id="aBy" value="${esc(G.outBy)}">\x3c/div>\x3cdiv>\x3clabel>지정내용 (없으면 비워 두기)\x3c/label>\x3cinput id="aTgt">\x3c/div>\x3c/div>
-    \x3clabel>일련번호 (한 줄에 하나씩, 상품권에 찍힌 번호 그대로)\x3c/label>\x3ctextarea id="aSer" placeholder="272610566855119&#10;272610566855102">\x3c/textarea>
+    \x3clabel>일련번호 (한 줄에 하나씩, 상품권에 찍힌 번호 그대로)\x3c/label>\x3ctextarea id="aSer" placeholder="000000000000001&#10;000000000000002">\x3c/textarea>
     \x3cdiv class="btns">\x3cbutton class="btn" id="aGo">입고 등록\x3c/button>\x3c/div>\x3c/div>`;
     $('#aGo').onclick=e=>act(e.target, async()=>{ const ser=$('#aSer').value.split(/[\s,]+/).filter(Boolean);
       const n=await run('addVouchers',{kind:$('#aKind').value,face:$('#aFace').value,inDate:$('#aDate').value,src:$('#aSrc').value,inBy:$('#aBy').value,target:$('#aTgt').value,serials:ser});
