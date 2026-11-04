@@ -115,6 +115,7 @@ const OWN_HEAD = {
 /* ───────── 웹 앱 ───────── */
 function doGet(e) {
   if (e && e.parameter && e.parameter.s) return HtmlService.createHtmlOutputFromFile('Sign').setTitle('수령 서명').addMetaTag('viewport', 'width=device-width, initial-scale=1');
+  if (!me_()) return HtmlService.createHtmlOutput('<meta charset="utf-8"><div style="font:17px/1.6 sans-serif;max-width:480px;margin:40px auto;padding:20px;border:1px solid #dfe5df;border-radius:14px"><b>후원품 수령 확인</b><p>이 주소는 복지관에서 문자로 보내드린 <b>서명 링크</b>로만 열 수 있어요. 받은 문자의 링크를 눌러 주세요.</p><p style="color:#5f6b64;font-size:14px">직원은 기관용 앱 주소로 들어가 주세요.</p></div>').setTitle('후원품 수령 확인').addMetaTag('viewport', 'width=device-width, initial-scale=1');
   return HtmlService.createHtmlOutputFromFile('Index')
     .setTitle(APP.title)
     .addMetaTag('viewport', 'width=device-width, initial-scale=1')
