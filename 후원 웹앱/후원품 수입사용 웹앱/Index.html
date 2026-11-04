@@ -537,19 +537,21 @@ async function homeSignOpen(id){
     ed();
   };
   const sendLink=async i=>{ const p=r.people[i];
-    let phone=p.phone||''; if(!phone){ phone=(prompt(`${p.name}님 연락처를 넣어 주세요 (본인 확인과 문자 보내기에 써요)`,'')||'').replace(/\D/g,''); if(!phone) return; }
+    let phone=p.phone||''; if(!phone){ const v=prompt(`${p.name}님 연락처 (문자로 보낼 때·생년월일이 없을 때 본인 확인에 써요. 카톡으로만 보내고 생년월일이 있으면 비워 둬도 돼요)`,''); if(v===null) return; phone=v.replace(/\D/g,''); }
     let L; try{ L=await run('makeSignLink',r.id,i,phone); }catch(e){ return alert(e); }
     p.phone=L.phone; p.linked=true;
     const m=$('#modal'), box=$('#modalBox');
     box.innerHTML=`\x3ch2 style="margin:0 0 6px;font-size:17px">${esc(p.name)}님께 서명 링크 보내기\x3c/h2>
       \x3cp class="muted" style="margin:0 0 6px">받는 분은 링크를 열고 \x3cb>${esc(L.check)}\x3c/b>로 본인 확인 후 서명해요. 링크는 서명하면 닫히고, 안 하면 14일 뒤 닫혀요.\x3c/p>
-      \x3clabel>받는 번호\x3c/label>\x3cinput id="lp" value="${esc(L.phone)}" inputmode="tel">
+      \x3clabel>받는 번호 (문자로 보낼 때)\x3c/label>\x3cinput id="lp" value="${esc(L.phone)}" inputmode="tel">
       \x3clabel>보낼 문자\x3c/label>\x3ctextarea id="lm" style="min-height:120px">${esc(L.msg)}\x3c/textarea>
-      \x3cdiv class="btns">\x3cbutton class="btn line" id="lc">문자 복사\x3c/button>\x3cspan style="flex:1">\x3c/span>\x3cbutton class="btn line" id="lx">닫기\x3c/button>\x3ca class="btn" id="ls" href="#">문자 앱 열기\x3c/a>\x3c/div>`;
+      \x3cp class="muted" style="margin:8px 0 0">카톡으로 보낼 땐 \x3cb>안내 문구 복사\x3c/b> 후 카톡 대화방에 붙여넣기 하면 돼요. 폰에서는 \x3cb>공유\x3c/b>로 카톡을 바로 고를 수도 있어요.\x3c/p>\x3cdiv class="btns">\x3cbutton class="btn line" id="lc">안내 문구 복사\x3c/button>\x3cbutton class="btn line" id="lu">링크만 복사\x3c/button>${navigator.share?'\x3cbutton class="btn line" id="lsh">공유 (카톡 등)\x3c/button>':''}\x3cspan style="flex:1">\x3c/span>\x3cbutton class="btn line" id="lx">닫기\x3c/button>\x3ca class="btn" id="ls" href="#">문자 앱 열기\x3c/a>\x3c/div>`;
     m.style.display='flex';
     const upd=()=>{ $('#ls').href=smsHref($('#lp').value.replace(/\D/g,''),$('#lm').value); }; upd();
     $('#lp').oninput=upd; $('#lm').oninput=upd;
     $('#lc').onclick=()=>copyText($('#lm').value);
+    $('#lu').onclick=()=>copyText(L.url);
+    if($('#lsh')) $('#lsh').onclick=()=>navigator.share({text:$('#lm').value}).catch(()=>{});
     $('#lx').onclick=()=>{ m.style.display='none'; box.innerHTML=''; draw(); };
   };
   const bind=()=>{ $('#main').onclick=async e=>{ const ln=e.target.closest('[data-ln]'); if(ln) return sendLink(+ln.dataset.ln); const b=e.target.closest('[data-s]'); if(!b) return; const p=r.people[+b.dataset.s];
