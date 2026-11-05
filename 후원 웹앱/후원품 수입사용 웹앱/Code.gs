@@ -503,7 +503,7 @@ function createTeamReceipt(p,requestId) {
     if (!keys.some(k => need[k] > 0)) throw new Error('수량을 넣어 주세요.');
     checkStock_(lots, need);
     const id=newRecordId_('R'),date = ymd_(p.date) || today_(), no = distNo_(date, lots,id);
-    const vs = splitVouch_(lots, people, p.vsel, need, p.vskip);
+    const vs = splitVouch_(lots, people, p.vsel, need, p.vskip, Object.keys(st).map(k => st[k]));
     if (vs) markVouch_(people.reduce((a, x, i) => a.concat(vsFlat_(vs[i]).map(sr => ({ serial: sr, person: str_(x.name) }))), []),
       { date: date, purpose: '팀 배분' + (str_(p.note) ? ' · ' + str_(p.note) : ''), outBy: p.outBy, note: '배분번호 ' + no });
     const rows = [];
@@ -592,7 +592,7 @@ function requestHome(p,requestId) {
     const id = 'H' + Utilities.formatDate(new Date(), APP.tz, 'yyMMddHHmmss') + Math.random().toString(36).slice(2, 5);
     // 상품권 묶음: 고른 번호를 받는 분 순서대로 나눠 관리대장에 기록 (이름은 관리대장 수령자 칸에만)
     const vp = (p.people || []).filter(x => str_(x.name));
-    const vs = splitVouch_(lots, vp, p.vsel, need, p.vskip);
+    const vs = splitVouch_(lots, vp, p.vsel, need, p.vskip, Object.keys(st).map(k => st[k]));
     if (vs) {
       const tot = {}; vp.forEach(x => keys.forEach(k => { tot[k] = (tot[k] || 0) + num_(x.qty && x.qty[k]); }));
       Object.keys(p.vsel || {}).forEach(k => { if ((p.vsel[k] || []).length && tot[k] !== need[k]) throw new Error('받는 분별 상품권 수량 합계를 맞춰 주세요.'); });
@@ -962,30 +962,81 @@ const vGroup_ = v => v.kind + '|' + v.face + '|' + v.inDate;
 /* ───────── E-2. 팀·가정 배분에서 상품권 번호 고르기 ───────── */
 const nm_ = s => str_(s).replace(/\s/g, '');
 /** 후원품 묶음(품명·입고일·후원처)과 관리대장 상품권이 같은 것인지: 입고일 같고, 후원처가 겹치고, 이름이 비슷하면 */
-function vMatch_(l, v) {
-  if (!l || !v || !v.inDate || v.inDate !== l.inDate) return false;
-  const a = nm_(l.donor), b = nm_(v.src);
-  if (a && b && !(a.includes(b) || b.includes(a))) return false;
-  const ln = nm_(l.name), k = nm_(v.kind);
-  return !!k && (ln.includes(k.slice(0, 3)) || k.includes(ln.slice(0, 3)) || /상품권|카드|기프트|쿠폰/.test(ln));
+/* 수입 물품(입고 묶음) ↔ 상품권 관리대장 짝짓기
+   - 입고일이 앞뒤 VOUCH_DAYS일 안이면 같은 묶음으로 봐요 (관리대장 등록이 며칠 늦거나 빠른 경우)
+   - 품명에 금액(1만원권, 50,000원 등)이 있으면 면액이 같은 상품권만 짝지어요
+   - 한 상품권이 여러 물품에 맞으면 가장 잘 맞는 물품 하나에만 붙여요 (면액·후원처가 맞고 날짜가 가까운 순) */
+const VOUCH_DAYS = 7;
+const dayNo_ = s => { const m = String(s || '').match(/^(\d{4})-(\d{2})-(\d{2})$/); return m ? Date.UTC(+m[1], +m[2] - 1, +m[3]) / 864e5 : NaN; };
+/** 품명 속 금액: '온누리 1만원권' → 10000, '1만5천원' → 15000, '5,000원' → 5000, 없으면 0 */
+function lotFace_(name) {
+  const s = nm_(name).replace(/,/g, '');
+  let m = s.match(/(\d+)만(\d+)천원/); if (m) return Number(m[1]) * 10000 + Number(m[2]) * 1000;
+  m = s.match(/(\d+(?:\.\d+)?)만원/); if (m) return Math.round(Number(m[1]) * 10000);
+  m = s.match(/(\d+)천원/); if (m) return Number(m[1]) * 1000;
+  m = s.match(/(\d{3,})원/); if (m) return Number(m[1]);
+  return 0;
 }
-function lotVouchers_(lots, all) {
-  const out = {}; all = all || vouchers_();
-  lots.forEach(l => { const L = all.filter(v => v.status === '보유' && vMatch_(l, v)); if (L.length) out[l.key] = L; });
+/** 짝이 맞으면 점수(클수록 잘 맞음), 아니면 -1 */
+function vScore_(l, v) {
+  if (!l || !v || !v.inDate || !l.inDate) return -1;
+  const gap = Math.abs(dayNo_(v.inDate) - dayNo_(l.inDate));
+  if (!(gap <= VOUCH_DAYS)) return -1;
+  const a = nm_(l.donor), b = nm_(v.src), donorOk = !!(a && b && (a.includes(b) || b.includes(a)));
+  if (a && b && !donorOk) return -1;
+  const ln = nm_(l.name), k = nm_(v.kind);
+  if (!k || !(ln.includes(k.slice(0, 3)) || k.includes(ln.slice(0, 3)) || /상품권|기프트|쿠폰/.test(ln) || (/카드/.test(ln) && /카드/.test(k)))) return -1;
+  const face = lotFace_(l.name);
+  if (face && v.face && face !== v.face) return -1;
+  return (face && face === v.face ? 100 : 0) + (donorOk ? 50 : 0) + (VOUCH_DAYS - gap);
+}
+function vMatch_(l, v) { return vScore_(l, v) >= 0; }
+/** 묶음마다 보유 상품권. universe: 짝을 겨룰 전체 물품 (안 주면 lots끼리만) */
+function lotVouchers_(lots, all, universe) {
+  all = all || vouchers_();
+  const want = {}, pool = (universe || []).slice();
+  lots.forEach(l => { want[l.key] = 1; if (!pool.some(x => x.key === l.key)) pool.push(l); });
+  const out = {};
+  all.forEach(v => {
+    if (v.status !== '보유') return;
+    let best = null, top = -1;
+    pool.forEach(l => { const s = vScore_(l, v); if (s > top) { top = s; best = l; } });
+    if (best && want[best.key]) (out[best.key] = out[best.key] || []).push(v);
+  });
   return out;
+}
+/** 점검표: 수입 물품과 관리대장이 어긋난 곳 (수량 차이, 짝 없는 상품권) */
+function getVoucherCheck() {
+  if (!canVouch_()) needView_();
+  if (!map_('VOUCH')) return { ready: false };
+  const lots = stockCached_(), held = vouchers_().filter(v => v.status === '보유');
+  const lv = lotVouchers_(lots, held, lots), matched = new Set();
+  Object.keys(lv).forEach(k => lv[k].forEach(v => matched.add(v.serial)));
+  const looks = l => /상품권|기프트|쿠폰|카드/.test(nm_(l.name));
+  const bad = lots.filter(l => lv[l.key] || (looks(l) && l.remain > 0)).map(l => {
+    const L = lv[l.key] || [];
+    return { name: l.name, inDate: l.inDate, donor: l.donor, face: lotFace_(l.name), remain: l.remain, held: L.length, faces: [...new Set(L.map(v => v.face))] };
+  }).filter(x => x.held !== x.remain);
+  const groups = {};
+  held.filter(v => !matched.has(v.serial)).forEach(v => {
+    const k = [v.kind, v.face, v.inDate, v.src].join('|');
+    const g = groups[k] || (groups[k] = { kind: v.kind, face: v.face, inDate: v.inDate, src: v.src, n: 0, first: v.serial, last: v.serial });
+    g.n++; g.last = v.serial;
+  });
+  return { ready: true, days: VOUCH_DAYS, heldTotal: held.length, matchedTotal: matched.size, lots: bad, orphans: Object.keys(groups).map(k => groups[k]) };
 }
 /** 화면용: 상품권과 연결되는 후원품 묶음마다 보유 번호 (권한 없는 직원에게는 장수만) */
 function getLotVouchers() {
   needOrg_();
   if (!map_('VOUCH')) return {};
-  const lv = lotVouchers_(stockCached_().filter(l => l.remain > 0)), can = canVouch_(), out = {};
+  const st = stockCached_(), lv = lotVouchers_(st.filter(l => l.remain > 0), null, st), can = canVouch_(), out = {};
   Object.keys(lv).forEach(k => { out[k] = can ? { n: lv[k].length, list: lv[k].map(v => ({ serial: v.serial, kind: v.kind, face: v.face, target: v.target })) } : { n: lv[k].length, locked: true }; });
   return out;
 }
 /** 고른 번호를 사람 순서대로 나눔 → 사람마다 {묶음키: [번호]} (상품권 묶음이 없으면 null) */
-function splitVouch_(lots, people, vsel, need, skip) {
+function splitVouch_(lots, people, vsel, need, skip, universe) {
   vsel = vsel || {}; skip = skip || [];
-  const held = lotVouchers_(lots);
+  const held = lotVouchers_(lots, null, universe);
   lots.forEach(l => { if (held[l.key] && need[l.key] > 0 && !(vsel[l.key] || []).length && skip.indexOf(l.key) < 0) throw new Error(canVouch_() ? '「' + l.name + '」은 상품권이라 나가는 번호를 골라 주세요.' : '「' + l.name + '」은 상품권이라 상품권 권한이 있는 직원만 나눌 수 있어요. 관리자에게 요청해 주세요.'); });
   const all = {}; vouchers_().forEach(v => { all[v.serial] = v; });
   const keys = Object.keys(vsel).filter(k => (vsel[k] || []).length);
