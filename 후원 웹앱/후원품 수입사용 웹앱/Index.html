@@ -270,7 +270,7 @@ function vBox(el,o){
   el.innerHTML=keys.map(k=>{ const lot=lotOf(k)||{name:k}, V=S.lv[k], need=o.need(k), got=(o.vsel[k]||[]).length, skip=o.vskip.includes(k);
     if(V.locked) return `\x3cdiv class="card note warn">\x3cb>${esc(lot.name)}\x3c/b>은 번호로 관리하는 상품권이라 \x3cb>상품권 권한\x3c/b>이 있는 직원만 나눌 수 있어요. 관리자에게 요청해 주세요.\x3c/div>`;
     return `\x3cdiv class="card">\x3ch2>🎫 ${esc(lot.name)} 번호 고르기\x3c/h2>
-      \x3cp class="muted" style="margin:0 0 6px">${esc(lot.inDate)} 입고${lot.donor?' · '+esc(lot.donor):''} · 관리대장에 보유 \x3cb>${V.n}\x3c/b>장. 실물 번호를 보고 체크해 주세요. 목록 위쪽 번호부터 받는 분 순서대로 나눠 담겨요.\x3c/p>
+      \x3cp class="muted" style="margin:0 0 6px">${esc(lot.inDate)} 입고${lot.donor?' · '+esc(lot.donor):''} · ${lot.remain!=null?`후원품 재고 \x3cb>${lot.remain}\x3c/b> · `:''}관리대장 보유 \x3cb>${V.n}\x3c/b>장${lot.remain!=null&&lot.remain!==V.n?' \x3cspan style="color:#b45309">(수가 달라요. 상품권 탭 [수입과 맞춰 보기]에서 확인)\x3c/span>':''}. 실물 번호를 보고 체크해 주세요. 목록 위쪽 번호부터 받는 분 순서대로 나눠 담겨요.\x3c/p>
       ${skip?'':`\x3cdiv class="btns">\x3cbutton class="btn sub sm" data-vf="${esc(k)}">앞에서부터 ${need}장 고르기\x3c/button>\x3cbutton class="btn line sm" data-vc="${esc(k)}">선택 해제\x3c/button>\x3c/div>
       \x3cdiv class="lots" style="max-height:220px;margin-top:6px">${V.list.map(v=>`\x3clabel class="lot ${o.vsel[k].includes(v.serial)?'on':''}" style="align-items:center">\x3cspan>\x3cinput type="checkbox" data-vk="${esc(k)}" data-vs="${esc(v.serial)}" ${o.vsel[k].includes(v.serial)?'checked':''} style="width:auto"> \x3cb>${esc(v.serial)}\x3c/b> \x3cspan class="muted">${esc(v.kind)} ${Number(v.face||0).toLocaleString()}원${v.target?' · 지정: '+esc(v.target):''}\x3c/span>\x3c/span>\x3c/label>`).join('')}\x3c/div>
       \x3cp class="${got===need?'muted':'exp'}" style="margin:6px 0 2px">고른 번호 \x3cb>${got}\x3c/b>장 / 나갈 수량 \x3cb>${need}\x3c/b>장${got===need&&need?' ✓':need?' — 맞춰 주세요':''}\x3c/p>
@@ -698,7 +698,7 @@ async function vouchView(){
   $('#vAddP').onclick=()=>{ const last=G.people[G.people.length-1]; G.people.push({type:last?last.type:'직원',name:'',team:'',addr:'',n:''}); drawPeople(); };
   $('#vLink').onchange=e=>{ if(e.target.dataset.lg) G.link[e.target.dataset.lg]=e.target.value; };
   $('#vDate').onchange=e=>G.date=e.target.value; $('#vPur').oninput=e=>G.purpose=e.target.value; $('#vChk').oninput=e=>G.check=e.target.value;
-  $('#vBy').oninput=e=>{ G.outBy=e.target.value; try{localStorage.setItem('vby',G.outBy);}catch(x){} };
+  $('#vBy').oninput=e=>{ G.outBy=e.target.value; }; $('#vBy').onchange=e=>{ G.outBy=e.target.value; try{localStorage.setItem('vby',G.outBy);}catch(x){} };
   $('#vGo').onclick=e=>act(e.target, async()=>{
     G.people.forEach(p=>{checkInputQuantities({qty:p.n});if(!Number.isInteger(num(p.n)))throw '상품권 장수는 정수로 입력해주세요.';});
     const A=assign(), tot=A.reduce((a,x)=>a+x.serials.length,0);

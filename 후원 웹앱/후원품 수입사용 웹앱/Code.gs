@@ -978,10 +978,19 @@ function lotFace_(name) {
   m = s.match(/(\d{3,})원/); if (m) return Number(m[1]);
   return 0;
 }
-/** 품명과 상품권 종류가 같은 것을 가리키는지 */
-function vNameOk_(l, v) {
+/** 품명이 상품권 종류(브랜드)를 직접 가리키는지: '온누리상품권 1만원권' ↔ '온누리상품권' */
+function vNameSame_(l, v) {
   const ln = nm_(l.name), k = nm_(v.kind);
-  return !!k && (ln.includes(k.slice(0, 3)) || k.includes(ln.slice(0, 3)) || /상품권|기프트|쿠폰/.test(ln) || (/카드/.test(ln) && /카드/.test(k)));
+  return !!k && (ln.includes(k.slice(0, 3)) || k.includes(ln.slice(0, 3)));
+}
+/** 품명과 상품권 종류가 같은 것을 가리키는지.
+    품명에 브랜드가 없을 때('상품권', '기프트카드 5만원')만 어느 종류든 받아요.
+    '온누리상품권'처럼 다른 브랜드가 적힌 물품은 신세계상품권과 짝짓지 않아요. */
+function vNameOk_(l, v) {
+  if (!nm_(v.kind)) return false;
+  if (vNameSame_(l, v)) return true;
+  const rest = nm_(l.name).replace(/[\d,.]+|만원|천원|원|권|장|매|상품권|기프트|카드|쿠폰|모바일|지류|[()\[\]·\-_\/]/g, '');
+  return !rest && /상품권|기프트|쿠폰|카드/.test(nm_(l.name));
 }
 /** 짝이 맞으면 점수(클수록 잘 맞음), 아니면 -1 */
 function vScore_(l, v) {
@@ -992,7 +1001,7 @@ function vScore_(l, v) {
   if (a && b && !donorOk) return -1;
   if (!vNameOk_(l, v)) return -1;
   const face = lotFace_(l.name);
-  return 200 + (face && v.face ? (face === v.face ? 100 : -100) : 0) + (donorOk ? 50 : 0) + (VOUCH_DAYS - gap);
+  return 200 + (vNameSame_(l, v) ? 150 : 0) + (face && v.face ? (face === v.face ? 100 : -100) : 0) + (donorOk ? 50 : 0) + (VOUCH_DAYS - gap);
 }
 /** 짝이 안 되는 이유 (점검표 안내용) */
 function vWhy_(l, v) {
