@@ -646,8 +646,10 @@ async function vouchView(){
   G.sel=G.sel.filter(sr=>V.held.some(v=>v.serial===sr));
   const gives=rc.slice(0,10);
   const gkey=v=>v.kind+'|'+v.face+'|'+v.inDate;
-  const lotCands=full.filter(l=>/상품권|카드|기프트/.test(l.name));
-  const guess=g=>{ const [k,,d]=g.split('|'), nk=k.replace(/\s/g,''); const L=lotCands.filter(l=>l.name.replace(/\s/g,'').includes(nk.slice(0,3))); return (L.find(l=>l.inDate===d)||{}).key||''; };
+  const linked=Object.values(V.links||{});
+  const lotCands=full.filter(l=>/상품권|카드|기프트|쿠폰/.test(l.name)||linked.includes(l.key));
+  const guess0=g=>{ const [k,,d]=g.split('|'), nk=k.replace(/\s/g,''); const L=lotCands.filter(l=>l.name.replace(/\s/g,'').includes(nk.slice(0,3))); return (L.find(l=>l.inDate===d)||{}).key||''; };
+  const guess=g=>(V.links||{})[g]||guess0(g);
   $('#main').innerHTML=`
   \x3cdiv class="card">\x3ch2>상품권 보유 현황\x3c/h2>\x3ctable class="tbl">\x3ctr>\x3cth>종류\x3c/th>\x3cth>보유\x3c/th>\x3cth>보유 금액\x3c/th>\x3cth>지급완료\x3c/th>\x3c/tr>
   ${V.summary.map(x=>`\x3ctr>\x3ctd>${esc(x.kind)}\x3c/td>\x3ctd>\x3cb>${x.held}\x3c/b>장\x3c/td>\x3ctd>${won(x.heldAmt)}원\x3c/td>\x3ctd class="muted">${x.out}장\x3c/td>\x3c/tr>`).join('')}\x3c/table>
@@ -678,7 +680,7 @@ async function vouchView(){
     $('#vAssign').innerHTML=G.sel.length?`\x3cp class="${tot===G.sel.length?'muted':'exp'}">나눌 장수 합계 ${tot} / 고른 상품권 ${G.sel.length}장${tot===G.sel.length?' ✓':' — 맞춰 주세요'}\x3c/p>${A.map(a=>`\x3cdiv class="muted" style="font-size:12.5px">· ${esc(a.name)}: ${a.serials.map(esc).join(', ')}\x3c/div>`).join('')}`:'';
     const groups=[...new Set(G.sel.map(sr=>gkey(V.held.find(v=>v.serial===sr))))];
     groups.forEach(g=>{ if(G.link[g]===undefined) G.link[g]=guess(g); });
-    $('#vLink').innerHTML=groups.length?`\x3clabel>후원품 대장 연결 (배분 기록·재고에도 같이 반영)\x3c/label>${groups.map(g=>{const [k,f,d]=g.split('|');return `\x3cdiv class="row" style="margin-top:4px;align-items:center">\x3cdiv class="muted" style="flex:0 0 40%">${esc(k)} ${won(f)}원 · ${esc(d)} 입고\x3c/div>\x3cdiv>\x3cselect data-lg="${esc(g)}">\x3coption value="">연결 안 함 (상품권 대장만 기록)\x3c/option>${lotCands.map(l=>`\x3coption value="${esc(l.key)}" ${G.link[g]===l.key?'selected':''}>${esc(l.name)} · ${esc(l.inDate)} 입고 · 남은 ${l.remain}\x3c/option>`).join('')}\x3c/select>\x3c/div>\x3c/div>`;}).join('')}`:''; };
+    $('#vLink').innerHTML=groups.length?`\x3clabel>후원품 대장 연결 (배분 기록·재고에도 같이 반영)\x3c/label>${groups.map(g=>{const [k,f,d]=g.split('|');return `\x3cdiv class="row" style="margin-top:4px;align-items:center">\x3cdiv class="muted" style="flex:0 0 40%">${esc(k)} ${won(f)}원 · ${esc(d)} 입고\x3c/div>\x3cdiv>\x3cselect data-lg="${esc(g)}">\x3coption value="">연결 안 함 (상품권 대장만 기록)\x3c/option>${lotCands.map(l=>`\x3coption value="${esc(l.key)}" ${G.link[g]===l.key?'selected':''}>${esc(l.name)} · ${esc(l.inDate)} 입고 · 남은 ${l.remain}\x3c/option>`).join('')}\x3c/select>\x3c/div>\x3c/div>`;}).join('')}\x3cp class="muted" style="font-size:12.5px;margin:6px 0 0">「연결 안 함」으로 주면 상품권 대장과 수령증에만 남고, \x3cb>배분 기록과 후원품 재고에는 반영되지 않아요.\x3c/b>\x3c/p>`:''; };
   $('#vKind').onchange=e=>{ G.kind=e.target.value; drawList(); }; $('#vQ').oninput=drawList;
   $('#vList').onchange=e=>{ const sr=e.target.dataset.sr; if(!sr) return; const i=G.sel.indexOf(sr); if(e.target.checked&&i<0) G.sel.push(sr); if(!e.target.checked&&i>=0) G.sel.splice(i,1); drawList(); };
   $('#vFirst').onclick=()=>{ const n=num($('#vN').value); if(!n) return toast('장수를 넣어 주세요.'); shown().filter(v=>!G.sel.includes(v.serial)).slice(0,n).forEach(v=>G.sel.push(v.serial)); drawList(); };
@@ -716,12 +718,13 @@ async function vouchView(){
   $('#vCheck').onclick=()=>printHtml(checkHtml(),false);
   $('#vCheckX').onclick=e=>toExcel(e.target,checkHtml(),'상품권점검표_'+S.boot.today,false);
   const matchHtml=c=>!c.ready?'':`\x3cdiv style="margin-top:10px;border-top:1px solid var(--line);padding-top:10px">
-    \x3cp class="muted">관리대장 보유 \x3cb>${c.heldTotal}\x3c/b>장 중 \x3cb>${c.matchedTotal}\x3c/b>장이 수입 물품과 짝지어졌어요. (입고일 앞뒤 ${c.days}일 · 품명에 금액이 있으면 면액까지 비교)\x3c/p>
-    ${c.lots.length?`\x3ch2>수입 재고와 관리대장 보유 장수가 다른 물품\x3c/h2>\x3ctable class="tbl">\x3ctr>\x3cth>물품\x3c/th>\x3cth>입고일\x3c/th>\x3cth>후원처\x3c/th>\x3cth>재고\x3c/th>\x3cth>관리대장 보유\x3c/th>\x3c/tr>
-    ${c.lots.map(x=>`\x3ctr>\x3ctd>${esc(x.name)}\x3c/td>\x3ctd>${esc(x.inDate)}\x3c/td>\x3ctd>${esc(x.donor)}\x3c/td>\x3ctd>\x3cb>${x.remain}\x3c/b>\x3c/td>\x3ctd>\x3cb>${x.held}\x3c/b>장${x.held?'':' \x3cspan class="muted">(짝 없음)\x3c/span>'}\x3c/td>\x3c/tr>`).join('')}\x3c/table>`:'\x3cp>✅ 상품권 물품마다 수입 재고와 관리대장 보유 장수가 맞아요.\x3c/p>'}
-    ${c.orphans.length?`\x3ch2>어느 수입 물품과도 짝이 안 된 상품권\x3c/h2>\x3ctable class="tbl">\x3ctr>\x3cth>종류\x3c/th>\x3cth>면액\x3c/th>\x3cth>입고일\x3c/th>\x3cth>입고처\x3c/th>\x3cth>장수\x3c/th>\x3cth>번호\x3c/th>\x3c/tr>
-    ${c.orphans.map(g=>`\x3ctr>\x3ctd>${esc(g.kind)}\x3c/td>\x3ctd>${won(g.face)}원\x3c/td>\x3ctd>${esc(g.inDate||'(없음)')}\x3c/td>\x3ctd>${esc(g.src)}\x3c/td>\x3ctd>\x3cb>${g.n}\x3c/b>장\x3c/td>\x3ctd class="muted">${esc(g.first)}${g.n>1?' ~ '+esc(g.last):''}\x3c/td>\x3c/tr>`).join('')}\x3c/table>`:''}
-    ${c.lots.length||c.orphans.length?'\x3cp class="muted">맞추는 법: 관리대장의 입고일·입고처·종류·면액과 후원물품등록의 입고일·후원처·품명(금액 포함)을 서로 맞춰 주세요. 이미 나간 상품권이면 관리대장 상태를 「지급완료」로 바꿔 주세요.\x3c/p>':''}\x3c/div>`;
+    \x3cp class="muted">관리대장에서 아직 「보유」인 상품권 \x3cb>${c.heldTotal}\x3c/b>장 중 \x3cb>${c.matchedTotal}\x3c/b>장이 수입 물품과 짝지어졌어요. (입고일 앞뒤 ${c.days}일 안에서 짝지음)\x3c/p>
+    ${c.lots.length?`\x3ch2>재고와 관리대장이 다른 물품\x3c/h2>\x3ctable class="tbl">\x3ctr>\x3cth>물품\x3c/th>\x3cth>입고일\x3c/th>\x3cth>입고\x3c/th>\x3cth>나감\x3c/th>\x3cth>남은 재고\x3c/th>\x3cth>관리대장 보유\x3c/th>\x3cth>확인할 것\x3c/th>\x3c/tr>
+    ${c.lots.map(x=>`\x3ctr>\x3ctd>${esc(x.name)}\x3cdiv class="muted" style="font-size:12px">${esc(x.donor)}\x3c/div>\x3c/td>\x3ctd>${esc(x.inDate)}\x3c/td>\x3ctd>${x.inQty}\x3c/td>\x3ctd>${x.out}\x3c/td>\x3ctd>\x3cb>${x.remain}\x3c/b>\x3c/td>\x3ctd>\x3cb>${x.held}\x3c/b>장${x.held?`\x3cdiv class="muted" style="font-size:12px">${esc(x.first)}${x.held>1?' ~ '+esc(x.last):''}\x3c/div>`:''}\x3c/td>
+    \x3ctd class="muted" style="font-size:12.5px">${x.held>x.remain?`나간 ${x.held-x.remain}장이 관리대장에서 아직 「보유」예요. 번호 없이 배분한 경우라면 관리대장에서 그 번호를 「지급완료」로 바꿔 주세요.`:x.held?`관리대장 보유가 ${x.remain-x.held}장 적어요. 「연결 안 함」으로 지급해서 배분 기록·재고에 안 남은 상품권이 있는지 확인해 주세요.`:`짝지어진 상품권이 없어요. 아래 '짝이 안 된 상품권'에 이유가 있는지 봐 주세요.`}\x3c/td>\x3c/tr>`).join('')}\x3c/table>`:'\x3cp>✅ 상품권 물품마다 남은 재고와 관리대장 보유 장수가 맞아요.\x3c/p>'}
+    ${c.orphans.length?`\x3ch2>어느 수입 물품과도 짝이 안 된 상품권\x3c/h2>\x3ctable class="tbl">\x3ctr>\x3cth>상품권\x3c/th>\x3cth>입고일\x3c/th>\x3cth>장수\x3c/th>\x3cth>가장 비슷한 수입 물품과 안 맞는 이유\x3c/th>\x3c/tr>
+    ${c.orphans.map(g=>`\x3ctr>\x3ctd>${esc(g.kind)} ${won(g.face)}원\x3cdiv class="muted" style="font-size:12px">${esc(g.src)} · ${esc(g.first)}${g.n>1?' ~ '+esc(g.last):''}\x3c/div>\x3c/td>\x3ctd>${esc(g.inDate||'(없음)')}\x3c/td>\x3ctd>\x3cb>${g.n}\x3c/b>장\x3c/td>
+    \x3ctd style="font-size:12.5px">${g.near?`${esc(g.near.name)} · ${esc(g.near.inDate||'입고일 없음')}\x3cdiv class="muted">${g.near.why.length?g.near.why.map(esc).join(' / '):'짝이 맞을 수 있는데 더 잘 맞는 다른 물품에 밀렸어요'}\x3c/div>`:'\x3cspan class="muted">비슷한 수입 물품이 없어요. 후원물품등록에 이 상품권 입고가 있는지 확인해 주세요.\x3c/span>'}\x3c/td>\x3c/tr>`).join('')}\x3c/table>`:''}\x3c/div>`;
   $('#vMatch').onclick=e=>act(e.target, async()=>{ $('#vMatchOut').innerHTML=matchHtml(await run('getVoucherCheck')); }, '맞춰 보는 중...');
   if($('#vAddOpen')) $('#vAddOpen').onclick=()=>{ $('#vAdd').innerHTML=`\x3cdiv style="margin-top:10px;border-top:1px solid var(--line);padding-top:10px">
     \x3cdiv class="row">\x3cdiv>\x3clabel>상품권 종류\x3c/label>\x3cinput id="aKind" list="kindList">\x3cdatalist id="kindList">${V.kinds.map(k=>`\x3coption value="${esc(k)}">`).join('')}\x3c/datalist>\x3c/div>\x3cdiv>\x3clabel>면액 (원)\x3c/label>\x3cinput id="aFace" inputmode="numeric" placeholder="10000">\x3c/div>\x3c/div>
