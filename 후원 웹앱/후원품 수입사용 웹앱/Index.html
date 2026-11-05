@@ -719,9 +719,14 @@ async function vouchView(){
   $('#vCheckX').onclick=e=>toExcel(e.target,checkHtml(),'상품권점검표_'+S.boot.today,false);
   const matchHtml=c=>!c.ready?'':`\x3cdiv style="margin-top:10px;border-top:1px solid var(--line);padding-top:10px">
     \x3cp class="muted">관리대장에서 아직 「보유」인 상품권 \x3cb>${c.heldTotal}\x3c/b>장 중 \x3cb>${c.matchedTotal}\x3c/b>장이 수입 물품과 짝지어졌어요. (입고일 앞뒤 ${c.days}일 안에서 짝지음)\x3c/p>
-    ${c.lots.length?`\x3ch2>재고와 관리대장이 다른 물품\x3c/h2>\x3ctable class="tbl">\x3ctr>\x3cth>물품\x3c/th>\x3cth>입고일\x3c/th>\x3cth>입고\x3c/th>\x3cth>나감\x3c/th>\x3cth>남은 재고\x3c/th>\x3cth>관리대장 보유\x3c/th>\x3cth>확인할 것\x3c/th>\x3c/tr>
-    ${c.lots.map(x=>`\x3ctr>\x3ctd>${esc(x.name)}\x3cdiv class="muted" style="font-size:12px">${esc(x.donor)}\x3c/div>\x3c/td>\x3ctd>${esc(x.inDate)}\x3c/td>\x3ctd>${x.inQty}\x3c/td>\x3ctd>${x.out}\x3c/td>\x3ctd>\x3cb>${x.remain}\x3c/b>\x3c/td>\x3ctd>\x3cb>${x.held}\x3c/b>장${x.held?`\x3cdiv class="muted" style="font-size:12px">${esc(x.first)}${x.held>1?' ~ '+esc(x.last):''}\x3c/div>`:''}\x3c/td>
-    \x3ctd class="muted" style="font-size:12.5px">${x.held>x.remain?`나간 ${x.held-x.remain}장이 관리대장에서 아직 「보유」예요. 번호 없이 배분한 경우라면 관리대장에서 그 번호를 「지급완료」로 바꿔 주세요.`:x.held?`관리대장 보유가 ${x.remain-x.held}장 적어요. 「연결 안 함」으로 지급해서 배분 기록·재고에 안 남은 상품권이 있는지 확인해 주세요.`:`짝지어진 상품권이 없어요. 아래 '짝이 안 된 상품권'에 이유가 있는지 봐 주세요.`}\x3c/td>\x3c/tr>`).join('')}\x3c/table>`:'\x3cp>✅ 상품권 물품마다 남은 재고와 관리대장 보유 장수가 맞아요.\x3c/p>'}
+    ${c.lots.length?`\x3ch2>수입 기록과 관리대장이 다른 물품\x3c/h2>\x3cp class="muted" style="font-size:12.5px;margin:0 0 6px">칸마다 \x3cb>후원물품등록·배분 기록\x3c/b> / \x3cb>관리대장\x3c/b> 순서예요. 다른 칸은 주황색으로 보여요.\x3c/p>
+    \x3ctable class="tbl">\x3ctr>\x3cth>물품\x3c/th>\x3cth>입고일\x3c/th>\x3cth>입고\x3c/th>\x3cth>나감\x3c/th>\x3cth>남음\x3c/th>\x3cth>확인할 것\x3c/th>\x3c/tr>
+    ${c.lots.map(x=>{ const cell=(a,b)=>`\x3ctd style="${a!==b?'color:#b45309;font-weight:700':''}">${a} / ${b}\x3c/td>`, tips=[];
+      if(!x.vIn) tips.push('관리대장에 짝지어진 상품권이 없어요. 아래 「짝이 안 된 상품권」에 이유가 있는지 봐 주세요.');
+      else if(x.vIn!==x.inQty) tips.push(`입고 수가 달라요. 후원물품등록 ${x.inQty} · 관리대장 ${x.vIn}장. 어느 쪽이 맞는지 확인해 주세요.`);
+      if(x.vIn&&x.out>x.vOut) tips.push(`배분 기록은 ${x.out} 나갔는데 관리대장 지급완료는 ${x.vOut}장이에요. 번호 없이 배분한 ${x.out-x.vOut}장이 관리대장에서 아직 「보유」일 수 있어요.`);
+      if(x.vIn&&x.vOut>x.out) tips.push(`관리대장 지급완료 ${x.vOut}장이 배분 기록(${x.out})보다 많아요. 「연결 안 함」으로 지급해서 배분 기록에 안 남은 게 있을 수 있어요.`);
+      return `\x3ctr>\x3ctd>${esc(x.name)}\x3cdiv class="muted" style="font-size:12px">${esc(x.donor)}\x3c/div>\x3c/td>\x3ctd>${esc(x.inDate)}\x3c/td>${cell(x.inQty,x.vIn)}${cell(x.out,x.vOut)}${cell(x.remain,x.held)}\x3ctd class="muted" style="font-size:12.5px">${tips.join('\x3cbr>')}\x3c/td>\x3c/tr>`; }).join('')}\x3c/table>`:'\x3cp>✅ 상품권 물품마다 입고·나감·남은 수가 관리대장과 맞아요.\x3c/p>'}
     ${c.orphans.length?`\x3ch2>어느 수입 물품과도 짝이 안 된 상품권\x3c/h2>\x3ctable class="tbl">\x3ctr>\x3cth>상품권\x3c/th>\x3cth>입고일\x3c/th>\x3cth>장수\x3c/th>\x3cth>가장 비슷한 수입 물품과 안 맞는 이유\x3c/th>\x3c/tr>
     ${c.orphans.map(g=>`\x3ctr>\x3ctd>${esc(g.kind)} ${won(g.face)}원\x3cdiv class="muted" style="font-size:12px">${esc(g.src)} · ${esc(g.first)}${g.n>1?' ~ '+esc(g.last):''}\x3c/div>\x3c/td>\x3ctd>${esc(g.inDate||'(없음)')}\x3c/td>\x3ctd>\x3cb>${g.n}\x3c/b>장\x3c/td>
     \x3ctd style="font-size:12.5px">${g.near?`${esc(g.near.name)} · ${esc(g.near.inDate||'입고일 없음')}\x3cdiv class="muted">${g.near.why.length?g.near.why.map(esc).join(' / '):'짝이 맞을 수 있는데 더 잘 맞는 다른 물품에 밀렸어요'}\x3c/div>`:'\x3cspan class="muted">비슷한 수입 물품이 없어요. 후원물품등록에 이 상품권 입고가 있는지 확인해 주세요.\x3c/span>'}\x3c/td>\x3c/tr>`).join('')}\x3c/table>`:''}\x3c/div>`;

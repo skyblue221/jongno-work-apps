@@ -1015,14 +1015,14 @@ function vWhy_(l, v) {
   return r;
 }
 function vMatch_(l, v) { return vScore_(l, v) >= 0; }
-/** 묶음마다 보유 상품권. universe: 짝을 겨룰 전체 물품 (안 주면 lots끼리만) */
-function lotVouchers_(lots, all, universe) {
+/** 묶음마다 보유 상품권. universe: 짝을 겨룰 전체 물품 (안 주면 lots끼리만). anyStatus: 지급완료 등도 포함 */
+function lotVouchers_(lots, all, universe, anyStatus) {
   all = all || vouchers_();
   const want = {}, pool = (universe || []).slice();
   lots.forEach(l => { want[l.key] = 1; if (!pool.some(x => x.key === l.key)) pool.push(l); });
   const out = {};
   all.forEach(v => {
-    if (v.status !== '보유') return;
+    if (!anyStatus && v.status !== '보유') return;
     let best = null, top = -1;
     pool.forEach(l => { const s = vScore_(l, v); if (s > top) { top = s; best = l; } });
     if (best && want[best.key]) (out[best.key] = out[best.key] || []).push(v);
@@ -1033,15 +1033,18 @@ function lotVouchers_(lots, all, universe) {
 function getVoucherCheck() {
   if (!canVouch_()) needView_();
   if (!map_('VOUCH')) return { ready: false };
-  const lots = stockCached_(), held = vouchers_().filter(v => v.status === '보유');
+  const lots = stockCached_(), every = vouchers_(), held = every.filter(v => v.status === '보유');
   const lv = lotVouchers_(lots, held, lots), matched = new Set();
   Object.keys(lv).forEach(k => lv[k].forEach(v => matched.add(v.serial)));
+  // 입고·나감도 관리대장과 비교하려고 지급완료 등 모든 상품권을 같은 규칙으로 짝지음
+  const la = lotVouchers_(lots, every, lots, true);
   const looks = l => /상품권|기프트|쿠폰|카드/.test(nm_(l.name));
-  const bad = lots.filter(l => lv[l.key] || (looks(l) && l.remain > 0)).map(l => {
-    const L = lv[l.key] || [];
-    return { name: l.name, inDate: l.inDate, donor: l.donor, inQty: l.inQty, out: l.out + l.disp + l.pending, remain: l.remain, held: L.length,
+  const bad = lots.filter(l => la[l.key] || (looks(l) && l.remain > 0)).map(l => {
+    const L = lv[l.key] || [], A = la[l.key] || [];
+    return { name: l.name, inDate: l.inDate, donor: l.donor, inQty: l.inQty, out: l.out + l.disp + l.pending, remain: l.remain,
+      vIn: A.length, vOut: A.length - L.length, held: L.length,
       first: L.length ? L[0].serial : '', last: L.length ? L[L.length - 1].serial : '' };
-  }).filter(x => x.held !== x.remain);
+  }).filter(x => x.held !== x.remain || x.vIn !== x.inQty);
   const groups = {};
   held.filter(v => !matched.has(v.serial)).forEach(v => {
     const k = [v.kind, v.face, v.inDate, v.src].join('|');
