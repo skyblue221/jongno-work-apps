@@ -464,6 +464,9 @@ function createTeamReceipt(p,requestId) {
     if (!keys.some(k => need[k] > 0)) throw new Error('수량을 넣어 주세요.');
     checkStock_(lots, need);
     const id=newRecordId_('R'),date = ymd_(p.date) || today_(), no = distNo_(date, lots,id);
+    const vs = splitVouch_(lots, people, p.vsel, need, p.vskip);
+    if (vs) markVouch_(people.reduce((a, x, i) => a.concat(vsFlat_(vs[i]).map(sr => ({ serial: sr, person: str_(x.name) }))), []),
+      { date: date, purpose: '팀 배분' + (str_(p.note) ? ' · ' + str_(p.note) : ''), outBy: p.outBy, note: '배분번호 ' + no });
     const rows = [];
     people.forEach(x => lots.forEach(l => {
       const q = num_(x.qty[l.key]);
@@ -472,7 +475,7 @@ function createTeamReceipt(p,requestId) {
     appendDist_(id, rows);
 
     const items = lots.map(l => ({ key: l.key, name: l.name, inDate: l.inDate, donor: l.donor, unit: l.unit, inQty: l.inQty, give: need[l.key] || 0, remainAfter: l.remain - (need[l.key] || 0) }));
-    const ppl = people.map(x => ({ name: str_(x.name), team: str_(x.team), note: str_(x.note), qty: x.qty, sig: '', at: '' }));
+    const ppl = people.map((x, i) => { const o = { name: str_(x.name), team: str_(x.team), note: str_(x.note), qty: x.qty, sig: '', at: '' }; if (vs && vsFlat_(vs[i]).length) { o.vs = vs[i]; o.serials = vsFlat_(vs[i]); } return o; });
     appendOwn_('RCPT', [id, '팀', no, date, me_(), '서명 대기', JSON.stringify(items), JSON.stringify(ppl), '', str_(p.note), new Date()]);
     return { id: id, url: ScriptApp.getService().getUrl() + '?r=' + id };
   });
@@ -484,7 +487,7 @@ function rcptObj_(x, withSig) {
     const raw = JSON.parse(r[7] || '[]'); let addrs = [];
     if (withSig && raw[0] && raw[0].af) { try { addrs = JSON.parse(DriveApp.getFileById(raw[0].af).getBlob().getDataAsString()); } catch (e) { addrs = []; } }
     o.people = raw.map((p, i) => {
-      const q = { name: p.name, team: p.team, note: p.note || '', qty: p.qty, at: p.at, signed: !!p.sig, serials: p.serials || [], who: p.who || '직원', idType:p.idType==='생년월일'?'생년월일':'주소', addr: addrs[i] || '' };
+      const q = { name: p.name, team: p.team, note: p.note || '', qty: p.qty, at: p.at, signed: !!p.sig, serials: p.serials || [], vs: p.vs || {}, who: p.who || '직원', idType:p.idType==='생년월일'?'생년월일':'주소', addr: addrs[i] || '' };
       if (withSig && p.sig) { try { const b = DriveApp.getFileById(p.sig).getBlob(); q.sigUrl = 'data:' + b.getContentType() + ';base64,' + Utilities.base64Encode(b.getBytes()); } catch (e) { q.sigUrl = ''; } }
       return q;
     });
@@ -548,15 +551,24 @@ function requestHome(p,requestId) {
     checkStock_(lots, need);
     if (!str_(p.manager)) throw new Error('담당자 이름을 골라 주세요.');
     const id = 'H' + Utilities.formatDate(new Date(), APP.tz, 'yyMMddHHmmss') + Math.random().toString(36).slice(2, 5);
-    const items = lots.map(l => ({ key: l.key, name: l.name, inDate: wIn_(l), unit: l.unit, qty: need[l.key] || 0 })).filter(i => i.qty > 0);
+    // 상품권 묶음: 고른 번호를 받는 분 순서대로 나눠 관리대장에 기록 (이름은 관리대장 수령자 칸에만)
+    const vp = (p.people || []).filter(x => str_(x.name));
+    const vs = splitVouch_(lots, vp, p.vsel, need, p.vskip);
+    if (vs) {
+      const tot = {}; vp.forEach(x => keys.forEach(k => { tot[k] = (tot[k] || 0) + num_(x.qty && x.qty[k]); }));
+      Object.keys(p.vsel || {}).forEach(k => { if ((p.vsel[k] || []).length && tot[k] !== need[k]) throw new Error('받는 분별 상품권 수량 합계를 맞춰 주세요.'); });
+      markVouch_(vp.reduce((a, x, i) => a.concat(vsFlat_(vs[i]).map(sr => ({ serial: sr, person: str_(x.name) }))), []),
+        { date: ymd_(p.date) || today_(), purpose: '가정 배분 (담당 ' + str_(p.manager) + ')', outBy: p.outBy, note: '가정배분 ' + id });
+    }
+    const items = lots.map(l => { const o = { key: l.key, name: l.name, inDate: wIn_(l), unit: l.unit, qty: need[l.key] || 0 }; if (vs && (p.vsel[l.key] || []).length) o.serials = p.vsel[l.key].slice(); return o; }).filter(i => i.qty > 0);
     const row = [id, ymd_(p.date) || today_(), str_(p.manager), me_(), num_(p.count), JSON.stringify(items), '확인 대기', '', '', '', '', ''];
     if (p.later) {
       // 나중에 서명받기: 명단은 min 드라이브의 잠긴 임시 파일에만 둠 (시트에는 안 씀)
       const people = (p.people || []).filter(x => str_(x.name));
       if (!people.length) throw new Error('받는 분 명단을 넣어 주세요.');
       const data = { id: id, date: row[1], manager: row[2], dateMode: p.dateMode === 'fill' ? 'fill' : 'blank',
-        items: lots.filter(l => need[l.key] > 0).map(l => ({ key: l.key, name: l.name, inDate: l.inDate, donor: l.donor, inQty: l.inQty, give: need[l.key], remainAfter: l.remain - need[l.key] })),
-        people: people.map(x => ({ name: str_(x.name), addr: str_(x.addr), idType:x.idType==='생년월일'?'생년월일':'주소', phone: digits_(x.phone), birth: birth6_(x.birth) || (x.idType === '생년월일' ? birth6_(x.addr) : ''), qty: x.qty || {}, sig: '', at: '' })) };
+        items: lots.filter(l => need[l.key] > 0).map(l => { const o = { key: l.key, name: l.name, inDate: l.inDate, donor: l.donor, inQty: l.inQty, give: need[l.key], remainAfter: l.remain - need[l.key] }; if (vs && (p.vsel[l.key] || []).length) o.serials = p.vsel[l.key].slice(); return o; }),
+        people: people.map((x, i) => ({ vs: vs ? vs[i] : undefined, name: str_(x.name), addr: str_(x.addr), idType:x.idType==='생년월일'?'생년월일':'주소', phone: digits_(x.phone), birth: birth6_(x.birth) || (x.idType === '생년월일' ? birth6_(x.addr) : ''), qty: x.qty || {}, sig: '', at: '' })) };
       const f = trackedFile_(folder_(['가정배분_임시명단']),id + '.json', JSON.stringify(data), 'application/json');
       row[9] = '서명 대기'; row[11] = f.getId();
     }
@@ -576,6 +588,8 @@ function confirmHome(id, ok,requestId) {
     const sh = own_('HOME');
     guardRows_(sh, [x.row]);
     if (!ok) {
+      const ser = JSON.parse(x.r[5] || '[]').reduce((a, i) => a.concat(i.serials || []), []);
+      if (ser.length) markVouch_(ser.map(sr => ({ serial: sr, release: true })), {});
       sh.getRange(x.row, 7, 1, 2).setValues([['취소', today_()]]);
       if (x.r[11]) { try { DriveApp.getFileById(x.r[11]).setTrashed(true); } catch (e) {} sh.getRange(x.row, 10, 1, 3).setValues([['취소', '', '']]); }
       return true;
@@ -614,7 +628,7 @@ function listHomeSign() {
 }
 function getHomeSign(id) {
   const x = findHome_(id, true), d = homeData_(x).d;
-  return { id: d.id, date: d.date, manager: d.manager, dateMode: d.dateMode || 'blank', items: d.items, people: d.people.map(p => ({ name: p.name, addr: p.addr, idType:p.idType==='생년월일'?'생년월일':'주소', qty: p.qty, at: p.at, sigUrl: p.sig, phone: p.phone || '', linked: !!(p.tok && (!p.tokExp || Date.now() < p.tokExp)), via: p.via || '' })) };
+  return { id: d.id, date: d.date, manager: d.manager, dateMode: d.dateMode || 'blank', items: d.items, people: d.people.map(p => ({ vs: p.vs || {}, name: p.name, addr: p.addr, idType:p.idType==='생년월일'?'생년월일':'주소', qty: p.qty, at: p.at, sigUrl: p.sig, phone: p.phone || '', linked: !!(p.tok && (!p.tokExp || Date.now() < p.tokExp)), via: p.via || '' })) };
 }
 function signHome(id, idx, dataUrl,requestId) {
   return withMutation_('signHome',requestId,[id,idx,dataUrl],() => {
@@ -633,19 +647,27 @@ function updateHomeSign(id, list,requestId) {
     if (x.r[9] !== '서명 대기') throw new Error('서명이 끝난 명단은 고칠 수 없어요.');
     const people = (list || []).filter(p => str_(p.name));
     if (!people.length) throw new Error('받는 분을 한 명 이상 넣어 주세요.');
+    const vkeys = d.items.map(it => it.key).filter(k => d.people.some(o => o.vs && (o.vs[k] || []).length));
+    people.forEach(p => { p.qty = p.qty || {}; p._o = p.i >= 0 ? d.people[p.i] : null; });
+    const ev = vkeys.length ? editVouch_(vkeys, d.people, people, k => '「' + (d.items.find(it => it.key === k) || {}).name + '」') : null;
     const need = {}; people.forEach(p => d.items.forEach(it => { need[it.key] = (need[it.key] || 0) + num_(p.qty && p.qty[it.key]); }));
     // 이미 이 명단이 가져간 수량(it.give)까지 더해서 가능한지 확인
     checkEditStock_(d.items, need);
+    if (ev) {
+      markVouch_(ev.release.map(sr => ({ serial: sr, release: true })).concat(people.reduce((a, p, i) => a.concat(vsFlat_(ev.vs[i]).map(sr => ({ serial: sr, person: str_(p.name), keep: true }))), [])),
+        { date: d.date, purpose: '가정 배분 (담당 ' + d.manager + ')' });
+      vkeys.forEach(k => { const it = d.items.find(x => x.key === k); if (it) it.serials = ev.vs.reduce((a, vs) => a.concat(vs[k] || []), []); });
+    }
     const oldItems = JSON.parse(x.r[5] || '[]');
     if(x.r[6]==='확인'&&oldItems.length)linkLegacyDist_(id,distNo_(ymd_(x.r[1]),oldItems));
     d.people = people.map(p => {
       const o = p.i >= 0 ? d.people[p.i] : null;
       const same = o && o.sig && str_(o.name)===str_(p.name) && str_(o.addr)===str_(p.addr) && (o.idType||'주소')===(p.idType||'주소') && d.items.every(it => num_(o.qty[it.key]) === num_(p.qty && p.qty[it.key]));
-      return { name: str_(p.name), addr: str_(p.addr), idType:p.idType==='생년월일'?'생년월일':'주소', phone: p.phone !== undefined ? digits_(p.phone) : (o ? o.phone || '' : ''), birth: (o && o.birth && str_(o.addr) === str_(p.addr)) ? o.birth : (p.idType === '생년월일' ? birth6_(p.addr) : (o ? o.birth || '' : '')), tok: o ? o.tok || '' : '', qty: p.qty || {}, sig: same ? o.sig : '', at: same ? o.at : '' };
+      return { vs: ev ? ev.vs[people.indexOf(p)] : (o ? o.vs : undefined), name: str_(p.name), addr: str_(p.addr), idType:p.idType==='생년월일'?'생년월일':'주소', phone: p.phone !== undefined ? digits_(p.phone) : (o ? o.phone || '' : ''), birth: (o && o.birth && str_(o.addr) === str_(p.addr)) ? o.birth : (p.idType === '생년월일' ? birth6_(p.addr) : (o ? o.birth || '' : '')), tok: o ? o.tok || '' : '', qty: p.qty || {}, sig: same ? o.sig : '', at: same ? o.at : '' };
     });
     d.items.forEach(it => { it.give = need[it.key] || 0; });
     h.f.setContent(JSON.stringify(d));
-    const items = d.items.map(it => ({ key: it.key, name: it.name, inDate: it.inDate, unit: (oldItems.find(o => o.key === it.key) || {}).unit || '', qty: it.give }));
+    const items = d.items.map(it => { const o = { key: it.key, name: it.name, inDate: it.inDate, unit: (oldItems.find(o => o.key === it.key) || {}).unit || '', qty: it.give }; if (it.serials) o.serials = it.serials; return o; });
     own_('HOME').getRange(x.row, 5, 1, 2).setValues([[people.length, JSON.stringify(items.filter(i => i.qty > 0))]]);
     // min이 이미 확인해서 배분 기록에 들어간 경우엔 그 줄도 같이 고침
     if (x.r[6] === '확인' && oldItems.length) {
@@ -664,12 +686,19 @@ function updateHomeTotals(id, p,requestId) {
     if (!x) throw new Error('찾을 수 없어요.');
     if (x.r[6] === '취소') throw new Error('취소된 요청이에요.');
     if (x.r[9]) throw new Error('폰으로 서명받는 명단은 「가정 서명」 화면에서 고쳐 주세요.');
-    const oldItems = JSON.parse(x.r[5] || '[]'), need = {};
+    const oldItems = JSON.parse(x.r[5] || '[]'), need = {}, keepSer = {}, release = [];
     (p.items || []).forEach(i => { need[i.key] = num_(i.qty); });
+    // 상품권 묶음: 남길 번호를 골라서 보냄 → 수량 = 남긴 번호 수, 나머지는 관리대장에 「보유」로
+    oldItems.filter(i => (i.serials || []).length).forEach(i => {
+      const q = (p.items || []).find(y => y.key === i.key) || {}, want = Array.isArray(q.serials) ? q.serials : i.serials;
+      if (want.some(sr => i.serials.indexOf(sr) < 0)) throw new Error('「' + i.name + '」 상품권은 수정에서 늘릴 수 없어요. 더 주려면 새로 배분해 주세요.');
+      keepSer[i.key] = want.slice(); need[i.key] = want.length; i.serials.forEach(sr => { if (want.indexOf(sr) < 0) release.push(sr); });
+    });
     checkEditStock_(oldItems.map(i => ({ key: i.key, name: i.name, give: i.qty })), need);
     if(x.r[6]==='확인'&&oldItems.length)linkLegacyDist_(id,distNo_(ymd_(x.r[1]),oldItems));
     const count = num_(p.count) || num_(x.r[4]);
-    const items = oldItems.map(i => Object.assign({}, i, { qty: need[i.key] || 0 }));
+    const items = oldItems.map(i => { const o = Object.assign({}, i, { qty: need[i.key] || 0 }); if (keepSer[i.key]) o.serials = keepSer[i.key]; return o; });
+    if (release.length) markVouch_(release.map(sr => ({ serial: sr, release: true })), {});
     own_('HOME').getRange(x.row, 5, 1, 2).setValues([[count, JSON.stringify(items.filter(i => i.qty > 0))]]);
     if (x.r[6] === '확인') {
       const no = ymd_(x.r[1]) + '_' + oldItems[0].name + (oldItems.length > 1 ? ' 외 ' + (oldItems.length - 1) : '');
@@ -766,13 +795,22 @@ function updateTeamReceipt(id, p,requestId) {
     const people = (p.people || []).filter(q => str_(q.name));
     if (!people.length) throw new Error('받는 사람을 한 명 이상 넣어 주세요.');
     const need = {}; people.forEach(q => items.forEach(it => { need[it.key] = (need[it.key] || 0) + num_(q.qty[it.key]); }));
-    checkEditStock_(items, need);
     const date = ymd_(p.date) || ymd_(x.r[3]);
+    // 상품권 번호가 있는 묶음: 사람마다 원래 번호 안에서만 남기고, 빠진 번호는 관리대장에 「보유」로 돌려놓음
+    const vkeys = items.map(it => it.key).filter(k => old.some(o => o.vs && (o.vs[k] || []).length));
+    people.forEach(q => { q._o = old.find(y => y.name === q.from) || old.find(y => y.name === q.name) || null; });
+    const ev = vkeys.length ? editVouch_(vkeys, old, people, k => '「' + (items.find(it => it.key === k) || {}).name + '」') : null;
+    if (ev) { Object.keys(need).forEach(k => { need[k] = 0; }); people.forEach(q => items.forEach(it => { need[it.key] = (need[it.key] || 0) + num_(q.qty[it.key]); })); }
+    checkEditStock_(items, need);
+    if (ev) markVouch_(ev.release.map(sr => ({ serial: sr, release: true })).concat(people.reduce((a, q, i) => a.concat(vsFlat_(ev.vs[i]).map(sr => ({ serial: sr, person: str_(q.name), keep: true }))), [])),
+      { date: date, purpose: '팀 배분' + (str_(p.note) ? ' · ' + str_(p.note) : '') });
     // 수량이 바뀐 사람은 서명을 다시 받아야 함
-    const ppl = people.map(q => {
-      const o = old.find(y => y.name === q.from) || old.find(y => y.name === q.name) || {};
+    const ppl = people.map((q, qi) => {
+      const o = q._o || {};
       const same = o.sig && str_(o.name)===str_(q.name) && str_(o.team)===str_(q.team) && (ymd_(p.date)||ymd_(x.r[3]))===ymd_(x.r[3]) && items.every(it => num_(o.qty && o.qty[it.key]) === num_(q.qty[it.key]));
-      return { name: str_(q.name), team: str_(q.team), note: str_(q.note), qty: q.qty, sig: same ? o.sig : '', at: same ? o.at : '' };
+      const r = { name: str_(q.name), team: str_(q.team), note: str_(q.note), qty: q.qty, sig: same ? o.sig : '', at: same ? o.at : '' };
+      if (ev && vsFlat_(ev.vs[qi]).length) { r.vs = ev.vs[qi]; r.serials = vsFlat_(ev.vs[qi]); }
+      return r;
     });
     const rename = {}; people.forEach(q => { if (q.from && q.from !== q.name) rename[q.name] = q.from; });
     const oldPairs = []; old.forEach(o => items.forEach(it => oldPairs.push({ person: o.name, name: it.name,inDate:it.inDate })));
@@ -881,6 +919,85 @@ function vouchers_() {
     inDate: ymd_(r.inDate), src: str_(r.src), target: str_(r.target), outDate: ymd_(r.outDate), purpose: str_(r.purpose), person: str_(r.person), check: str_(r.check), outBy: str_(r.outBy), status: str_(r.status) || '보유' }));
 }
 const vGroup_ = v => v.kind + '|' + v.face + '|' + v.inDate;
+
+/* ───────── E-2. 팀·가정 배분에서 상품권 번호 고르기 ───────── */
+const nm_ = s => str_(s).replace(/\s/g, '');
+/** 후원품 묶음(품명·입고일·후원처)과 관리대장 상품권이 같은 것인지: 입고일 같고, 후원처가 겹치고, 이름이 비슷하면 */
+function vMatch_(l, v) {
+  if (!l || !v || !v.inDate || v.inDate !== l.inDate) return false;
+  const a = nm_(l.donor), b = nm_(v.src);
+  if (a && b && !(a.includes(b) || b.includes(a))) return false;
+  const ln = nm_(l.name), k = nm_(v.kind);
+  return !!k && (ln.includes(k.slice(0, 3)) || k.includes(ln.slice(0, 3)) || /상품권|카드|기프트|쿠폰/.test(ln));
+}
+function lotVouchers_(lots, all) {
+  const out = {}; all = all || vouchers_();
+  lots.forEach(l => { const L = all.filter(v => v.status === '보유' && vMatch_(l, v)); if (L.length) out[l.key] = L; });
+  return out;
+}
+/** 화면용: 상품권과 연결되는 후원품 묶음마다 보유 번호 (권한 없는 직원에게는 장수만) */
+function getLotVouchers() {
+  needOrg_();
+  if (!map_('VOUCH')) return {};
+  const lv = lotVouchers_(stockCached_().filter(l => l.remain > 0)), can = canVouch_(), out = {};
+  Object.keys(lv).forEach(k => { out[k] = can ? { n: lv[k].length, list: lv[k].map(v => ({ serial: v.serial, kind: v.kind, face: v.face, target: v.target })) } : { n: lv[k].length, locked: true }; });
+  return out;
+}
+/** 고른 번호를 사람 순서대로 나눔 → 사람마다 {묶음키: [번호]} (상품권 묶음이 없으면 null) */
+function splitVouch_(lots, people, vsel, need, skip) {
+  vsel = vsel || {}; skip = skip || [];
+  const held = lotVouchers_(lots);
+  lots.forEach(l => { if (held[l.key] && need[l.key] > 0 && !(vsel[l.key] || []).length && skip.indexOf(l.key) < 0) throw new Error(canVouch_() ? '「' + l.name + '」은 상품권이라 나가는 번호를 골라 주세요.' : '「' + l.name + '」은 상품권이라 상품권 권한이 있는 직원만 나눌 수 있어요. 관리자에게 요청해 주세요.'); });
+  const all = {}; vouchers_().forEach(v => { all[v.serial] = v; });
+  const keys = Object.keys(vsel).filter(k => (vsel[k] || []).length);
+  if (!keys.length) return null;
+  needVouch_();
+  const seen = new Set();
+  keys.forEach(k => {
+    const l = lots.find(x => x.key === k); if (!l) throw new Error('상품권 묶음을 찾을 수 없어요. 새로고침해 주세요.');
+    const ok = {}; (held[k] || []).forEach(v => { ok[v.serial] = 1; });
+    vsel[k].forEach(sr => { if (!ok[sr]) throw new Error(all[sr] && all[sr].status !== '보유' ? sr + ' 는 이미 ' + all[sr].status + ' 상태예요. 새로고침해 주세요.' : sr + ' 는 「' + l.name + '」 묶음의 상품권이 아니에요.'); if (seen.has(sr)) throw new Error('같은 번호를 두 번 골랐어요: ' + sr); seen.add(sr); });
+    if (vsel[k].length !== (need[k] || 0)) throw new Error('「' + l.name + '」 수량(' + (need[k] || 0) + ')과 고른 번호(' + vsel[k].length + '장)를 맞춰 주세요.');
+  });
+  const at = {};
+  return people.map(p => { const vs = {}; keys.forEach(k => { const q = num_(p.qty && p.qty[k]); if (!Number.isInteger(q)) throw new Error('상품권 수량은 정수로 넣어 주세요.'); const s0 = at[k] || 0; if (q) vs[k] = vsel[k].slice(s0, s0 + q); at[k] = s0 + q; }); return vs; });
+}
+const vsFlat_ = vs => Object.keys(vs || {}).reduce((a, k) => a.concat(vs[k] || []), []);
+/** 관리대장에 지급(또는 돌려놓기) 기록. list: [{serial, person, keep?, release?}] */
+function markVouch_(list, info) {
+  if (!list.length) return;
+  const m = mapOrThrow_('VOUCH'), sh = sheet_('VOUCH'), auto = autoCols_(sh, m.headerRow), by = {};
+  vouchers_().forEach(v => { by[v.serial] = v; });
+  const w = cellWriter_(sh, auto), set = (row, f, val) => w.set(row, m.cols[f], f === 'outDate' && val ? toDate_(val) : val);
+  list.forEach(x => {
+    const v = by[x.serial]; if (!v) { if (x.release) return; throw new Error('관리대장에 없는 번호예요: ' + x.serial); }
+    if (x.release) { if (v.status === '보유') return; ['outDate', 'purpose', 'person', 'check', 'outBy'].forEach(f => set(v.row, f, '')); set(v.row, 'status', '보유'); return; }
+    if (!x.keep && v.status !== '보유') throw new Error(x.serial + ' 는 이미 ' + v.status + ' 상태예요. 새로고침해 주세요.');
+    set(v.row, 'outDate', info.date); set(v.row, 'purpose', info.purpose); set(v.row, 'person', str_(x.person));
+    if (!x.keep) { set(v.row, 'check', info.check || '수령증 확인'); set(v.row, 'status', '지급완료'); set(v.row, 'outBy', str_(info.outBy)); if (info.note) set(v.row, 'note', info.note); }
+  });
+  w.flush();
+}
+/** 수정할 때: 사람마다 남길 번호(kept)는 원래 그 사람 번호 중에서만. 늘리기는 안 됨 */
+function editVouch_(vkeys, olds, news, label) {
+  const used = new Set(), out = [], release = [];
+  news.forEach(q => {
+    const o = q._o && !used.has(q._o) ? q._o : null; if (o) used.add(o);
+    const vs = {};
+    vkeys.forEach(k => {
+      const had = (o && o.vs && o.vs[k]) || [], want = (q.vs && q.vs[k]) || null;
+      const keep = want ? want.filter(sr => had.indexOf(sr) >= 0) : had.slice(0, num_(q.qty && q.qty[k]));
+      if (want && keep.length !== want.length) throw new Error((q.name || '받는 분') + '님 상품권 번호가 맞지 않아요. 새로고침해 주세요.');
+      if (num_(q.qty && q.qty[k]) > had.length && !want) throw new Error(label(k) + ' 상품권은 수정에서 늘릴 수 없어요. 더 주려면 새로 배분해 주세요.');
+      if (keep.length) vs[k] = keep;
+      if (q.qty) q.qty[k] = keep.length;
+    });
+    out.push(vs);
+  });
+  const kept = new Set(); out.forEach(vs => vsFlat_(vs).forEach(sr => kept.add(sr)));
+  olds.forEach(o => vsFlat_(o.vs).forEach(sr => { if (!kept.has(sr)) release.push(sr); }));
+  return { vs: out, release: release };
+}
 function getVouchers() {
   if (!canVouch_()) needView_();
   if (!map_('VOUCH')) return { ready: false };
@@ -1213,8 +1330,8 @@ function resetSetup() {
 /* ───────── 저장 안전장치: 같은 요청 재시도·중간 실패 복구 ───────── */
 let ACTIVE_OP = null;
 const MUTATION_TARGETS = {
- createTeamReceipt:['DIST','@RCPT'],createOrgReceipt:['DIST','@RCPT','@ORG'],requestHome:['@HOME'],confirmHome:['DIST','@HOME'],
- updateTeamReceipt:['DIST','@RCPT'],updateOrgReceipt:['DIST','@RCPT','@ORG'],updateHomeSign:['DIST','@HOME'],updateHomeTotals:['DIST','@HOME'],
+ createTeamReceipt:['DIST','VOUCH','@RCPT'],createOrgReceipt:['DIST','@RCPT','@ORG'],requestHome:['VOUCH','@HOME'],confirmHome:['DIST','VOUCH','@HOME'],
+ updateTeamReceipt:['DIST','VOUCH','@RCPT'],updateOrgReceipt:['DIST','@RCPT','@ORG'],updateHomeSign:['DIST','VOUCH','@HOME'],updateHomeTotals:['DIST','VOUCH','@HOME'],
  giveVouchers:['VOUCH','DIST','@RCPT'],updateVoucherGive:['VOUCH','DIST','@RCPT'],cancelVoucherGive:['VOUCH','DIST','@RCPT'],addVouchers:['VOUCH'],
  dispose:['DISP','@DLOG'],updateDisposal:['DISP','@DLOG'],signReceipt:['@RCPT'],signHome:['@HOME'],finishHome:['@HOME'],saveReceiptPdf:['@RCPT'],markOrgReturned:['@RCPT']
 };
@@ -1298,7 +1415,7 @@ function withMutation_(kind,requestId,args,fn){
   if(old){ctx.row=old.row;journalWrite_(ctx,'준비중');}
   else{sh.appendRow([id,kind,fingerprint,'준비중','',JSON.stringify(ctx.meta),'',new Date()]);ctx.row=sh.getLastRow();}
   try{const targets=MUTATION_TARGETS[kind]||[];for(const key of targets)if(['DIST','DISP'].includes(key))ensureRecordColumn_(key);
-   if(!light)for(const key of targets)snapshotSheet_(ctx,key);
+   if(!light)for(const key of targets)if(key!=='VOUCH'||vouchInvolved_(kind,args))snapshotSheet_(ctx,key);
    snapshotFiles_(ctx,kind,args);journalWrite_(ctx,'처리중');ACTIVE_OP=ctx;ctx.executing=true;
    const result=fn();SpreadsheetApp.flush();ACTIVE_OP=null;finishJournal_(ctx,'완료',resultRef_(kind,result));return result;
   }catch(e){ACTIVE_OP=null;try{if(ctx.executing)restoreOperation_(ctx.meta);finishJournal_(ctx,'복구완료',undefined,e.message);}catch(recovery){journalWrite_(ctx,'복구필요',undefined,recovery.message);throw Error('저장 중 오류가 났고 자동 복구를 확인하지 못했어요. 관리자에게 알려주세요. 복구 기록: '+id);}
@@ -1309,6 +1426,11 @@ function withMutation_(kind,requestId,args,fn){
 function finishJournal_(ctx,status,result,error){const meta=ctx.meta;if(meta.light)ctx.meta={light:true};journalWrite_(ctx,status,result,error);cleanupOperation_(meta);}
 
 /* ───────── 가벼운 되돌리기: 이번 저장이 건드리는 줄만 기억 ───────── */
+/** 상품권 번호가 걸린 수정일 때만 관리대장을 통째로 백업 (평소 수정은 가볍게) */
+function vouchInvolved_(kind,args){try{
+ if(kind==='updateTeamReceipt')return JSON.parse(findRcpt_(args[0]).r[7]||'[]').some(p=>p.vs&&Object.keys(p.vs).length);
+ if(kind==='updateHomeSign'||kind==='updateHomeTotals'){const x=ownRows_('HOME').find(y=>y.r[0]===args[0]);return !!x&&JSON.parse(x.r[5]||'[]').some(i=>(i.serials||[]).length);}
+ return true;}catch(e){return true;}}
 const LIGHT_OPS=['createTeamReceipt','createOrgReceipt','requestHome','confirmHome','dispose','addVouchers','giveVouchers','signReceipt','signHome','finishHome','saveReceiptPdf','markOrgReturned'];
 function lightCtx_(){return ACTIVE_OP&&ACTIVE_OP.meta.light?ACTIVE_OP:null;}
 /** [3,4,5,8] → [[3,5],[8,8]] (이어지는 번호 묶음) */
