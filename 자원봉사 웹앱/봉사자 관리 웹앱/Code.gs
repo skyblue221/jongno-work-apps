@@ -156,6 +156,15 @@ function getAppData_impl_(requestedYear){
  return {people:all.people,awards:all.awards,activity:[],history:[],jinwoo:[],years,initialStats:getDashboardStats_impl_(year),initialYear:year};
 }
 function refreshAppData(year){invalidateReadCache_();return getAppData(year);}
+/* ── 미리 읽어 두기: 읽어 둔 자료는 6시간이 지나면 사라져서 아침 첫 화면이 15초 넘게 걸렸어요.
+   편집기에서 installWarmTrigger를 한 번 ▶실행하면 4시간마다 warmCache가 자동으로 돌며 미리 읽어 둬요. */
+function warmCache(){const y=Number(today_().slice(0,4));getAppData_impl_(y);getLookupData_impl_(y);getDashboardHome_impl_(y);}
+function installWarmTrigger(){
+ ScriptApp.getProjectTriggers().filter(t=>t.getHandlerFunction()==='warmCache').forEach(t=>ScriptApp.deleteTrigger(t));
+ ScriptApp.newTrigger('warmCache').timeBased().everyHours(4).create();
+ warmCache();
+ Logger.log('4시간마다 미리 읽어 두기를 켰어요.');
+}
 function safeRecords_(key){return ss_().getSheetByName(key)?records_(key):[];}
 /** 입수 가능한 과거 자료 범위가 불완전하면 '신규 확인 필요'로 집계합니다. */
 function statsForYear_impl_(year,all){

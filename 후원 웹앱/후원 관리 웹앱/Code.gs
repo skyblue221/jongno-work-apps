@@ -73,21 +73,41 @@ function rowsRead_(key){
 let _REVS=null;
 function revs_(){if(_REVS)return _REVS;try{_REVS=PropertiesService.getDocumentProperties().getProperties();}catch(e){_REVS={};}return _REVS;}
 function cachePrefix_(key){return ss_().getId()+':rows-v1:'+key+':'+(revs_()['donationRev:'+key]||'0');}
-function cacheGet_(key){
-  try{const c=CacheService.getScriptCache(),prefix=cachePrefix_(key),m=JSON.parse(c.get(prefix)||'null');
+function cacheGet_(key){return chunkGet_(cachePrefix_(key));}
+function cachePut_(key,rows){chunkPut_(cachePrefix_(key),rows);}
+function chunkGet_(prefix){
+  try{const c=CacheService.getScriptCache(),m=JSON.parse(c.get(prefix)||'null');
     if(!m||!(m.count>0))return null;
     const keys=Array.from({length:m.count},(_,i)=>prefix+':'+m.token+':'+i),parts=c.getAll(keys);
     if(!keys.every(k=>typeof parts[k]==='string'))return null;
     return JSON.parse(keys.map(k=>parts[k]).join(''));
   }catch(e){return null;}
 }
-function cachePut_(key,rows){
-  try{const c=CacheService.getScriptCache(),prefix=cachePrefix_(key),json=JSON.stringify(rows),count=Math.ceil(json.length/30000);
+function chunkPut_(prefix,value){
+  try{const c=CacheService.getScriptCache(),json=JSON.stringify(value),count=Math.ceil(json.length/30000);
     if(!count||count>120)return;   // 너무 크면 그냥 시트에서 읽음
     const token=Utilities.getUuid().slice(0,8),parts={};
     for(let i=0;i<count;i++)parts[prefix+':'+token+':'+i]=json.slice(i*30000,(i+1)*30000);
     c.putAll(parts,21600);c.put(prefix,JSON.stringify({count,token}),21600);
   }catch(e){/* 임시 저장은 실패해도 괜찮아요 */}
+}
+/** 계산 결과도 기억: 쓰는 탭들의 버전이 그대로면 다시 계산하지 않음
+   (대시보드·월별 이체내역은 CMS 몇 년 치를 열 때마다 다시 계산해서 4~6초 걸렸어요) */
+function resultCached_(name,deps,fn){
+  const r=revs_(),prefix=ss_().getId()+':result-v1:'+name+':'+deps.map(k=>r['donationRev:'+k]||'0').join('.');
+  if(!_SAVE_LOCK_HELD){const hit=chunkGet_(prefix);if(hit)return hit;}
+  const v=fn();
+  if(!_SAVE_LOCK_HELD)chunkPut_(prefix,v);
+  return v;
+}
+/* 미리 계산해 두기: 기억은 6시간이 지나면 사라져요. 편집기에서 installWarmTrigger를 한 번 ▶실행하면
+   4시간마다 warmCache가 자동으로 돌며 대시보드와 이번 달 이체내역을 미리 계산해 둬요. */
+function warmCache(){const t=today_();donationDashboardCached_(Number(t.slice(0,4)));monthlyTransferCached_(t.slice(0,7));}
+function installWarmTrigger(){
+  ScriptApp.getProjectTriggers().filter(t=>t.getHandlerFunction()==='warmCache').forEach(t=>ScriptApp.deleteTrigger(t));
+  ScriptApp.newTrigger('warmCache').timeBased().everyHours(4).create();
+  warmCache();
+  Logger.log('4시간마다 미리 계산하기를 켰어요.');
 }
 /** 이 탭들은 다음에 시트에서 새로 읽게 함 (안 주면 전부) */
 function invalidateRows_(keys){
@@ -397,6 +417,10 @@ function deleteBank(id){requireOwner_();return withLock_(()=>{
 /* ── 월별 정기후원 이체결과 (CMS 정상출금 + 통장 정기후원) ── */
 function getMonthlyTransfer(ym){requireRole_();
   if(!/^\d{4}-\d{2}$/.test(String(ym||'')))throw Error('연도와 월을 골라 주세요.');
+  return monthlyTransferCached_(String(ym));
+}
+function monthlyTransferCached_(ym){return resultCached_('transfer:'+ym,['CMS','BANK','DONOR'],()=>monthlyTransfer_(ym));}
+function monthlyTransfer_(ym){
   const dm=donorMap_(),rows=[],people=new Set(),missing=new Map();
   cmsObjects_().filter(r=>r.date.slice(0,7)===ym&&isOk_(r)&&r.paid>0).forEach(r=>{
     const d=dm.get(r.no)||{};
@@ -662,7 +686,9 @@ function saveLegacyCertPrint(o){requireOwner_();return withLock_(()=>{
 
 /* ── 후원 대시보드 (담당자만) ──
    정기후원(CMS 정상출금 + 통장)을 달마다 사람·금액으로 묶고, 연도끼리 비교. 챙길 일(연속 오류·출금 없음·성별 빈칸)도 함께 */
-function getDonationDashboard(year){requireOwner_();
+function getDonationDashboard(year){requireOwner_();return donationDashboardCached_(Number(year)||Number(today_().slice(0,4)));}
+function donationDashboardCached_(Y){return resultCached_('dash:'+Y+':'+today_(),['CMS','BANK','DONOR','NEW','MONTH'],()=>donationDashboard_(Y));}
+function donationDashboard_(year){
   const Y=Number(year)||Number(today_().slice(0,4));
   const idx=cmsPersonIndex_(),dm=donorMap_();
   const byMonth={};   // 'yyyy-mm' → {people:Set, amount, cms:Set, bank:Set}

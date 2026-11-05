@@ -51,6 +51,8 @@ textarea{min-height:90px}
 #pad{border:2px dashed #b9c4bc;border-radius:10px;touch-action:none;background:#fff;display:block;width:100%}
 .preview{border:1px solid var(--line);border-radius:10px;padding:10px;background:#fff;overflow:auto}
 #printArea{display:none}
+body.viewer .frm,
+body.viewer :is(#dGo,#oGo,#xGo,#vGo,#vAddOpen,#sEdit,#sLink,#sPdf,#oEdit,#oPdf,#dEdit,#hsEdit,#hsDone,#oScan,[data-s],[data-ln],[data-ok],[data-no],[data-ed],[data-r],[data-x],[data-l]){display:none!important}
 @media print{
   @page{margin:10mm}
   body{background:#fff}
@@ -97,23 +99,25 @@ function daysTo(d){ const m=String(d||'').match(/^(\d{4})-(\d{2})-(\d{2})$/); if
 const slow=setTimeout(()=>{ const c=$('#main .card'); if(c&&!S.boot) c.innerHTML='아직 불러오는 중이에요. 시트를 읽는 데 시간이 걸리고 있어요.\x3cbr>\x3cspan class="muted">1분이 넘으면 Apps Script → 실행 기록의 맨 위 줄을 캡처해서 알려 주세요.\x3c/span>'; },30000);
 new Promise(res=>{ try{ google.script.url.getLocation(l=>res((l&&l.parameter&&l.parameter.r)||'')); }catch(e){ res(''); } }).then(r=>{ RECEIPT_ID=r; return run('getBoot', RECEIPT_ID); }).then(b=>{ clearTimeout(slow);
   S.boot=b; S.stock=b.stock||[]; S.staff=b.staff||[];
-  $('#who').textContent = (b.admin?'관리자 · ':'')+(b.me||'');
+  $('#who').textContent = (b.admin?'관리자 · ':b.viewer?`보기 전용 (${b.viewer}까지) · `:'')+(b.me||'');
+  if(b.viewer) document.body.classList.add('viewer');
   if (RECEIPT_ID) { $('#nav').style.display='none'; return signView(RECEIPT_ID, b.receipt); }
-  buildNav(); go(b.admin ? (b.setupOk?'dist':'setup') : 'home');
+  buildNav(); go(b.admin ? (b.setupOk?'dist':'setup') : b.viewer ? 'sign' : 'home');
 }).catch(e=>{ clearTimeout(slow); $('#main').innerHTML=`\x3cdiv class="card note warn">${esc(e)}\x3c/div>`; });
 
 function expiring(){ const n=S.boot.alertDays||30; return S.stock.filter(l=>l.remain>0&&l.expiry&&daysTo(l.expiry)!=null&&daysTo(l.expiry)<=n).sort((a,b)=>daysTo(a.expiry)-daysTo(b.expiry)); }
 function expiryCard(){ const L=expiring(); if(!L.length) return '';
   return `\x3cdiv class="card note warn" style="margin-bottom:12px">\x3cb>⏰ 유통기한이 지났거나 ${S.boot.alertDays||30}일 안에 끝나는 물품 ${L.length}개\x3c/b>\x3cbr>${L.map(l=>{const d=daysTo(l.expiry);return `· ${esc(l.name)} — 남은 ${l.remain}${esc(l.unit||'')} · 유통 ${esc(l.expiry)} \x3cb>${d<0?`(${-d}일 지남)`:d===0?'(오늘까지)':`(${d}일 남음)`}\x3c/b>`;}).join('\x3cbr>')}\x3c/div>`; }
-function tabs(){ const c=S.boot.counts||{}; c.stock=expiring().length; return S.boot.admin
-  ? [['dist','팀 배분'],['sign','서명 현황',c.sign],['home','가정 배분'],['hsign','가정 서명'],['homeok','가정 확인',c.home],['org','유관기관',c.org],['vouch','상품권'],['disp','폐기'],['stock','재고',c.stock],['setup','설정']]
-  : [['home','가정 배분'],['hsign','가정 서명']].concat(S.boot.vouch?[['vouch','상품권']]:[]).concat([['stock','재고',c.stock]]); }
+function tabs(){ const c=S.boot.counts||{}; c.stock=expiring().length; if(S.boot.viewer) return [['sign','서명 현황',c.sign],['hsign','가정 서명',c.hsign],['homeok','가정 확인',c.home],['org','유관기관',c.org],['vouch','상품권'],['disp','폐기'],['stock','재고',c.stock]];
+  return S.boot.admin
+  ? [['dist','팀 배분'],['sign','서명 현황',c.sign],['home','가정 배분'],['hsign','가정 서명',c.hsign],['homeok','가정 확인',c.home],['org','유관기관',c.org],['vouch','상품권'],['disp','폐기'],['stock','재고',c.stock],['setup','설정']]
+  : [['home','가정 배분'],['hsign','가정 서명',c.hsign]].concat(S.boot.vouch?[['vouch','상품권']]:[]).concat([['stock','재고',c.stock]]); }
 function buildNav(){ $('#nav').innerHTML = tabs().map(([k,t,n])=>`\x3cbutton data-k="${k}">${t}${n?`\x3cspan class="dot">${n}\x3c/span>`:''}\x3c/button>`).join(''); $('#nav').onclick=e=>{const b=e.target.closest('button'); if(b) go(b.dataset.k);}; }
 async function refreshStock(fresh){ S.stock = await run('getStock', false,!!fresh); buildNav(); document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.k===S.tab)); }
 /* 저장 직후 재고는 뒤에서 새로 불러옴 (다음 화면이 재고를 쓰지 않을 때만) — 저장 완료 안내를 기다리지 않고 바로 보여 줌 */
 function refreshStockLater(){ refreshStock().catch(e=>console.warn('재고 새로고침 실패', e)); }
 function go(k){
-  S.tab=k; $('#main').onclick=null; $('#main').oninput=null; document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.k===k));
+  S.tab=k; if(k==='dist'||k==='home') S.lv=null; $('#main').onclick=null; $('#main').oninput=null; document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.k===k));
   if(!S.boot.setupOk && k!=='setup'){ $('#main').innerHTML=`\x3cdiv class="card note">${S.boot.admin?'먼저 \x3cb>설정\x3c/b> 탭에서 시트 칸을 확인해 주세요.':'관리자가 아직 앱을 설정하고 있어요. 조금 뒤에 다시 열어 주세요.'}\x3c/div>`; return; }
   ({dist:distView,sign:signListView,home:homeView,homeok:homeOkView,vouch:vouchView,hsign:hsignView,org:orgView,disp:dispView,stock:stockView,setup:setupView})[k]();
 }
@@ -208,6 +212,26 @@ const xlsBtn=id=>`\x3cbutton class="btn line" id="${id}">엑셀로 받기\x3c/bu
 function printHtml(html, landscape){ $('#printArea').innerHTML=fitPage(html, landscape); setTimeout(()=>window.print(),150); }
 
 
+
+async function famPick(title, onPick){
+  const m=$('#modal'), box=$('#modalBox');
+  box.innerHTML='\x3cp class="muted">명단을 불러오는 중이에요...\x3c/p>'; m.style.display='flex';
+  let L; try{ L=S.fam||(S.fam=await run('getFamilies')); }catch(e){ m.style.display='none'; return alert(e); }
+  const sel=new Set();
+  box.innerHTML=`\x3ch2 style="margin:0 0 6px;font-size:17px">${esc(title)}\x3c/h2>\x3cinput id="fq" placeholder="이름·담당자·주소로 찾기">
+    \x3cdiv id="fl" class="lots" style="max-height:52vh;margin-top:6px">\x3c/div>\x3cp id="fn" class="muted" style="margin:6px 0 0">\x3c/p>
+    \x3cdiv class="btns">\x3cbutton class="btn line" id="fx">닫기\x3c/button>\x3cspan style="flex:1">\x3c/span>\x3cbutton class="btn" id="fo">선택한 분 넣기\x3c/button>\x3c/div>`;
+  const draw=()=>{ const q=$('#fq').value.trim();
+    const V=L.map((f,i)=>({f,i})).filter(o=>!q||[o.f.name,o.f.manager,o.f.addr].join(' ').includes(q));
+    $('#fl').innerHTML=V.length?V.map(o=>`\x3clabel class="lot ${sel.has(o.i)?'on':''}" style="align-items:center">\x3cspan>\x3cinput type="checkbox" data-fi="${o.i}" ${sel.has(o.i)?'checked':''} style="width:auto"> \x3cb>${esc(o.f.name)}\x3c/b> \x3cspan class="muted">${esc(o.f.birth)}${o.f.manager?' · 담당 '+esc(o.f.manager):''}\x3c/span>\x3cbr>\x3cspan class="muted">${esc(o.f.addr)}\x3c/span>\x3c/span>\x3c/label>`).join(''):'\x3cp class="muted">명단이 없어요.\x3c/p>';
+    $('#fn').textContent=`${sel.size}명 선택`; };
+  $('#fq').oninput=draw;
+  $('#fl').onchange=e=>{ const i=e.target.dataset.fi; if(i===undefined) return; e.target.checked?sel.add(+i):sel.delete(+i); draw(); };
+  $('#fx').onclick=()=>{ m.style.display='none'; box.innerHTML=''; };
+  $('#fo').onclick=()=>{ if(!sel.size) return toast('한 분 이상 골라 주세요.'); onPick([...sel].map(i=>L[i])); m.style.display='none'; box.innerHTML=''; };
+  draw();
+}
+function smsHref(phone,msg){ return `sms:${phone}${/iPhone|iPad|iPod/.test(navigator.userAgent)?'&':'?'}body=${encodeURIComponent(msg)}`; }
 function signPad(title){
   return new Promise(res=>{
     const m=$('#modal'), box=$('#modalBox');
@@ -233,8 +257,49 @@ function readImage(file,max){ max=max||1400; return new Promise((res,rej)=>{ con
   const im=new Image(); im.onerror=rej; im.onload=()=>{ const s=Math.min(1,max/Math.max(im.width,im.height)), c=document.createElement('canvas'); c.width=Math.round(im.width*s); c.height=Math.round(im.height*s); c.getContext('2d').drawImage(im,0,0,c.width,c.height); res({dataUrl:c.toDataURL('image/jpeg',.85),name:file.name.replace(/\.\w+$/,'')+'.jpg'}); }; im.src=fr.result; }; fr.readAsDataURL(file); }); }
 
 
+function vby(){ try{return localStorage.getItem('vby')||'';}catch(e){return '';} }
+function loadLV(cb){ if(S.lv){ if(cb) cb(); return; } run('getLotVouchers').then(x=>{ S.lv=x||{}; if(cb) cb(); }).catch(()=>{ S.lv={}; }); }
+function vSplit(keys,vsel,people){ const at={}; return people.map(p=>{ const o={}; keys.forEach(k=>{ const q=num(p.q(k)), s0=at[k]||0; if(q>0) o[k]=(vsel[k]||[]).slice(s0,s0+q); at[k]=s0+q; }); return o; }); }
+const vsFlat=vs=>Object.keys(vs||{}).reduce((a,k)=>a.concat(vs[k]||[]),[]);
+function vBox(el,o){
+  if(!el) return;
+  const keys=S.lv?o.sel.filter(k=>S.lv[k]):[];
+  if(!keys.length){ el.innerHTML=''; return; }
+  keys.forEach(k=>{ const L=S.lv[k].list||[]; o.vsel[k]=(o.vsel[k]||[]).filter(sr=>L.some(v=>v.serial===sr)); });
+  const ppl=o.people(), asg=vSplit(keys,o.vsel,ppl);
+  el.innerHTML=keys.map(k=>{ const lot=lotOf(k)||{name:k}, V=S.lv[k], need=o.need(k), got=(o.vsel[k]||[]).length, skip=o.vskip.includes(k);
+    if(V.locked) return `\x3cdiv class="card note warn">\x3cb>${esc(lot.name)}\x3c/b>은 번호로 관리하는 상품권이라 \x3cb>상품권 권한\x3c/b>이 있는 직원만 나눌 수 있어요. 관리자에게 요청해 주세요.\x3c/div>`;
+    return `\x3cdiv class="card">\x3ch2>🎫 ${esc(lot.name)} 번호 고르기\x3c/h2>
+      \x3cp class="muted" style="margin:0 0 6px">${esc(lot.inDate)} 입고${lot.donor?' · '+esc(lot.donor):''} · 관리대장에 보유 \x3cb>${V.n}\x3c/b>장. 실물 번호를 보고 체크해 주세요. 목록 위쪽 번호부터 받는 분 순서대로 나눠 담겨요.\x3c/p>
+      ${skip?'':`\x3cdiv class="btns">\x3cbutton class="btn sub sm" data-vf="${esc(k)}">앞에서부터 ${need}장 고르기\x3c/button>\x3cbutton class="btn line sm" data-vc="${esc(k)}">선택 해제\x3c/button>\x3c/div>
+      \x3cdiv class="lots" style="max-height:220px;margin-top:6px">${V.list.map(v=>`\x3clabel class="lot ${o.vsel[k].includes(v.serial)?'on':''}" style="align-items:center">\x3cspan>\x3cinput type="checkbox" data-vk="${esc(k)}" data-vs="${esc(v.serial)}" ${o.vsel[k].includes(v.serial)?'checked':''} style="width:auto"> \x3cb>${esc(v.serial)}\x3c/b> \x3cspan class="muted">${esc(v.kind)} ${Number(v.face||0).toLocaleString()}원${v.target?' · 지정: '+esc(v.target):''}\x3c/span>\x3c/span>\x3c/label>`).join('')}\x3c/div>
+      \x3cp class="${got===need?'muted':'exp'}" style="margin:6px 0 2px">고른 번호 \x3cb>${got}\x3c/b>장 / 나갈 수량 \x3cb>${need}\x3c/b>장${got===need&&need?' ✓':need?' — 맞춰 주세요':''}\x3c/p>
+      ${got===need&&need?ppl.map((p,i)=>asg[i][k]&&asg[i][k].length?`\x3cdiv class="muted" style="font-size:12.5px">· ${esc(p.name)}: ${asg[i][k].map(esc).join(', ')}\x3c/div>`:'').join(''):''}`}
+      ${S.boot.admin?`\x3clabel style="display:flex;gap:6px;align-items:center;color:var(--ink);margin-top:8px">\x3cinput type="checkbox" data-vx="${esc(k)}" ${skip?'checked':''} style="width:auto"> 번호 없이 수량만 내보내기 \x3cspan class="muted">(관리대장에 없는 상품권일 때만)\x3c/span>\x3c/label>`:''}
+      \x3cp class="muted" style="margin:6px 0 0">번호와 받는 분 이름은 상품권 관리대장의 출고일·수령자·상태 칸에 같이 기록돼요.\x3c/p>\x3c/div>`; }).join('');
+  el.onchange=e=>{ const t=e.target;
+    if(t.dataset.vs){ const k=t.dataset.vk, all=S.lv[k].list.map(v=>v.serial), set=new Set(o.vsel[k]); if(t.checked) set.add(t.dataset.vs); else set.delete(t.dataset.vs); o.vsel[k]=all.filter(sr=>set.has(sr)); vBox(el,o); }
+    if(t.dataset.vx){ const k=t.dataset.vx, i=o.vskip.indexOf(k); if(t.checked&&i<0) o.vskip.push(k); if(!t.checked&&i>=0) o.vskip.splice(i,1); vBox(el,o); } };
+  el.onclick=e=>{ const t=e.target;
+    if(t.dataset.vf){ const k=t.dataset.vf; o.vsel[k]=S.lv[k].list.map(v=>v.serial).slice(0,o.need(k)); vBox(el,o); }
+    if(t.dataset.vc){ o.vsel[t.dataset.vc]=[]; vBox(el,o); } };
+}
+async function vCheck(o){
+  if(!S.lv) S.lv=await run('getLotVouchers')||{};
+  const out={vsel:{},vskip:[]};
+  o.sel.filter(k=>S.lv[k]&&o.need(k)>0).forEach(k=>{ const lot=lotOf(k)||{name:k}, n=o.need(k);
+    if(S.lv[k].locked) throw `「${lot.name}」은 상품권이라 상품권 권한이 있는 직원만 나눌 수 있어요. 관리자에게 요청해 주세요.`;
+    if(o.vskip.includes(k)){ out.vskip.push(k); return; }
+    if(!Number.isInteger(n)) throw '상품권 수량은 정수로 넣어 주세요.';
+    const got=(o.vsel[k]||[]).length; if(got!==n) throw `「${lot.name}」 상품권 번호를 ${n}장 골라 주세요. (지금 ${got}장)`;
+    out.vsel[k]=o.vsel[k].slice(); });
+  return out;
+}
+function vChips(list,kept,tag){ return list.map(sr=>{ const on=kept.includes(sr); return `\x3cspan class="chip" data-vt="${esc(tag+'|'+sr)}" title="${on?'눌러서 돌려놓기':'눌러서 다시 넣기'}" style="cursor:pointer;font-size:11.5px;${on?'':'background:#fff;border:1px dashed var(--line);color:var(--sub);text-decoration:line-through'}">${esc(sr)}\x3c/span>`; }).join(''); }
+function vToggle(arr,orig,sr){ const set=new Set(arr); if(set.has(sr)) set.delete(sr); else set.add(sr); return orig.filter(x=>set.has(x)); }
 function distView(){
-  const D = S.dist || (S.dist={date:S.boot.today, sel:[], people:[], note:''});
+  const D = S.dist || (S.dist={date:S.boot.today, sel:[], people:[], note:''}); D.vsel=D.vsel||{}; D.vskip=D.vskip||[];
+  const vo={sel:D.sel,vsel:D.vsel,vskip:D.vskip,need:k=>D.people.reduce((s,p)=>s+num(p.qty[k]),0),people:()=>D.people.map(p=>({name:p.name,q:k=>p.qty[k]}))};
   $('#main').innerHTML=expiryCard()+`
   \x3cdiv class="card">\x3ch2>1. 무엇을 나눌까요?\x3c/h2>\x3cdiv class="row">\x3cdiv>\x3clabel>배분일\x3c/label>\x3cinput type="date" id="dDate" value="${D.date}">\x3c/div>\x3c/div>
   \x3clabel>물품 (여러 개 고를 수 있어요)\x3c/label>\x3cdiv id="dPick">\x3c/div>\x3c/div>
@@ -242,19 +307,21 @@ function distView(){
   \x3cdiv class="row">\x3cdiv>\x3clabel>받는 직원\x3c/label>\x3cinput id="dWho" list="staffList" placeholder="이름 입력·선택">\x3c/div>\x3cdiv style="flex:0 0 auto;align-self:end">\x3cbutton class="btn sub" id="dAdd">추가\x3c/button>\x3c/div>\x3c/div>
   \x3cdatalist id="staffList">${S.staff.map(s=>`\x3coption value="${esc(s.name)}">${esc(s.team)}\x3c/option>`).join('')}\x3c/datalist>
   \x3cdiv id="dPeople">\x3c/div>
-  \x3clabel>비고 (선택)\x3c/label>\x3cinput id="dNote" value="${esc(D.note)}">\x3c/div>
+  \x3clabel>공통 비고 (선택 · 사람별 비고가 빈 줄에만 들어가요)\x3c/label>\x3cinput id="dNote" value="${esc(D.note)}">\x3c/div>
+  \x3cdiv id="dV">\x3c/div>
   \x3cdiv class="btns">\x3cbutton class="btn" id="dGo">배분 등록하고 수령증 만들기\x3c/button>\x3cbutton class="btn line" id="dReset">새로 쓰기\x3c/button>\x3c/div>
   \x3cdiv id="dDone">\x3c/div>`;
   $('#dDate').onchange=e=>D.date=e.target.value; $('#dNote').oninput=e=>D.note=e.target.value;
   picker($('#dPick'), D.sel, drawPeople);
   const add=()=>{ const n=$('#dWho').value.trim(); if(!n) return; const s=S.staff.find(x=>x.name===n);
-    D.people.push({name:n,team:s?s.team:'',qty:{}}); $('#dWho').value=''; drawPeople(); };
+    D.people.push({name:n,team:s?s.team:'',note:'',qty:{}}); $('#dWho').value=''; drawPeople(); };
   $('#dAdd').onclick=add; $('#dWho').onkeydown=e=>{ if(e.key==='Enter') add(); };
   $('#dReset').onclick=()=>{ if(confirm('입력한 내용을 지울까요?')){ S.dist=null; distView(); } };
   $('#dGo').onclick=e=>act(e.target, async()=>{
     if(!D.sel.length) throw '물품을 골라 주세요.';
-    const r=await run('createTeamReceipt',{date:D.date,note:D.note,items:D.sel.map(k=>({key:k})),people:D.people});
-    S.dist=null; await refreshStock(); bumpCount('sign',1);
+    const vc=await vCheck(vo);
+    const r=await run('createTeamReceipt',{date:D.date,note:D.note,items:D.sel.map(k=>({key:k})),people:D.people,vsel:vc.vsel,vskip:vc.vskip,outBy:vby()});
+    S.dist=null; S.lv=null; await refreshStock(); bumpCount('sign',1);
     distView();
     $('#dDone').innerHTML=`\x3cdiv class="card note">\x3cb>배분 기록에 들어갔어요.\x3c/b> 이제 서명만 받으면 돼요.
       \x3cdiv class="btns">\x3cbutton class="btn" id="dSign">지금 여기서 서명 받기\x3c/button>\x3cbutton class="btn sub" id="dLink">서명 링크 복사\x3c/button>\x3c/div>
@@ -262,17 +329,18 @@ function distView(){
     $('#dSign').onclick=()=>signView(r.id); $('#dLink').onclick=()=>copyText(r.url);
     window.scrollTo(0,document.body.scrollHeight);
   }, '등록 중...');
-  drawPeople();
+  drawPeople(); loadLV(()=>vBox($('#dV'),vo));
   function drawPeople(){
     const lots=D.sel.map(lotOf).filter(Boolean);
+    vBox($('#dV'),vo);
     if(!D.people.length){ $('#dPeople').innerHTML='\x3cp class="muted">받는 직원을 추가해 주세요.\x3c/p>'; return; }
     const tot=k=>D.people.reduce((s,p)=>s+num(p.qty[k]),0);
-    $('#dPeople').innerHTML=`\x3cdiv class="scroll">\x3ctable class="tbl">\x3ctr>\x3cth>이름\x3c/th>\x3cth>소속\x3c/th>${lots.map(l=>`\x3cth>${esc(l.name)}\x3cbr>\x3cspan class="muted">남은 ${l.remain}\x3c/span>\x3c/th>`).join('')}\x3cth>\x3c/th>\x3c/tr>
-      ${D.people.map((p,i)=>`\x3ctr>\x3ctd>${esc(p.name)}\x3c/td>\x3ctd>\x3cinput value="${esc(p.team)}" data-t="${i}" style="width:110px">\x3c/td>${lots.map(l=>`\x3ctd>\x3cinput class="q" inputmode="numeric" data-i="${i}" data-k="${esc(l.key)}" value="${p.qty[l.key]||''}">\x3c/td>`).join('')}\x3ctd>\x3cbutton class="btn line sm" data-x="${i}">빼기\x3c/button>\x3c/td>\x3c/tr>`).join('')}
-      \x3ctr>\x3cth colspan="2">합계\x3c/th>${lots.map(l=>{const t=tot(l.key);return `\x3cth class="${t>l.remain?'exp':''}">${t}\x3c/th>`;}).join('')}\x3cth>\x3c/th>\x3c/tr>\x3c/table>\x3c/div>
+    $('#dPeople').innerHTML=`\x3cdiv class="scroll">\x3ctable class="tbl">\x3ctr>\x3cth>이름\x3c/th>\x3cth>소속\x3c/th>${lots.map(l=>`\x3cth>${esc(l.name)}\x3cbr>\x3cspan class="muted">남은 ${l.remain}\x3c/span>\x3c/th>`).join('')}\x3cth>비고 \x3cspan class="muted">(세부 품목 등)\x3c/span>\x3c/th>\x3cth>\x3c/th>\x3c/tr>
+      ${D.people.map((p,i)=>`\x3ctr>\x3ctd>${esc(p.name)}\x3c/td>\x3ctd>\x3cinput value="${esc(p.team)}" data-t="${i}" style="width:110px">\x3c/td>${lots.map(l=>`\x3ctd>\x3cinput class="q" inputmode="numeric" data-i="${i}" data-k="${esc(l.key)}" value="${p.qty[l.key]||''}">\x3c/td>`).join('')}\x3ctd>\x3cinput data-n="${i}" value="${esc(p.note||'')}" placeholder="비워 둬도 돼요" style="min-width:160px">\x3c/td>\x3ctd>\x3cbutton class="btn line sm" data-x="${i}">빼기\x3c/button>\x3c/td>\x3c/tr>`).join('')}
+      \x3ctr>\x3cth colspan="2">합계\x3c/th>${lots.map(l=>{const t=tot(l.key);return `\x3cth class="${t>l.remain?'exp':''}">${t}\x3c/th>`;}).join('')}\x3cth>\x3c/th>\x3cth>\x3c/th>\x3c/tr>\x3c/table>\x3c/div>
       ${lots.length?`\x3cdiv class="row" style="margin-top:8px">${lots.map(l=>`\x3cdiv>\x3clabel>${esc(l.name)} 한 사람당\x3c/label>\x3cdiv class="row">\x3cinput class="q" inputmode="numeric" data-all="${esc(l.key)}">\x3cbutton class="btn sub sm" data-fill="${esc(l.key)}" style="flex:0 0 auto">모두에게\x3c/button>\x3c/div>\x3c/div>`).join('')}\x3c/div>`:''}`;
     const box=$('#dPeople');
-    box.oninput=e=>{ const t=e.target; if(t.dataset.k){ D.people[t.dataset.i].qty[t.dataset.k]=t.value; const th=box.querySelectorAll('tr:last-child th')[1+D.sel.indexOf(t.dataset.k)]; if(th){const v=tot(t.dataset.k); th.textContent=v; th.className=v>lotOf(t.dataset.k).remain?'exp':'';} } if(t.dataset.t) D.people[t.dataset.t].team=t.value; };
+    box.oninput=e=>{ const t=e.target; if(t.dataset.k){ D.people[t.dataset.i].qty[t.dataset.k]=t.value; const th=box.querySelectorAll('tr:last-child th')[1+D.sel.indexOf(t.dataset.k)]; if(th){const v=tot(t.dataset.k); th.textContent=v; th.className=v>lotOf(t.dataset.k).remain?'exp':'';} if(S.lv&&S.lv[t.dataset.k]) vBox($('#dV'),vo); } if(t.dataset.t) D.people[t.dataset.t].team=t.value; if(t.dataset.n) D.people[t.dataset.n].note=t.value; };
     box.onclick=e=>{ const t=e.target; if(t.dataset.x){ D.people.splice(+t.dataset.x,1); drawPeople(); }
       if(t.dataset.fill){ const v=box.querySelector(`[data-all="${CSS.escape(t.dataset.fill)}"]`).value; D.people.forEach(p=>p.qty[t.dataset.fill]=v); drawPeople(); } };
   }
@@ -281,7 +349,7 @@ function bumpCount(k,d){ const c=S.boot.counts||(S.boot.counts={}); c[k]=Math.ma
 
 
 function rcptHtml(r){ return receiptHtml({ items:r.items, dest:S.boot.dept||'일상동행팀', noTeam:r.type==='상품권'&&r.people.every(p=>p.who==='당사자'),
-    rows:r.people.map(p=>({name:p.name,team:p.team,idType:p.who==='당사자'?(p.idType||'주소'):'주소',addr:p.who==='당사자'?(p.addr||''):S.boot.org,date:p.at||'',sigUrl:p.sigUrl,note:(p.serials||[]).join(', '),noteSmall:!!(p.serials||[]).length,qty:r.items.map(it=>num(p.qty[it.key]))})) }); }
+    rows:r.people.map(p=>({name:p.name,team:p.team,idType:p.who==='당사자'?(p.idType||'주소'):'주소',addr:p.who==='당사자'?(p.addr||''):S.boot.org,date:r.type==='팀'?r.date:(p.at||''),sigUrl:p.sigUrl,note:(p.serials||[]).length?[r.type==='팀'?p.note:'',p.serials.join(', ')].filter(Boolean).join(' / '):(p.note||''),noteSmall:!!(p.serials||[]).length,qty:r.items.map(it=>num(p.qty[it.key]))})) }); }
 async function rcptExcel(btn,id){ const r=await run('getReceipt',id); return toExcel(btn,rcptHtml(r),'수령증_'+r.no,true); }
 async function signView(id, data){
   $('#main').innerHTML='\x3cdiv class="card">수령증을 불러오는 중이에요...\x3c/div>';
@@ -315,27 +383,29 @@ async function signView(id, data){
 
 
 function editTeam(r){
-  const E={date:r.date, note:r.note||'', people:r.people.map(p=>({from:p.name,name:p.name,team:p.team,qty:Object.assign({},p.qty),signed:p.signed}))};
+  const E={date:r.date, note:r.note||'', people:r.people.map(p=>({from:p.name,name:p.name,team:p.team,note:p.note||'',qty:Object.assign({},p.qty),signed:p.signed,ov:p.vs||{},vs:JSON.parse(JSON.stringify(p.vs||{}))}))};
+  const vk=r.items.map(it=>it.key).filter(k=>r.people.some(p=>((p.vs||{})[k]||[]).length));
   const draw=()=>{
     $('#main').innerHTML=`\x3cbutton class="btn line sm" id="eBack">← 수령증으로\x3c/button>
     \x3cdiv class="card">\x3ch2>수령증 내용 수정\x3c/h2>\x3cp class="note">고치면 \x3cb>배분 기록\x3c/b>도 같이 바뀌어요. 수령인·소속·배분일·수량이 바뀐 사람은 \x3cb>서명을 다시\x3c/b> 받아야 해요. 수량을 0으로 하면 그 줄은 배분 기록에서 빠져요.\x3c/p>
-    \x3cdiv class="row">\x3cdiv>\x3clabel>배분일\x3c/label>\x3cinput type="date" id="eDate" value="${E.date}">\x3c/div>\x3cdiv>\x3clabel>비고\x3c/label>\x3cinput id="eNote" value="${esc(E.note)}">\x3c/div>\x3c/div>
-    \x3cdiv class="scroll" style="margin-top:10px">\x3ctable class="tbl">\x3ctr>\x3cth>이름\x3c/th>\x3cth>소속\x3c/th>${r.items.map(it=>`\x3cth>${esc(it.name)}\x3c/th>`).join('')}\x3cth>\x3c/th>\x3c/tr>
+    \x3cdiv class="row">\x3cdiv>\x3clabel>배분일\x3c/label>\x3cinput type="date" id="eDate" value="${E.date}">\x3c/div>\x3cdiv>\x3clabel>공통 비고 (사람별 비고가 빈 줄에만)\x3c/label>\x3cinput id="eNote" value="${esc(E.note)}">\x3c/div>\x3c/div>
+    \x3cdiv class="scroll" style="margin-top:10px">\x3ctable class="tbl">\x3ctr>\x3cth>이름\x3c/th>\x3cth>소속\x3c/th>${r.items.map(it=>`\x3cth>${esc(it.name)}\x3c/th>`).join('')}\x3cth>비고\x3c/th>\x3cth>\x3c/th>\x3c/tr>
     ${E.people.map((p,i)=>`\x3ctr>\x3ctd>\x3cinput data-i="${i}" data-f="name" value="${esc(p.name)}" list="staffList" style="width:90px">${p.signed?'\x3cbr>\x3cspan class="tag ok">서명함\x3c/span>':''}\x3c/td>\x3ctd>\x3cinput data-i="${i}" data-f="team" value="${esc(p.team)}" style="width:100px">\x3c/td>
-      ${r.items.map(it=>`\x3ctd>\x3cinput class="q" inputmode="numeric" data-i="${i}" data-k="${esc(it.key)}" value="${p.qty[it.key]||''}">\x3c/td>`).join('')}\x3ctd>\x3cbutton class="btn line sm" data-x="${i}">빼기\x3c/button>\x3c/td>\x3c/tr>`).join('')}\x3c/table>\x3c/div>
+      ${r.items.map(it=>vk.includes(it.key)?`\x3ctd style="min-width:150px">\x3cb>${((p.vs||{})[it.key]||[]).length}\x3c/b>장${((p.ov||{})[it.key]||[]).length?'\x3cbr>'+vChips(p.ov[it.key],p.vs[it.key]||[],i+'|'+it.key):''}\x3c/td>`:`\x3ctd>\x3cinput class="q" inputmode="numeric" data-i="${i}" data-k="${esc(it.key)}" value="${p.qty[it.key]||''}">\x3c/td>`).join('')}\x3ctd>\x3cinput data-i="${i}" data-f="note" value="${esc(p.note||'')}" style="min-width:160px">\x3c/td>\x3ctd>\x3cbutton class="btn line sm" data-x="${i}">빼기\x3c/button>\x3c/td>\x3c/tr>`).join('')}\x3c/table>\x3c/div>
     \x3cdatalist id="staffList">${S.staff.map(x=>`\x3coption value="${esc(x.name)}">${esc(x.team)}\x3c/option>`).join('')}\x3c/datalist>
     \x3cdiv class="btns">\x3cbutton class="btn sub" id="eAdd">받는 사람 추가\x3c/button>\x3cspan style="flex:1">\x3c/span>\x3cbutton class="btn" id="eSave">저장\x3c/button>\x3c/div>
-    \x3cp class="muted">물품을 더 넣으려면 팀 배분에서 새로 등록해 주세요.\x3c/p>\x3c/div>`;
+    \x3cp class="muted">물품을 더 넣으려면 팀 배분에서 새로 등록해 주세요.${vk.length?' 🎫 상품권은 번호를 누르면 \x3cb>돌려놓기\x3c/b>(관리대장에서 다시 「보유」)가 돼요. 더 주려면 새로 배분해 주세요.':''}\x3c/p>\x3c/div>`;
     $('#eBack').onclick=()=>signView(r.id,r);
     $('#eDate').onchange=e=>E.date=e.target.value; $('#eNote').oninput=e=>E.note=e.target.value;
-    $('#eAdd').onclick=()=>{ E.people.push({from:'',name:'',team:'',qty:{}}); draw(); };
+    $('#eAdd').onclick=()=>{ E.people.push({from:'',name:'',team:'',note:'',qty:{},ov:{},vs:{}}); draw(); };
     $('#main').oninput=e=>{ const t=e.target, p=E.people[t.dataset.i]; if(!p) return;
       if(t.dataset.f){ p[t.dataset.f]=t.value; if(t.dataset.f==='name'){ const st=S.staff.find(x=>x.name===t.value); if(st&&!p.team){ p.team=st.team; const tm=$(`[data-i="${t.dataset.i}"][data-f="team"]`); if(tm) tm.value=st.team; } } }
       if(t.dataset.k) p.qty[t.dataset.k]=t.value; };
-    $('#main').onclick=e=>{ const t=e.target; if(t.dataset.x){ E.people.splice(+t.dataset.x,1); draw(); } };
+    $('#main').onclick=e=>{ const t=e.target; if(t.dataset.x){ E.people.splice(+t.dataset.x,1); draw(); }
+      const c=e.target.closest('[data-vt]'); if(c){ const [i,k,sr]=[c.dataset.vt.split('|')[0],c.dataset.vt.split('|').slice(1,-1).join('|'),c.dataset.vt.split('|').pop()], p=E.people[i]; p.vs[k]=vToggle(p.vs[k]||[],p.ov[k]||[],sr); draw(); } };
     $('#eSave').onclick=e=>act(e.target, async()=>{
-      const nr=await run('updateTeamReceipt',r.id,{date:E.date,note:E.note,people:E.people.filter(p=>p.name.trim()).map(p=>({from:p.from,name:p.name.trim(),team:p.team,qty:p.qty}))});
-      await refreshStock(); toast('고쳤어요. 배분 기록도 같이 바뀌었어요.',3000); signView(r.id,nr);
+      const nr=await run('updateTeamReceipt',r.id,{date:E.date,note:E.note,people:E.people.filter(p=>p.name.trim()).map(p=>{ const qty=Object.assign({},p.qty), vs={}; vk.forEach(k=>{ vs[k]=(p.vs||{})[k]||[]; qty[k]=vs[k].length; }); return {from:p.from,name:p.name.trim(),team:p.team,note:p.note||'',qty:qty,vs:vk.length?vs:undefined}; })});
+      S.lv=null; await refreshStock(); toast('고쳤어요. 배분 기록도 같이 바뀌었어요.',3000); signView(r.id,nr);
     }, '저장 중...');
   };
   draw();
@@ -397,15 +467,16 @@ async function signListView(){
 
 
 function homeView(){
-  const H = S.home || (S.home={date:S.boot.today, sel:[], rows:[], dateMode:'blank', phoneSign:false,idType:'주소', manager:(()=>{try{return localStorage.getItem('mgr')||'';}catch(e){return '';}})(), sent:false});
+  const H = S.home || (S.home={date:S.boot.today, sel:[], rows:[], dateMode:'blank', phoneSign:false,idType:'주소', manager:(()=>{try{return localStorage.getItem('mgr')||'';}catch(e){return '';}})(), sent:false}); H.vsel=H.vsel||{}; H.vskip=H.vskip||[];
   $('#main').innerHTML=expiryCard()+`
   \x3cdiv class="note">🔒 종이 서명 방식의 재고 요청에는 인원·수량만 기록해요. 인쇄·브라우저 PDF는 화면에서 처리하며, 엑셀로 받기는 서버에서 변환한 파일을 드라이브에 보관해요. 「나중에 폰으로 서명받기」는 명단을 임시 보관하고, 완료 후 수령증 PDF를 남긴 뒤 임시 파일을 휴지통으로 보내요.\x3c/div>
   \x3cdiv class="card">\x3ch2>1. 담당자와 물품\x3c/h2>\x3cdiv class="row">\x3cdiv>\x3clabel>사례 담당자\x3c/label>\x3cselect id="hMgr">\x3coption value="">이름 고르기\x3c/option>${S.staff.map(s=>`\x3coption ${s.name===H.manager?'selected':''}>${esc(s.name)}\x3c/option>`).join('')}\x3c/select>\x3c/div>\x3cdiv>\x3clabel>배분일\x3c/label>\x3cinput type="date" id="hDate" value="${H.date}">\x3c/div>\x3c/div>
   \x3clabel>가져갈 물품\x3c/label>\x3cdiv id="hPick">\x3c/div>\x3c/div>
   \x3cdiv class="card">\x3ch2>2. 받는 분 명단\x3c/h2>
   \x3clabel>명단 전체에 사용할 정보\x3cselect id="hIdentity">\x3coption>주소\x3c/option>\x3coption>생년월일\x3c/option>\x3c/select>\x3c/label>\x3clabel>한 줄에 한 분씩 「이름, 선택한 식별정보」 (엑셀에서 복사해 붙여도 돼요)\x3c/label>\x3ctextarea id="hPaste" placeholder="홍길동, 종로구 예시로 1&#10;김예시, 종로구 예시로 2">\x3c/textarea>
-  \x3cdiv class="btns">\x3cbutton class="btn sub" id="hParse">명단 넣기\x3c/button>\x3cbutton class="btn line" id="hOne">한 분 추가\x3c/button>\x3c/div>
+  \x3cdiv class="btns">\x3cbutton class="btn sub" id="hParse">명단 넣기\x3c/button>\x3cbutton class="btn line" id="hOne">한 분 추가\x3c/button>${S.boot.fam?'\x3cbutton class="btn sub" id="hFam">이용인 명단에서 고르기\x3c/button>':''}\x3c/div>
   \x3cdiv id="hRows" style="margin-top:10px">\x3c/div>\x3c/div>
+  \x3cdiv id="hV">\x3c/div>
   \x3cdiv class="card">\x3ch2>3. 수령증\x3c/h2>
   \x3clabel>수령증의 수령일 칸\x3c/label>
   \x3cdiv class="row" id="hDateMode">\x3clabel style="display:flex;gap:6px;align-items:center;color:var(--ink);margin:0">\x3cinput type="radio" name="dm" value="blank" style="width:auto" ${H.dateMode==='blank'?'checked':''}> 비워서 인쇄 (가정에서 손으로 쓰기)\x3c/label>
@@ -422,36 +493,43 @@ function homeView(){
   $('#hDate').onchange=e=>H.date=e.target.value; $('#hDateMode').onchange=e=>{ if(e.target.name==='dm') H.dateMode=e.target.value; }; $('#hPhone').onchange=e=>{ H.phoneSign=e.target.checked; drawRows(); };
   picker($('#hPick'), H.sel, drawRows);
   $('#hParse').onclick=()=>{ $('#hPaste').value.split(/\r?\n/).map(s=>s.trim()).filter(Boolean).forEach(line=>{ const p=line.split(/\t|,/).map(x=>x.trim()); H.rows.push({idType:H.idType||'주소',name:p[0],addr:p.slice(1).filter(Boolean).join(' '),qty:{},sig:''}); }); $('#hPaste').value=''; drawRows(); };
+  if($('#hFam')) $('#hFam').onclick=()=>famPick('가정 배분 받는 분 고르기',list=>{ list.forEach(f=>H.rows.push({name:f.name,addr:H.idType==='생년월일'?f.birth:f.addr,idType:H.idType,phone:f.phone,birth:f.birth6,qty:{},sig:''})); drawRows(); toast(`${list.length}명을 넣었어요.`); });
   $('#hOne').onclick=()=>{ H.rows.push({name:'',addr:'',idType:H.idType||'주소',qty:{},sig:''}); drawRows(); };
   $('#hClear').onclick=()=>{ if(confirm('명단과 서명을 모두 지울까요?')){ S.home=null; homeView(); } };
   const checkHome=()=>{try{checkInputQuantities(H.rows);return true;}catch(e){alert(e.message);return false;}};
   const qOf=(r,k)=> r.qty[k]===undefined?1:num(r.qty[k]);
   const lots=()=>H.sel.map(lotOf).filter(Boolean);
   const total=k=>H.rows.filter(r=>r.name).reduce((s,r)=>s+qOf(r,k),0);
-  const html=()=>{ const L=lots(); return receiptHtml({ dest:S.boot.dept||'일상동행팀', noTeam:true,
+  const vo={sel:H.sel,vsel:H.vsel,vskip:H.vskip,need:k=>total(k),people:()=>H.rows.filter(r=>r.name).map(r=>({name:r.name,q:k=>qOf(r,k)}))};
+  const vNotes=()=>{ const keys=H.sel.filter(k=>(H.vsel[k]||[]).length); return keys.length?vSplit(keys,H.vsel,vo.people()).map(vsFlat):[]; };
+  const html=()=>{ const L=lots(), vn=vNotes(); let ri=-1; return receiptHtml({ dest:S.boot.dept||'일상동행팀', noTeam:true,
     items:L.map(l=>({name:l.name,inDate:l.inDate,donor:l.donor,inQty:l.inQty,give:total(l.key),remainAfter:H.sent?l.remain:l.remain-total(l.key)})),
-    rows:H.rows.filter(r=>r.name).map(r=>({name:r.name,team:'',addr:r.addr,idType:H.idType,date:(r.sig||H.dateMode==='fill')?H.date:'',sigUrl:r.sig,note:'',qty:L.map(l=>qOf(r,l.key))})) }); };
+    rows:H.rows.filter(r=>r.name).map(r=>{ ri++; const n=(vn[ri]||[]).join(', '); return {name:r.name,team:'',addr:r.addr,idType:H.idType,date:H.dateMode==='fill'?H.date:(r.sig?S.boot.today:''),sigUrl:r.sig,note:n,noteSmall:!!n,qty:L.map(l=>qOf(r,l.key))}; }) }); };
   $('#hXls').onclick=e=>{if(!checkHome())return; if(!H.sel.length||!H.rows.some(r=>r.name)) return toast('물품과 명단을 넣어 주세요.'); toExcel(e.target,html(),'가정배분수령증_'+H.date,true); };
   $('#hPrint').onclick=()=>{if(!checkHome())return; if(!H.sel.length||!H.rows.some(r=>r.name)) return toast('물품과 명단을 넣어 주세요.'); printHtml(html(),true); };
   $('#hLater').onclick=e=>act(e.target, async()=>{
     checkInputQuantities(H.rows);if(H.sent) throw '이미 요청했어요.'; if(!H.manager) throw '사례 담당자 이름을 골라 주세요.';
     const people=H.rows.filter(r=>r.name); if(!H.sel.length||!people.length) throw '물품과 명단을 넣어 주세요.';
+    const vc=await vCheck(vo);
     if(!confirm('명단(이름·선택한 주소 또는 생년월일)을 서명이 끝날 때까지만 잠긴 임시 파일에 저장해요. 서명을 마치면 수령증 PDF만 남고 임시 명단 파일은 휴지통으로 보내요. 계속할까요?')) return;
-    await run('requestHome',{later:true,manager:H.manager,date:H.date,count:people.length,items:H.sel.map(k=>({key:k,qty:total(k)})),
-      people:people.map(r=>({name:r.name,addr:r.addr,idType:H.idType,qty:Object.fromEntries(H.sel.map(k=>[k,qOf(r,k)]))}))});
-    S.home=null; refreshStockLater(); if(S.boot.admin) bumpCount('home',1);
+    await run('requestHome',{later:true,vsel:vc.vsel,vskip:vc.vskip,outBy:vby(),dateMode:H.dateMode,manager:H.manager,date:H.date,count:people.length,items:H.sel.map(k=>({key:k,qty:total(k)})),
+      people:people.map(r=>({name:r.name,addr:r.addr,idType:H.idType,phone:r.phone||'',birth:r.birth||'',qty:Object.fromEntries(H.sel.map(k=>[k,qOf(r,k)]))}))});
+    S.home=null; S.lv=null; refreshStockLater(); if(S.boot.admin) bumpCount('home',1); bumpCount('hsign',1);
     toast('저장했어요. 가정 서명 탭에서 이어서 서명받을 수 있어요.',3500); go('hsign');
   }, '저장 중...');
   $('#hSend').onclick=e=>act(e.target, async()=>{
     checkInputQuantities(H.rows);if(H.sent) throw '이미 요청했어요.'; if(!H.manager) throw '사례 담당자 이름을 골라 주세요.';
     const people=H.rows.filter(r=>r.name); if(!H.sel.length||!people.length) throw '물품과 명단을 넣어 주세요.';
-    await run('requestHome',{manager:H.manager,date:H.date,count:people.length,items:H.sel.map(k=>({key:k,qty:total(k)}))});
-    H.sent=true; refreshStockLater(); if(S.boot.admin) bumpCount('home',1);
+    const vc=await vCheck(vo), hasV=Object.keys(vc.vsel).length;
+    await run('requestHome',{manager:H.manager,date:H.date,count:people.length,items:H.sel.map(k=>({key:k,qty:total(k)})),vsel:vc.vsel,vskip:vc.vskip,outBy:vby(),
+      people:hasV?people.map(r=>({name:r.name,qty:Object.fromEntries(Object.keys(vc.vsel).map(k=>[k,qOf(r,k)]))})):[]});
+    H.sent=true; S.lv=null; refreshStockLater(); if(S.boot.admin) bumpCount('home',1);
     $('#hMsg').innerHTML=`\x3cp class="note">min에게 확인 요청을 보냈어요. 기록에는 \x3cb>${people.length}명 · 수량\x3c/b>만 남았어요. 수령증을 다 뽑았으면 \x3cb>명단 지우기\x3c/b>를 눌러 주세요.\x3c/p>`;
   }, '보내는 중...');
-  drawRows();
+  drawRows(); loadLV(()=>{ if(!H.sent) vBox($('#hV'),vo); });
   function drawRows(){
     const L=lots();
+    if(!H.sent) vBox($('#hV'),vo);
     if(!H.rows.length){ $('#hRows').innerHTML='\x3cp class="muted">명단을 넣어 주세요.\x3c/p>'; return; }
     $('#hRows').innerHTML=`\x3cdiv class="scroll">\x3ctable class="tbl">\x3ctr>\x3cth>성명\x3c/th>\x3cth>${esc(H.idType)}\x3c/th>${L.map(l=>`\x3cth>${esc(l.name)}\x3c/th>`).join('')}${H.phoneSign?'\x3cth>서명\x3c/th>':''}\x3cth>\x3c/th>\x3c/tr>
     ${H.rows.map((r,i)=>`\x3ctr>\x3ctd>\x3cinput data-i="${i}" data-f="name" value="${esc(r.name)}" style="width:90px">\x3c/td>\x3ctd>\x3cinput data-i="${i}" data-f="addr" value="${esc(r.addr)}" placeholder="${H.idType==='생년월일'?'예: 1980.01.01':'주소'}" style="min-width:150px">\x3c/td>
@@ -477,62 +555,86 @@ async function homeSignOpen(id){
   $('#main').innerHTML='\x3cdiv class="card">명단을 불러오는 중이에요...\x3c/div>';
   let r=await run('getHomeSign',id);
   const html=()=>receiptHtml({ dest:S.boot.dept||'일상동행팀', noTeam:true, items:r.items,
-    rows:r.people.map(p=>({name:p.name,team:'',addr:p.addr,idType:p.idType||'주소',date:p.at||'',sigUrl:p.sigUrl,note:'',qty:r.items.map(it=>num(p.qty[it.key]))})) });
+    rows:r.people.map(p=>({name:p.name,team:'',addr:p.addr,idType:p.idType||'주소',date:r.dateMode==='fill'?r.date:(p.at||''),sigUrl:p.sigUrl,note:vsFlat(p.vs).join(', '),noteSmall:!!vsFlat(p.vs).length,qty:r.items.map(it=>num(p.qty[it.key]))})) });
   const draw=()=>{
     const left=r.people.filter(p=>!p.sigUrl).length;
     $('#main').innerHTML=`\x3cbutton class="btn line sm" id="hsBack">← 가정 서명\x3c/button>
     \x3cdiv class="card">\x3ch2>${esc(r.manager)} · ${esc(r.date)}\x3c/h2>\x3cp class="muted" style="margin:0">${left?`\x3cspan class="tag wait">서명 ${left}명 남음\x3c/span>`:'\x3cspan class="tag ok">모두 서명했어요\x3c/span>'}\x3c/p>
-    \x3ctable class="tbl" style="margin-top:10px">${r.people.map((p,i)=>`\x3ctr>\x3ctd>\x3cb>${esc(p.name)}\x3c/b>\x3cbr>\x3cspan class="muted">${esc((p.idType||'주소')+': '+(p.addr||''))}\x3c/span>\x3c/td>\x3ctd style="text-align:right">${p.sigUrl?`\x3cimg src="${p.sigUrl}" style="height:30px">`:`\x3cbutton class="btn sm" data-s="${i}">서명하기\x3c/button>`}\x3c/td>\x3c/tr>`).join('')}\x3c/table>\x3c/div>
+    \x3ctable class="tbl" style="margin-top:10px">${r.people.map((p,i)=>`\x3ctr>\x3ctd>\x3cb>${esc(p.name)}\x3c/b>\x3cbr>\x3cspan class="muted">${esc((p.idType||'주소')+': '+(p.addr||''))}\x3c/span>\x3c/td>\x3ctd style="text-align:right">${p.sigUrl?`\x3cimg src="${p.sigUrl}" style="height:30px">${p.via?'\x3cbr>\x3cspan class="tag ok">'+esc(p.via)+'\x3c/span>':''}`:`\x3cbutton class="btn sm" data-s="${i}">서명하기\x3c/button> \x3cbutton class="btn sm line" data-ln="${i}">${p.linked?'링크 다시 복사':'서명 링크'}\x3c/button>${p.linked?'\x3cbr>\x3cspan class="tag wait">링크 만듦\x3c/span>':''}`}\x3c/td>\x3c/tr>`).join('')}\x3c/table>\x3cdiv class="btns">\x3cbutton class="btn line sm" id="hsReload">↻ 링크로 받은 서명 확인\x3c/button>\x3c/div>\x3c/div>
     \x3cdiv class="card">\x3ch2>수령증 미리보기\x3c/h2>\x3cdiv class="preview">${html()}\x3c/div>
-    \x3cdiv class="btns">\x3cbutton class="btn line" id="hsEdit">수량·명단 수정\x3c/button>\x3cbutton class="btn line" id="hsPrint">인쇄 / PDF\x3c/button>\x3cbutton class="btn line" id="hsXls">엑셀로 받기\x3c/button>\x3cbutton class="btn" id="hsDone">서명 마치기 (수령증 보관)\x3c/button>\x3c/div>
+    \x3cdiv class="btns">\x3clabel style="display:flex;gap:8px;align-items:center;color:var(--ink);margin:0;flex:1 0 100%">\x3cinput type="checkbox" id="hsFill" style="width:auto" ${r.dateMode==='fill'?'checked':''}> 수령일을 배분일(${esc(r.date)})로 채우기 \x3cspan class="muted">(끄면 서명한 날짜)\x3c/span>\x3c/label>\x3cbutton class="btn line" id="hsEdit">수량·명단 수정\x3c/button>\x3cbutton class="btn line" id="hsPrint">인쇄 / PDF\x3c/button>\x3cbutton class="btn line" id="hsXls">엑셀로 받기\x3c/button>\x3cbutton class="btn" id="hsDone">서명 마치기 (수령증 보관)\x3c/button>\x3c/div>
     \x3cp class="muted">서명 마치기를 누르면 수령증 PDF가 보관되고 임시 명단 파일은 휴지통으로 보내요.\x3c/p>\x3c/div>`;
     $('#hsBack').onclick=()=>go('hsign');
     $('#hsPrint').onclick=()=>printHtml(html(),true);
     $('#hsXls').onclick=e=>toExcel(e.target,html(),'가정배분수령증_'+r.date+'_'+r.manager,true);
     $('#hsEdit').onclick=()=>editHome();
+    $('#hsReload').onclick=e=>act(e.target,async()=>{ r=await run('getHomeSign',r.id); draw(); toast('새로 불러왔어요.'); },'불러오는 중...');
+    $('#hsFill').onchange=e=>{ r.dateMode=e.target.checked?'fill':'blank'; draw(); };
     $('#hsDone').onclick=e=>{ if(left&&!confirm(`아직 ${left}명이 서명하지 않았어요. 빈칸으로 두고 마칠까요?`)) return;
-      act(e.target, async()=>{ const h=html(); await run('finishHome',r.id,fitPage(h,true)); printHtml(h,true); toast('수령증을 보관했어요. 인쇄 창이 열려요.',3500); setTimeout(()=>go('hsign'),1500); }, '보관 중...'); };
+      act(e.target, async()=>{ const h=html(); await run('finishHome',r.id,fitPage(h,true)); bumpCount('hsign',-1); printHtml(h,true); toast('수령증을 보관했어요. 인쇄 창이 열려요.',3500); setTimeout(()=>go('hsign'),1500); }, '보관 중...'); };
   };
   const editHome=()=>{
-    const E=r.people.map((p,i)=>({i,name:p.name,addr:p.addr,idType:p.idType||'주소',qty:Object.assign({},p.qty),signed:!!p.sigUrl}));
+    const E=r.people.map((p,i)=>({i,name:p.name,addr:p.addr,idType:p.idType||'주소',qty:Object.assign({},p.qty),signed:!!p.sigUrl,ov:p.vs||{},vs:JSON.parse(JSON.stringify(p.vs||{}))}));
+    const vk=r.items.map(it=>it.key).filter(k=>r.people.some(p=>((p.vs||{})[k]||[]).length));
     const ed=()=>{
       $('#main').innerHTML=`\x3cbutton class="btn line sm" id="heBack">← 서명 화면\x3c/button>
       \x3cdiv class="card">\x3ch2>수량·명단 수정\x3c/h2>\x3cp class="note">재고와 배분 기록 숫자도 같이 맞춰져요. 이름·식별정보·수량이 바뀐 분은 \x3cb>서명을 다시\x3c/b> 받아야 해요.\x3c/p>
       \x3cdiv class="scroll">\x3ctable class="tbl">\x3ctr>\x3cth>성명\x3c/th>\x3cth>주소 / 생년월일\x3c/th>${r.items.map(it=>`\x3cth>${esc(it.name)}\x3c/th>`).join('')}\x3cth>\x3c/th>\x3c/tr>
       ${E.map((p,i)=>`\x3ctr>\x3ctd>\x3cinput data-i="${i}" data-f="name" value="${esc(p.name)}" style="width:90px">${p.signed?'\x3cbr>\x3cspan class="tag ok">서명함\x3c/span>':''}\x3c/td>\x3ctd>\x3cselect data-i="${i}" data-f="idType">\x3coption ${p.idType!=='생년월일'?'selected':''}>주소\x3c/option>\x3coption ${p.idType==='생년월일'?'selected':''}>생년월일\x3c/option>\x3c/select>\x3cinput data-i="${i}" data-f="addr" value="${esc(p.addr)}" style="min-width:150px">\x3c/td>
-        ${r.items.map(it=>`\x3ctd>\x3cinput class="q" inputmode="numeric" data-i="${i}" data-k="${esc(it.key)}" value="${p.qty[it.key]??''}">\x3c/td>`).join('')}\x3ctd>\x3cbutton class="btn line sm" data-x="${i}">빼기\x3c/button>\x3c/td>\x3c/tr>`).join('')}\x3c/table>\x3c/div>
-      \x3cdiv class="btns">\x3cbutton class="btn sub" id="heAdd">한 분 추가\x3c/button>\x3cspan style="flex:1">\x3c/span>\x3cbutton class="btn" id="heSave">저장\x3c/button>\x3c/div>\x3c/div>`;
+        ${r.items.map(it=>vk.includes(it.key)?`\x3ctd style="min-width:150px">\x3cb>${((p.vs||{})[it.key]||[]).length}\x3c/b>장${((p.ov||{})[it.key]||[]).length?'\x3cbr>'+vChips(p.ov[it.key],p.vs[it.key]||[],i+'|'+it.key):''}\x3c/td>`:`\x3ctd>\x3cinput class="q" inputmode="numeric" data-i="${i}" data-k="${esc(it.key)}" value="${p.qty[it.key]??''}">\x3c/td>`).join('')}\x3ctd>\x3cbutton class="btn line sm" data-x="${i}">빼기\x3c/button>\x3c/td>\x3c/tr>`).join('')}\x3c/table>\x3c/div>
+      \x3cdiv class="btns">\x3cbutton class="btn sub" id="heAdd">한 분 추가\x3c/button>\x3cspan style="flex:1">\x3c/span>\x3cbutton class="btn" id="heSave">저장\x3c/button>\x3c/div>${vk.length?'\x3cp class="muted">🎫 상품권은 번호를 누르면 \x3cb>돌려놓기\x3c/b>(관리대장에서 다시 「보유」)가 돼요. 더 주려면 새로 배분해 주세요.\x3c/p>':''}\x3c/div>`;
       $('#heBack').onclick=()=>{ draw(); bind(); };
-      $('#heAdd').onclick=()=>{ E.push({i:-1,name:'',addr:'',qty:{}}); ed(); };
+      $('#heAdd').onclick=()=>{ E.push({i:-1,name:'',addr:'',qty:{},ov:{},vs:{}}); ed(); };
       $('#main').oninput=e=>{ const t=e.target,p=E[t.dataset.i]; if(!p) return; if(t.dataset.f){if(t.dataset.f==='idType'&&p.idType!==t.value)p.addr='';p[t.dataset.f]=t.value;}if(t.dataset.k)p.qty[t.dataset.k]=t.value; };
-      $('#main').onclick=e=>{ const t=e.target; if(t.dataset.x){ E.splice(+t.dataset.x,1); ed(); } };
+      $('#main').onclick=e=>{ const t=e.target; if(t.dataset.x){ E.splice(+t.dataset.x,1); ed(); }
+        const c=e.target.closest('[data-vt]'); if(c){ const parts=c.dataset.vt.split('|'), p=E[parts[0]], k=parts.slice(1,-1).join('|'); p.vs[k]=vToggle(p.vs[k]||[],p.ov[k]||[],parts.pop()); ed(); } };
       $('#heSave').onclick=e=>act(e.target, async()=>{
-        r=await run('updateHomeSign',r.id,E.filter(p=>p.name.trim()).map(p=>({i:p.i,name:p.name.trim(),addr:p.addr,idType:p.idType||'주소',qty:p.qty})));
-        await refreshStock(); toast('고쳤어요. 재고 숫자도 같이 맞췄어요.',3000); $('#main').oninput=null; draw(); bind();
+        r=await run('updateHomeSign',r.id,E.filter(p=>p.name.trim()).map(p=>{ const qty=Object.assign({},p.qty), vs={}; vk.forEach(k=>{ vs[k]=(p.vs||{})[k]||[]; qty[k]=vs[k].length; }); return {i:p.i,name:p.name.trim(),addr:p.addr,idType:p.idType||'주소',qty:qty,vs:vk.length?vs:undefined}; }));
+        S.lv=null; await refreshStock(); toast('고쳤어요. 재고 숫자도 같이 맞췄어요.',3000); $('#main').oninput=null; draw(); bind();
       }, '저장 중...');
     };
     ed();
   };
-  const bind=()=>{ $('#main').onclick=async e=>{ const b=e.target.closest('[data-s]'); if(!b) return; const p=r.people[+b.dataset.s];
+  const sendLink=async i=>{ const p=r.people[i];
+    let L; try{ L=await run('makeSignLink',r.id,i,p.phone||''); }catch(e){
+      if(!String(e).includes('연락처')) return alert(e);
+      const v=prompt(`${p.name}님은 생년월일이 없어서 본인 확인에 연락처 뒤 4자리를 써요. 연락처를 넣어 주세요.`,''); if(!v) return;
+      try{ L=await run('makeSignLink',r.id,i,v.replace(/\D/g,'')); }catch(e2){ return alert(e2); } }
+    p.phone=L.phone; p.linked=true;
+    const m=$('#modal'), box=$('#modalBox');
+    box.innerHTML=`\x3ch2 style="margin:0 0 6px;font-size:17px">${esc(p.name)}님 서명 링크\x3c/h2>
+      \x3cp class="muted" style="margin:0 0 6px">받는 분은 링크를 열고 \x3cb>${esc(L.check)}\x3c/b>로 본인 확인 후 서명해요. 서명하면 링크가 닫히고, 안 하면 14일 뒤 닫혀요. 다시 복사해도 \x3cb>같은 링크\x3c/b>예요.\x3c/p>
+      \x3clabel>안내 문구 (고쳐서 복사해도 돼요)\x3c/label>\x3ctextarea id="lm" style="min-height:120px">${esc(L.msg)}\x3c/textarea>
+      \x3cdiv class="btns">\x3cbutton class="btn" id="lc">안내 문구 복사\x3c/button>\x3cbutton class="btn sub" id="lu">링크만 복사\x3c/button>\x3cspan style="flex:1">\x3c/span>\x3cbutton class="btn line" id="lx">닫기\x3c/button>\x3c/div>`;
+    m.style.display='flex';
+    $('#lc').onclick=()=>copyText($('#lm').value);
+    $('#lu').onclick=()=>copyText(L.url);
+    $('#lx').onclick=()=>{ m.style.display='none'; box.innerHTML=''; draw(); };
+  };
+  const bind=()=>{ $('#main').onclick=async e=>{ const ln=e.target.closest('[data-ln]'); if(ln) return sendLink(+ln.dataset.ln); const b=e.target.closest('[data-s]'); if(!b) return; const p=r.people[+b.dataset.s];
     const sig=await signPad(`${p.name}님 서명`); if(!sig) return;
     await act(b, async()=>{ r=await run('signHome',r.id,+b.dataset.s,sig); toast('서명했어요.'); draw(); }, '저장 중...'); }; };
   draw(); bind();
 }
 function editHomeTotals(x){
-  const E={count:x.count, qty:Object.fromEntries(x.items.map(i=>[i.key,i.qty]))};
+  const E={count:x.count, qty:Object.fromEntries(x.items.map(i=>[i.key,i.qty])), ser:Object.fromEntries(x.items.filter(i=>(i.serials||[]).length).map(i=>[i.key,i.serials.slice()]))};
   $('#main').onclick=null;
   $('#main').innerHTML=`\x3cbutton class="btn line sm" id="htBack">← 가정 확인\x3c/button>
   \x3cdiv class="card">\x3ch2>${esc(x.manager)} · ${esc(x.date)} 가정 배분 수정\x3c/h2>
   \x3cp class="note">종이로 뽑아 간 배분이라 명단은 없고, \x3cb>인원과 총 수량\x3c/b>만 고쳐요. ${x.status==='확인'?'이미 확인된 건이라 \x3cb>배분 기록도 같이\x3c/b> 바뀌어요.':'재고 숫자가 같이 맞춰져요.'} 수량을 0으로 하면 그 품목은 빠져요.\x3c/p>
   \x3cdiv class="row">\x3cdiv>\x3clabel>실제로 받은 인원\x3c/label>\x3cinput id="htCount" inputmode="numeric" value="${E.count}">\x3c/div>\x3c/div>
-  \x3ctable class="tbl" style="margin-top:10px">\x3ctr>\x3cth>품목\x3c/th>\x3cth>총 수량\x3c/th>\x3c/tr>${x.items.map(i=>`\x3ctr>\x3ctd>${esc(i.name)} \x3cspan class="muted">${esc(i.inDate)} 입고\x3c/span>\x3c/td>\x3ctd>\x3cinput class="q" inputmode="numeric" data-k="${esc(i.key)}" value="${i.qty}">\x3c/td>\x3c/tr>`).join('')}\x3c/table>
+  \x3ctable class="tbl" style="margin-top:10px">\x3ctr>\x3cth>품목\x3c/th>\x3cth>총 수량\x3c/th>\x3c/tr>${x.items.map(i=>`\x3ctr>\x3ctd>${esc(i.name)} \x3cspan class="muted">${esc(i.inDate)} 입고\x3c/span>\x3c/td>\x3ctd id="ht_${esc(i.key)}">${E.ser[i.key]?'':`\x3cinput class="q" inputmode="numeric" data-k="${esc(i.key)}" value="${i.qty}">`}\x3c/td>\x3c/tr>`).join('')}\x3c/table>
+  ${Object.keys(E.ser).length?'\x3cp class="muted">🎫 상품권은 번호를 누르면 \x3cb>돌려놓기\x3c/b>(관리대장에서 다시 「보유」)가 돼요. 더 주려면 새로 배분해 주세요.\x3c/p>':''}
   \x3cdiv class="btns">\x3cspan style="flex:1">\x3c/span>\x3cbutton class="btn" id="htSave">저장\x3c/button>\x3c/div>\x3c/div>`;
   $('#htBack').onclick=()=>go('homeok');
+  const drawSer=()=>x.items.filter(i=>E.ser[i.key]).forEach(i=>{ const td=document.getElementById('ht_'+i.key); if(td) td.innerHTML=`\x3cb>${E.ser[i.key].length}\x3c/b>장\x3cbr>${vChips(i.serials,E.ser[i.key],i.key)}`; });
+  drawSer();
+  $('#main').onclick=e=>{ const c=e.target.closest('[data-vt]'); if(!c) return; const parts=c.dataset.vt.split('|'), sr=parts.pop(), k=parts.join('|'), it=x.items.find(i=>i.key===k); E.ser[k]=vToggle(E.ser[k],it.serials,sr); drawSer(); };
   $('#htCount').oninput=e=>E.count=e.target.value;
   $('#main').oninput=e=>{ const t=e.target; if(t.dataset.k) E.qty[t.dataset.k]=t.value; };
   $('#htSave').onclick=e=>act(e.target, async()=>{
-    await run('updateHomeTotals',x.id,{count:E.count,items:x.items.map(i=>({key:i.key,qty:E.qty[i.key]}))});
-    await refreshStock(); toast('고쳤어요.'); go('homeok');
+    await run('updateHomeTotals',x.id,{count:E.count,items:x.items.map(i=>E.ser[i.key]?{key:i.key,qty:E.ser[i.key].length,serials:E.ser[i.key]}:{key:i.key,qty:E.qty[i.key]})});
+    S.lv=null; await refreshStock(); toast('고쳤어요.'); go('homeok');
   }, '저장 중...');
 }
 async function vouchView(){
@@ -550,12 +652,12 @@ async function vouchView(){
   \x3cdiv class="card">\x3ch2>상품권 보유 현황\x3c/h2>\x3ctable class="tbl">\x3ctr>\x3cth>종류\x3c/th>\x3cth>보유\x3c/th>\x3cth>보유 금액\x3c/th>\x3cth>지급완료\x3c/th>\x3c/tr>
   ${V.summary.map(x=>`\x3ctr>\x3ctd>${esc(x.kind)}\x3c/td>\x3ctd>\x3cb>${x.held}\x3c/b>장\x3c/td>\x3ctd>${won(x.heldAmt)}원\x3c/td>\x3ctd class="muted">${x.out}장\x3c/td>\x3c/tr>`).join('')}\x3c/table>
   \x3cdiv class="btns">\x3cbutton class="btn line sm" id="vCheck">월말 점검표 인쇄 (보유 목록)\x3c/button>\x3cbutton class="btn line sm" id="vCheckX">점검표 엑셀\x3c/button>${S.boot.admin?'\x3cbutton class="btn line sm" id="vAddOpen">상품권 입고 등록\x3c/button>':''}\x3c/div>\x3cdiv id="vAdd">\x3c/div>\x3c/div>
-  \x3cdiv class="card">\x3ch2>지급하기\x3c/h2>
+  \x3cdiv class="card frm">\x3ch2>지급하기\x3c/h2>
   \x3clabel>1. 나가는 상품권 고르기 (실물 번호를 보고 체크)\x3c/label>
   \x3cdiv class="row">\x3cdiv>\x3cselect id="vKind">\x3coption value="">모든 종류\x3c/option>${V.kinds.map(k=>`\x3coption ${k===G.kind?'selected':''}>${esc(k)}\x3c/option>`).join('')}\x3c/select>\x3c/div>\x3cdiv>\x3cinput id="vQ" placeholder="번호 끝자리로 찾기">\x3c/div>\x3c/div>
   \x3cdiv class="row" style="margin-top:6px">\x3cdiv style="flex:0 0 auto">\x3cinput id="vN" class="q" inputmode="numeric" placeholder="장수">\x3c/div>\x3cdiv style="flex:0 0 auto">\x3cbutton class="btn sub sm" id="vFirst">앞에서부터 선택\x3c/button> \x3cbutton class="btn line sm" id="vClear">선택 해제\x3c/button>\x3c/div>\x3c/div>
   \x3cdiv class="lots" id="vList" style="max-height:260px;margin-top:6px">\x3c/div>\x3cp id="vSel" class="muted">\x3c/p>
-  \x3clabel>2. 받는 사람과 장수 (고른 순서대로 나눠 담겨요)\x3c/label>\x3cdiv id="vPeople">\x3c/div>\x3cdiv class="btns" style="margin-top:6px">\x3cbutton class="btn line sm" id="vAddP">한 명 추가\x3c/button>\x3cbutton class="btn line sm" id="vPasteOpen">당사자 명단 붙여넣기\x3c/button>\x3c/div>\x3cdiv id="vPaste">\x3c/div>
+  \x3clabel>2. 받는 사람과 장수 (고른 순서대로 나눠 담겨요)\x3c/label>\x3cdiv id="vPeople">\x3c/div>\x3cdiv class="btns" style="margin-top:6px">\x3cbutton class="btn line sm" id="vAddP">한 명 추가\x3c/button>\x3cbutton class="btn line sm" id="vPasteOpen">당사자 명단 붙여넣기\x3c/button>${S.boot.fam?'\x3cbutton class="btn line sm" id="vFam">이용인 명단에서 고르기\x3c/button>':''}\x3c/div>\x3cdiv id="vPaste">\x3c/div>
   \x3cdiv id="vAssign">\x3c/div>
   \x3cdiv class="row">\x3cdiv>\x3clabel>지급일\x3c/label>\x3cinput type="date" id="vDate" value="${G.date}">\x3c/div>\x3cdiv>\x3clabel>사용목적 (사업·행사)\x3c/label>\x3cinput id="vPur" value="${esc(G.purpose)}">\x3c/div>\x3c/div>
   \x3cdiv class="row">\x3cdiv>\x3clabel>출고담당자\x3c/label>\x3cinput id="vBy" value="${esc(G.outBy)}">\x3c/div>\x3cdiv>\x3clabel>수령확인\x3c/label>\x3cinput id="vChk" value="${esc(G.check)}">\x3c/div>\x3c/div>
@@ -586,6 +688,7 @@ async function vouchView(){
     drawAssign(); };
   $('#vPeople').onchange=e=>{ if(e.target.dataset.f==='type'){ G.people[e.target.dataset.pi].type=e.target.value; drawPeople(); } };
   $('#vPeople').onclick=e=>{ if(e.target.dataset.px){ G.people.splice(+e.target.dataset.px,1); if(!G.people.length) G.people.push({type:'직원',name:'',team:'',addr:'',n:''}); drawPeople(); } };
+  if($('#vFam')) $('#vFam').onclick=()=>famPick('상품권 받는 분 고르기',list=>{ G.people=G.people.filter(p=>p.name.trim()).concat(list.map(f=>({type:'당사자',idType:'주소',name:f.name,addr:f.addr,team:'',n:'1'}))); drawPeople(); toast(`${list.length}명을 넣었어요. 장수를 확인해 주세요.`,3500); });
   $('#vPasteOpen').onclick=()=>{ $('#vPaste').innerHTML=`\x3clabel>명단 전체에 사용할 정보\x3cselect id="vPasteType">\x3coption>주소\x3c/option>\x3coption>생년월일\x3c/option>\x3c/select>\x3c/label>\x3clabel>한 줄에 한 분씩 「이름, 선택한 식별정보, 장수」 (장수가 없으면 1장)\x3c/label>\x3ctextarea id="vPasteT" placeholder="홍길동, 종로구 예시로 1, 2&#10;김예시, 종로구 예시로 2, 1">\x3c/textarea>\x3cdiv class="btns">\x3cbutton class="btn sub sm" id="vPasteGo">명단 넣기\x3c/button>\x3c/div>`;
     $('#vPasteGo').onclick=()=>{ const rows=$('#vPasteT').value.split(/\r?\n/).map(x=>x.trim()).filter(Boolean).map(line=>{ const t=line.split(/\t|,/).map(x=>x.trim()); let n=1; if(t.length>1&&/^\d+$/.test(t[t.length-1])) n=+t.pop(); return {type:'당사자',idType:$('#vPasteType').value,name:t[0],addr:t.slice(1).filter(Boolean).join(' '),team:'',n:String(n)}; });
       if(!rows.length) return toast('명단을 넣어 주세요.');
@@ -616,7 +719,7 @@ async function vouchView(){
     \x3cdiv class="row">\x3cdiv>\x3clabel>상품권 종류\x3c/label>\x3cinput id="aKind" list="kindList">\x3cdatalist id="kindList">${V.kinds.map(k=>`\x3coption value="${esc(k)}">`).join('')}\x3c/datalist>\x3c/div>\x3cdiv>\x3clabel>면액 (원)\x3c/label>\x3cinput id="aFace" inputmode="numeric" placeholder="10000">\x3c/div>\x3c/div>
     \x3cdiv class="row">\x3cdiv>\x3clabel>입고일 (후원물품등록과 같은 날짜로)\x3c/label>\x3cinput type="date" id="aDate" value="${S.boot.today}">\x3c/div>\x3cdiv>\x3clabel>입고처\x3c/label>\x3cinput id="aSrc" list="srcList">\x3cdatalist id="srcList">${V.srcs.map(k=>`\x3coption value="${esc(k)}">`).join('')}\x3c/datalist>\x3c/div>\x3c/div>
     \x3cdiv class="row">\x3cdiv>\x3clabel>입고담당자\x3c/label>\x3cinput id="aBy" value="${esc(G.outBy)}">\x3c/div>\x3cdiv>\x3clabel>지정내용 (없으면 비워 두기)\x3c/label>\x3cinput id="aTgt">\x3c/div>\x3c/div>
-    \x3clabel>일련번호 (한 줄에 하나씩, 상품권에 찍힌 번호 그대로)\x3c/label>\x3ctextarea id="aSer" placeholder="272610566855119&#10;272610566855102">\x3c/textarea>
+    \x3clabel>일련번호 (한 줄에 하나씩, 상품권에 찍힌 번호 그대로)\x3c/label>\x3ctextarea id="aSer" placeholder="000000000000001&#10;000000000000002">\x3c/textarea>
     \x3cdiv class="btns">\x3cbutton class="btn" id="aGo">입고 등록\x3c/button>\x3c/div>\x3c/div>`;
     $('#aGo').onclick=e=>act(e.target, async()=>{ const ser=$('#aSer').value.split(/[\s,]+/).filter(Boolean);
       const n=await run('addVouchers',{kind:$('#aKind').value,face:$('#aFace').value,inDate:$('#aDate').value,src:$('#aSrc').value,inBy:$('#aBy').value,target:$('#aTgt').value,serials:ser});
@@ -636,8 +739,8 @@ async function homeOkView(){
   ${wait.length?`\x3ctable class="tbl">${wait.map(x=>`\x3ctr>\x3ctd>\x3cb>${esc(x.manager)}\x3c/b> · ${esc(x.date)} · ${x.count}명\x3cbr>\x3cspan class="muted">${line(x)}\x3c/span>\x3c/td>\x3ctd style="text-align:right;white-space:nowrap">${x.sign?'':`\x3cbutton class="btn sm line" data-ed="${x.id}">수정\x3c/button> `}\x3cbutton class="btn sm" data-ok="${x.id}">확인\x3c/button> \x3cbutton class="btn sm line" data-no="${x.id}">취소\x3c/button>\x3c/td>\x3c/tr>`).join('')}\x3c/table>`:'\x3cp class="muted">기다리는 요청이 없어요.\x3c/p>'}\x3c/div>
   \x3cdiv class="card">\x3ch2>최근 처리\x3c/h2>${done.length?`\x3ctable class="tbl">${done.map(x=>`\x3ctr>\x3ctd>${esc(x.manager)} · ${esc(x.date)} · ${x.count}명\x3cbr>\x3cspan class="muted">${line(x)}\x3c/span>\x3c/td>\x3ctd style="white-space:nowrap">\x3cspan class="tag ${x.status==='확인'?'ok':''}">${esc(x.status)}\x3c/span>${x.status==='확인'&&!x.sign?` \x3cbutton class="btn sm line" data-ed="${x.id}">수정\x3c/button>`:''}\x3c/td>\x3c/tr>`).join('')}\x3c/table>`:'\x3cp class="muted">없어요.\x3c/p>'}\x3c/div>`;
   $('#main').onclick=e=>{ const t=e.target; if(t.dataset.ed) return editHomeTotals(list.find(x=>x.id===t.dataset.ed)); const id=t.dataset.ok||t.dataset.no; if(!id) return;
-    if(t.dataset.no && !confirm('이 요청을 취소할까요? 미리 빼 둔 재고가 돌아와요.')) return;
-    act(t, async()=>{ await run('confirmHome',id,!!t.dataset.ok); bumpCount('home',-1); refreshStockLater(); toast(t.dataset.ok?'배분 기록에 넣었어요.':'취소했어요.'); homeOkView(); }); };
+    if(t.dataset.no && !confirm('이 요청을 취소할까요? 미리 빼 둔 재고가 돌아와요.'+((list.find(x=>x.id===id)||{items:[]}).items.some(i=>(i.serials||[]).length)?' 상품권 번호도 관리대장에서 「보유」로 돌아가요.':''))) return;
+    act(t, async()=>{ await run('confirmHome',id,!!t.dataset.ok); if(t.dataset.no) S.lv=null; bumpCount('home',-1); refreshStockLater(); toast(t.dataset.ok?'배분 기록에 넣었어요.':'취소했어요.'); homeOkView(); }); };
 }
 
 
@@ -647,10 +750,10 @@ async function orgView(){
   const [orgs, rc] = await Promise.all([run('listOrgs'), run('listReceipts')]);
   const wait=rc.filter(r=>r.type==='기관'&&r.status==='회수 대기'), done=rc.filter(r=>r.type==='기관'&&r.status!=='회수 대기').slice(0,10);
   $('#main').innerHTML=`
-  \x3cdiv class="card">\x3ch2>받는 기관\x3c/h2>\x3clabel>저장된 기관에서 고르기\x3c/label>\x3cselect id="oPick">\x3coption value="">새 기관 입력\x3c/option>${orgs.map((o,i)=>`\x3coption value="${i}" ${o.name===O.org.name?'selected':''}>${esc(o.name)}\x3c/option>`).join('')}\x3c/select>
+  \x3cdiv class="card frm">\x3ch2>받는 기관\x3c/h2>\x3clabel>저장된 기관에서 고르기\x3c/label>\x3cselect id="oPick">\x3coption value="">새 기관 입력\x3c/option>${orgs.map((o,i)=>`\x3coption value="${i}" ${o.name===O.org.name?'selected':''}>${esc(o.name)}\x3c/option>`).join('')}\x3c/select>
   \x3cdiv class="row">\x3cdiv>\x3clabel>기관명\x3c/label>\x3cinput id="o_name">\x3c/div>\x3cdiv>\x3clabel>대표자\x3c/label>\x3cinput id="o_ceo">\x3c/div>\x3c/div>
   \x3clabel>주소\x3c/label>\x3cinput id="o_addr">\x3cdiv class="row">\x3cdiv>\x3clabel>연락처\x3c/label>\x3cinput id="o_tel">\x3c/div>\x3cdiv>\x3clabel>수령자 (모르면 비워 두세요)\x3c/label>\x3cinput id="o_contact">\x3c/div>\x3c/div>\x3c/div>
-  \x3cdiv class="card">\x3ch2>물품\x3c/h2>\x3cdiv class="row">\x3cdiv>\x3clabel>전달일\x3c/label>\x3cinput type="date" id="oDate" value="${O.date}">\x3c/div>\x3c/div>\x3clabel>물품 고르기\x3c/label>\x3cdiv id="oPick2">\x3c/div>\x3cdiv id="oQty">\x3c/div>
+  \x3cdiv class="card frm">\x3ch2>물품\x3c/h2>\x3cdiv class="row">\x3cdiv>\x3clabel>전달일\x3c/label>\x3cinput type="date" id="oDate" value="${O.date}">\x3c/div>\x3c/div>\x3clabel>물품 고르기\x3c/label>\x3cdiv id="oPick2">\x3c/div>\x3cdiv id="oQty">\x3c/div>
   \x3clabel>비고 (선택)\x3c/label>\x3cinput id="oNote" value="${esc(O.note)}">\x3c/div>
   \x3cdiv class="btns">\x3cbutton class="btn" id="oGo">배분 기록하고 인수증 만들기\x3c/button>\x3c/div>
   \x3cdiv class="card" style="margin-top:12px">\x3ch2>직인 받을 인수증\x3c/h2>${wait.length?`\x3ctable class="tbl">${wait.map(r=>`\x3ctr>\x3ctd>\x3cb>${esc(r.orgInfo.name)}\x3c/b> · ${esc(r.date)}\x3cbr>\x3cspan class="muted">${r.items.map(i=>`${esc(i.name)} ${i.give}${esc(i.unit)}`).join(', ')}\x3c/span>\x3c/td>\x3ctd style="text-align:right;white-space:nowrap">\x3cbutton class="btn sm line" data-p="${r.id}">출력\x3c/button> \x3cbutton class="btn sm line" data-ox="${r.id}">엑셀\x3c/button> \x3cbutton class="btn sm" data-r="${r.id}">회수 완료\x3c/button>\x3c/td>\x3c/tr>`).join('')}\x3c/table>`:'\x3cp class="muted">기다리는 인수증이 없어요.\x3c/p>'}
@@ -706,7 +809,7 @@ function dispHtml(d){
 }
 async function dispView(){
   const P = S.disp || (S.disp={sel:[], qty:{}, reason:'유통기한 지남', etc:'', date:S.boot.today, photo:null});
-  $('#main').innerHTML=`\x3cdiv class="card">\x3ch2>폐기 등록\x3c/h2>\x3clabel>폐기할 물품 (여러 개 고를 수 있어요)\x3c/label>\x3cdiv id="xPick">\x3c/div>\x3cdiv id="xQty">\x3c/div>
+  $('#main').innerHTML=`\x3cdiv class="card frm">\x3ch2>폐기 등록\x3c/h2>\x3clabel>폐기할 물품 (여러 개 고를 수 있어요)\x3c/label>\x3cdiv id="xPick">\x3c/div>\x3cdiv id="xQty">\x3c/div>
   \x3cdiv class="row">\x3cdiv>\x3clabel>폐기일\x3c/label>\x3cinput type="date" id="xDate" value="${P.date}">\x3c/div>\x3c/div>
   \x3clabel>사유\x3c/label>\x3cselect id="xWhy">${['유통기한 지남','파손·변질','보존연한 경과','사용 불가','기타'].map(t=>`\x3coption ${t===P.reason?'selected':''}>${t}\x3c/option>`).join('')}\x3c/select>
   \x3cinput id="xEtc" placeholder="자세한 사유 (예: 습도가 높은 창고 보관으로 부식이 발견됨)" value="${esc(P.etc)}" style="margin-top:6px">
@@ -764,14 +867,14 @@ async function stockView(){
     const L=list.filter(l=>!q||l.name.includes(q)||(l.donor||'').includes(q));
     $('#kList').innerHTML=L.length?L.map(l=>{ const d=daysTo(l.expiry);
       return `\x3cdiv class="lot" style="cursor:default">\x3cspan>\x3cb>${esc(l.name)}\x3c/b>\x3cbr>\x3cspan class="muted">${esc(l.inDate)} 입고${l.donor?' · '+esc(l.donor):''}${l.expiry?` · \x3cspan class="${d!=null&&d<=30?'exp':''}">유통 ${esc(l.expiry)}${d!=null&&d<0?' (지남)':d!=null&&d<=30?` (${d}일 남음)`:''}\x3c/span>`:''}\x3c/span>
-      ${S.boot.admin?`\x3cbr>\x3cspan class="muted">입고 ${l.inQty} · 나감 ${l.out} · 폐기 ${l.disp}${l.pending?` · 확인 대기 ${l.pending}`:''}\x3c/span>`:''}${l.photo&&/^https?:/.test(l.photo)?` \x3ca href="${esc(l.photo)}" target="_blank" class="muted">사진\x3c/a>`:''}\x3c/span>
+      ${(S.boot.admin||S.boot.viewer)?`\x3cbr>\x3cspan class="muted">입고 ${l.inQty} · 나감 ${l.out} · 폐기 ${l.disp}${l.pending?` · 확인 대기 ${l.pending}`:''}\x3c/span>`:''}${l.photo&&/^https?:/.test(l.photo)?` \x3ca href="${esc(l.photo)}" target="_blank" class="muted">사진\x3c/a>`:''}\x3c/span>
       \x3cspan style="white-space:nowrap">남은 \x3cb>${l.remain}\x3c/b>${esc(l.unit||'')}\x3c/span>\x3c/div>`;}).join(''):'\x3cp class="muted">없어요.\x3c/p>'; };
   let check='';
-  if(S.boot.admin){ const full=await run('getStock',true);
+  if((S.boot.admin||S.boot.viewer)){ const full=await run('getStock',true);
     const odd=full.filter(l=>l.remain<0||(l.done&&l.remain>0));
     if(odd.length) check=`\x3cdiv class="card note warn">\x3cb>확인이 필요한 물품 ${odd.length}개\x3c/b>\x3cbr>${odd.map(l=>`· ${esc(l.name)} (${esc(l.inDate)} 입고) — ${l.remain<0?`남은 수량 ${l.remain}: 등록 시트 지원수량(M열)과 배분 기록에 \x3cb>두 번\x3c/b> 들어갔는지 확인`:`사용완료 체크인데 ${l.remain}개 남음: 지원수량(M열)에 나간 수량 입력`}`).join('\x3cbr>')}\x3c/div>`; }
   $('#main').innerHTML=expiryCard()+check+`\x3cdiv class="card">\x3ch2>재고 \x3cbutton class="btn line sm" id="kFresh" style="float:right">↻ 최신으로\x3c/button>\x3c/h2>\x3cinput id="kq" placeholder="품명이나 후원처로 찾기">
-  ${S.boot.admin?'\x3clabel style="display:flex;gap:8px;align-items:center;color:var(--ink)">\x3cinput type="checkbox" id="kAll" style="width:auto"> 다 나간 물품도 보기\x3c/label>':''}\x3cdiv id="kList">\x3c/div>\x3cp style="margin-top:12px">\x3ca href="https://docs.google.com/forms/d/e/1FAIpQLSdFv6PF9OE8ac1YFcNvo2Q-MVCW1wAA5lnunsR5EDa6tuQZww/viewform" target="_blank" rel="noopener noreferrer">목록에 없는 후원품 등록 ↗\x3c/a>\x3c/p>\x3c/div>`;
+  ${(S.boot.admin||S.boot.viewer)?'\x3clabel style="display:flex;gap:8px;align-items:center;color:var(--ink)">\x3cinput type="checkbox" id="kAll" style="width:auto"> 다 나간 물품도 보기\x3c/label>':''}\x3cdiv id="kList">\x3c/div>\x3cp style="margin-top:12px">\x3ca href="https://docs.google.com/forms/d/e/1FAIpQLSdFv6PF9OE8ac1YFcNvo2Q-MVCW1wAA5lnunsR5EDa6tuQZww/viewform" target="_blank" rel="noopener noreferrer">목록에 없는 후원품 등록 ↗\x3c/a>\x3c/p>\x3c/div>`;
   $('#kq').oninput=draw;
   $('#kFresh').onclick=e=>act(e.target, async()=>{ S.stock=await run('getStock',false,true); list=all?await run('getStock',true):S.stock; buildNav(); draw(); toast('시트를 다시 읽었어요.'); }, '읽는 중...');
   $('#kAll')&&($('#kAll').onchange=async e=>{ all=e.target.checked; $('#kList').innerHTML='\x3cp class="muted">불러오는 중...\x3c/p>'; list=all?await run('getStock',true):S.stock; draw(); });
@@ -787,7 +890,21 @@ async function setupView(){
   \x3cdiv class="card">\x3ch2>수령증 배분처\x3c/h2>\x3cp class="muted" style="margin:0 0 6px">수령증 위쪽 「배분처」 칸에 들어가는 후원 담당 팀이에요.\x3c/p>\x3cdiv class="row">\x3cdiv>\x3cinput id="deptIn" value="${esc(S.boot.dept||'일상동행팀')}">\x3c/div>\x3cdiv style="flex:0 0 auto">\x3cbutton class="btn sm" id="deptSave">저장\x3c/button>\x3c/div>\x3c/div>\x3c/div>
   \x3cdiv class="card">\x3ch2>상품권 사용 권한\x3c/h2>\x3cp class="muted" style="margin:0 0 6px">상품권 탭을 쓸 직원의 \x3cb>기관 메일\x3c/b>을 한 줄에 하나씩 넣어 주세요. 이 직원들은 상품권 \x3cb>지급·수령증·본인이 지급한 것 수정/취소\x3c/b>만 할 수 있어요. 입고와 다른 탭 관리는 관리자만 해요.\x3c/p>
   \x3ctextarea id="vuIn" placeholder="hong@example.org" style="min-height:70px">\x3c/textarea>\x3cdiv class="btns">\x3cbutton class="btn sm" id="vuSave">저장\x3c/button>\x3c/div>\x3c/div>
+  \x3cdiv class="card">\x3ch2>보기 전용 권한 (팀장님·국장님 등)\x3c/h2>\x3cp class="muted" style="margin:0 0 6px">모든 탭을 \x3cb>볼 수만\x3c/b> 있어요(수령증 열기·인쇄·엑셀 가능). 등록·수정·취소는 관리자만 해요. \x3cb>만료일\x3c/b>이 지나면 저절로 닫혀요.\x3c/p>
+  \x3cdiv id="vwList">\x3c/div>\x3cdiv class="row" style="margin-top:6px">\x3cdiv>\x3cinput id="vwMail" placeholder="기관 메일">\x3c/div>\x3cdiv style="flex:0 0 150px">\x3cinput type="date" id="vwUntil">\x3c/div>\x3cdiv style="flex:0 0 auto">\x3cbutton class="btn sm" id="vwAdd">추가\x3c/button>\x3c/div>\x3c/div>\x3c/div>
+  \x3cdiv class="card">\x3ch2>이용인 명단 사용 권한\x3c/h2>\x3cp class="muted" style="margin:0 0 6px">가정 배분·상품권에서 \x3cb>「이용인 명단」 탭\x3c/b>을 불러와 골라 넣을 수 있는 직원의 \x3cb>기관 메일\x3c/b>을 한 줄에 하나씩 넣어 주세요. 관리자는 항상 쓸 수 있어요. 탭은 숨기거나 잠가도 불러와져요.\x3c/p>
+  \x3ctextarea id="fuIn" placeholder="teamlead@example.org" style="min-height:60px">\x3c/textarea>\x3cdiv class="btns">\x3cbutton class="btn sm" id="fuSave">저장\x3c/button>\x3c/div>\x3c/div>
+  \x3cdiv class="card">\x3ch2>외부 서명용 주소 (서명 링크)\x3c/h2>\x3cp class="muted" style="margin:0 0 6px">택배로 받은 분께 문자·카톡으로 서명 링크를 보낼 때 쓰는 주소예요. 배포를 하나 더 만들어(액세스: \x3cb>모든 사용자\x3c/b>) 그 웹 앱 주소(…/exec)를 넣어 주세요. 이 주소로는 \x3cb>서명 화면만\x3c/b> 열리고 다른 기능은 막혀 있어요.\x3c/p>
+  \x3cdiv class="row">\x3cdiv>\x3cinput id="puIn" value="${esc(S.boot.publicUrl||'')}" placeholder="https://script.google.com/…/exec">\x3c/div>\x3cdiv style="flex:0 0 auto">\x3cbutton class="btn sm" id="puSave">저장\x3c/button>\x3c/div>\x3c/div>\x3c/div>
   \x3cdiv id="cards">\x3c/div>`;
+  let VW=[]; const drawVw=()=>{ $('#vwList').innerHTML=VW.length?`\x3ctable class="tbl">${VW.map((v,i)=>`\x3ctr>\x3ctd>${esc(v.email)}\x3c/td>\x3ctd>${esc(v.until)}까지 ${v.until>=S.boot.today?'\x3cspan class="tag ok">사용 중\x3c/span>':'\x3cspan class="tag">만료\x3c/span>'}\x3c/td>\x3ctd style="text-align:right">\x3cbutton class="btn line sm" data-vw="${i}">빼기\x3c/button>\x3c/td>\x3c/tr>`).join('')}\x3c/table>`:'\x3cp class="muted">아직 없어요.\x3c/p>'; };
+  const saveVw=async btn=>act(btn,async()=>{ VW=await run('saveViewers',VW); drawVw(); toast('저장했어요.'); },'저장 중...');
+  run('getViewers').then(v=>{ VW=v; if($('#vwList')) drawVw(); });
+  $('#vwList').onclick=e=>{ const i=e.target.dataset.vw; if(i===undefined) return; VW.splice(+i,1); saveVw(e.target); };
+  $('#vwAdd').onclick=e=>{ const m=$('#vwMail').value.trim(), u=$('#vwUntil').value; if(!/@/.test(m)||!u) return toast('메일과 만료일을 넣어 주세요.'); VW=VW.filter(v=>v.email!==m.toLowerCase()).concat([{email:m,until:u}]); $('#vwMail').value=''; saveVw(e.target); };
+  run('getFamUsers').then(v=>{ if($('#fuIn')) $('#fuIn').value=v.join('\n'); });
+  $('#fuSave').onclick=e=>act(e.target, async()=>{ const v=await run('saveFamUsers',$('#fuIn').value); $('#fuIn').value=v.join('\n'); toast(`${v.length}명에게 명단 권한을 줬어요.`); });
+  $('#puSave').onclick=e=>act(e.target, async()=>{ S.boot.publicUrl=await run('savePublicUrl',$('#puIn').value); toast('저장했어요.'); });
   run('getVoucherUsers').then(v=>{ if($('#vuIn')) $('#vuIn').value=v.join('\n'); });
   $('#vuSave').onclick=e=>act(e.target, async()=>{ const v=await run('saveVoucherUsers',$('#vuIn').value); $('#vuIn').value=v.join('\n'); toast(`${v.length}명에게 상품권 권한을 줬어요.`); });
   $('#deptSave').onclick=e=>act(e.target, async()=>{ S.boot.dept=await run('saveDept',$('#deptIn').value); toast('저장했어요.'); });
