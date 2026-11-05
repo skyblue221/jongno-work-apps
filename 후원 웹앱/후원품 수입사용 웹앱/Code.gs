@@ -142,17 +142,56 @@ function needVouch_() { if (!canVouch_()) throw new Error('상품권 권한이 �
 function getVoucherUsers() { needAdmin_(); return vouchUsers_(); }
 function saveVoucherUsers(list) { needAdmin_(); const v = String(list || '').toLowerCase().split(/[,\s]+/).filter(x => /@/.test(x)); props_().setProperty('VUSERS', v.join(',')); return v; }
 function withLock_(fn) { const l = LockService.getScriptLock(); l.waitLock(30000); clearCache_(); try { return fn(); } finally { clearCache_(); l.releaseLock(); } }
-/* 속도: 한 번 실행 안에서 같은 탭을 여러 번 읽지 않게(MEMO), 재고 계산은 몇 분간 저장(CacheService) */
+/* 속도: 한 번 실행 안에서 같은 탭을 여러 번 읽지 않게(MEMO), 재고 계산은 1시간까지 저장(CacheService)
+   - 앱에서 저장하거나 시트에서 직접 고치면(onEdit) '버전'이 바뀌어 바로 새로 계산
+   - 설문지 응답처럼 onEdit이 안 생기는 추가도 탭의 마지막 줄 번호가 바뀌면 새로 계산
+   - 큰 결과도 저장되게 30,000자씩 나눠서 저장 (한 칸에 100KB까지만 들어가요) */
 const MEMO = {};
-const CACHE_SEC = 300;
-function clearCache_() { Object.keys(MEMO).forEach(k => delete MEMO[k]); try { CacheService.getScriptCache().removeAll(['stock', 'staff']); } catch (e) {} }
+const CACHE_SEC = 3600;
+const CACHE_TABS = ['REG', 'DIST', 'DISP', 'STAFF'];
+function clearCache_() { Object.keys(MEMO).forEach(k => delete MEMO[k]); try { props_().setProperty('CACHE_REV', Utilities.getUuid().slice(0, 8)); } catch (e) {} }
+/** 저장해 둔 재고가 아직 맞는지 가리는 표시: 버전 + 각 탭 마지막 줄 번호 */
+function cacheStamp_() {
+  if (MEMO.stamp) return MEMO.stamp;
+  const rows = CACHE_TABS.concat(['@HOME']).map(k => { const sh = k[0] === '@' ? ss_().getSheetByName(APP.own[k.slice(1)]) : sheet_(k); return sh ? sh.getLastRow() : 0; });
+  return (MEMO.stamp = (props_().getProperty('CACHE_REV') || '0') + ':' + rows.join('.'));
+}
 function cached_(key, fn) {
   if (MEMO[key]) return MEMO[key];
-  const c = CacheService.getScriptCache();
-  try { const hit = c.get(key); if (hit) return (MEMO[key] = JSON.parse(hit)); } catch (e) {}
+  const c = CacheService.getScriptCache(), prefix = 'v2:' + key + ':' + cacheStamp_();
+  try {
+    const m = JSON.parse(c.get(prefix) || 'null');
+    if (m && m.count > 0) {
+      const keys = Array.from({ length: m.count }, (_, i) => prefix + ':' + m.token + ':' + i), parts = c.getAll(keys);
+      if (keys.every(k => typeof parts[k] === 'string')) return (MEMO[key] = JSON.parse(keys.map(k => parts[k]).join('')));
+    }
+  } catch (e) {}
   const v = fn(); MEMO[key] = v;
-  try { c.put(key, JSON.stringify(v), CACHE_SEC); } catch (e) {}
+  try {
+    const json = JSON.stringify(v), count = Math.ceil(json.length / 30000);
+    if (count && count <= 60) {
+      const token = Utilities.getUuid().slice(0, 8), parts = {};
+      for (let i = 0; i < count; i++) parts[prefix + ':' + token + ':' + i] = json.slice(i * 30000, (i + 1) * 30000);
+      c.putAll(parts, CACHE_SEC); c.put(prefix, JSON.stringify({ count, token }), CACHE_SEC);
+    }
+  } catch (e) {}
   return v;
+}
+/** 시트에서 직접 고치면 재고·직원 목록을 새로 계산하게 함 */
+function onEdit(e) {
+  try {
+    const name = e && e.range ? e.range.getSheet().getName() : '';
+    const n = s => String(s).replace(/^\s*\d+\s*[.)_\-]\s*/, '').replace(/\s+/g, '');
+    if (!name || CACHE_TABS.some(k => n(APP.sheets[k]) === n(name)) || name === APP.own.HOME) clearCache_();
+  } catch (err) {}
+}
+/* 미리 계산해 두기: 편집기에서 installWarmTrigger를 한 번 ▶실행하면 1시간마다 재고를 미리 계산해 둬요 */
+function warmCache() { if (setupDone_()) { stockCached_(); staff_(); } }
+function installWarmTrigger() {
+  ScriptApp.getProjectTriggers().filter(t => t.getHandlerFunction() === 'warmCache').forEach(t => ScriptApp.deleteTrigger(t));
+  ScriptApp.newTrigger('warmCache').timeBased().everyHours(1).create();
+  warmCache();
+  Logger.log('1시간마다 재고 미리 계산하기를 켰어요.');
 }
 
 /** 탭 이름 앞의 번호(「2. 폐기 목록」)나 띄어쓰기가 달라도 찾음 */

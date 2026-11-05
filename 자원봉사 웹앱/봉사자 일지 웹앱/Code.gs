@@ -1777,14 +1777,43 @@ function pad_(row, n) {
  * 공용 도구
  * ============================================================ */
 
+/**
+ * 서명 이미지를 드라이브에서 받아 오는 데 3초 넘게 걸려서 6시간 동안 기억해 둬요.
+ * 서명을 새로 하면 파일 ID가 바뀌므로 예전 이미지가 보일 일은 없어요.
+ * 한 칸에 100KB까지만 들어가서 30,000자씩 나눠 저장해요.
+ */
 function imageDataUrl_(fileId) {
   if (!fileId) return '';
+  const cache = CacheService.getScriptCache();
+  const prefix = 'sig-v1:' + fileId;
+  try {
+    const count = Number(cache.get(prefix));
+    if (count > 0) {
+      const keys = [];
+      for (let i = 0; i < count; i++) keys.push(prefix + ':' + i);
+      const parts = cache.getAll(keys);
+      if (keys.every(function (k) { return typeof parts[k] === 'string'; })) {
+        return keys.map(function (k) { return parts[k]; }).join('');
+      }
+    }
+  } catch (e) {}
+  let url;
   try {
     const blob = DriveApp.getFileById(fileId).getBlob();
-    return 'data:' + (blob.getContentType() || 'image/png') + ';base64,' + Utilities.base64Encode(blob.getBytes());
+    url = 'data:' + (blob.getContentType() || 'image/png') + ';base64,' + Utilities.base64Encode(blob.getBytes());
   } catch (e) {
     return '';
   }
+  try {
+    const count = Math.ceil(url.length / 30000);
+    if (count <= 30) {
+      const parts = {};
+      for (let i = 0; i < count; i++) parts[prefix + ':' + i] = url.slice(i * 30000, (i + 1) * 30000);
+      cache.putAll(parts, 21600);
+      cache.put(prefix, String(count), 21600);
+    }
+  } catch (e) {}
+  return url;
 }
 
 
