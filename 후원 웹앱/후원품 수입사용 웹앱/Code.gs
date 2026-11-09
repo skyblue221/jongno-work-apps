@@ -597,7 +597,7 @@ function requestHome(p,requestId) {
       const tot = {}; vp.forEach(x => keys.forEach(k => { tot[k] = (tot[k] || 0) + num_(x.qty && x.qty[k]); }));
       Object.keys(p.vsel || {}).forEach(k => { if ((p.vsel[k] || []).length && tot[k] !== need[k]) throw new Error('받는 분별 상품권 수량 합계를 맞춰 주세요.'); });
       markVouch_(vp.reduce((a, x, i) => a.concat(vsFlat_(vs[i]).map(sr => ({ serial: sr, person: str_(x.name) }))), []),
-        { date: ymd_(p.date) || today_(), purpose: '가정 배분 (담당 ' + str_(p.manager) + ')', outBy: p.outBy, note: '가정배분 ' + id });
+        { date: ymd_(p.date) || today_(), purpose: '가정 배분 (담당 ' + str_(p.manager) + ')', outBy: str_(p.outBy) || str_(p.manager), note: '가정배분 ' + id });
     }
     const items = lots.map(l => { const o = { key: l.key, name: l.name, inDate: wIn_(l), unit: l.unit, qty: need[l.key] || 0 }; if (vs && (p.vsel[l.key] || []).length) o.serials = p.vsel[l.key].slice(); return o; }).filter(i => i.qty > 0);
     const row = [id, ymd_(p.date) || today_(), str_(p.manager), me_(), num_(p.count), JSON.stringify(items), '확인 대기', '', '', '', '', ''];

@@ -276,8 +276,11 @@ function vBox(el,o){
       \x3cp class="${got===need?'muted':'exp'}" style="margin:6px 0 2px">고른 번호 \x3cb>${got}\x3c/b>장 / 나갈 수량 \x3cb>${need}\x3c/b>장${got===need&&need?' ✓':need?' — 맞춰 주세요':''}\x3c/p>
       ${got===need&&need?ppl.map((p,i)=>asg[i][k]&&asg[i][k].length?`\x3cdiv class="muted" style="font-size:12.5px">· ${esc(p.name)}: ${asg[i][k].map(esc).join(', ')}\x3c/div>`:'').join(''):''}`}
       ${S.boot.admin?`\x3clabel style="display:flex;gap:6px;align-items:center;color:var(--ink);margin-top:8px">\x3cinput type="checkbox" data-vx="${esc(k)}" ${skip?'checked':''} style="width:auto"> 번호 없이 수량만 내보내기 \x3cspan class="muted">(관리대장에 없는 상품권일 때만)\x3c/span>\x3c/label>`:''}
-      \x3cp class="muted" style="margin:6px 0 0">번호와 받는 분 이름은 상품권 관리대장의 출고일·수령자·상태 칸에 같이 기록돼요.\x3c/p>\x3c/div>`; }).join('');
+      \x3cp class="muted" style="margin:6px 0 0">번호와 받는 분 이름은 상품권 관리대장의 출고일·수령자·상태 칸에 같이 기록돼요.\x3c/p>\x3c/div>`; }).join('')
+    +(keys.some(k=>!S.lv[k].locked)?`\x3cdiv class="card">\x3clabel>상품권 출고담당자 \x3cspan class="muted">(관리대장 「출고담당자」 칸에 들어가요)\x3c/span>\x3c/label>\x3cinput data-vby value="${esc(o.outBy||'')}" placeholder="예: 홍길동">\x3c/div>`:'');
+  el.oninput=e=>{ if(e.target.dataset.vby!==undefined) o.outBy=e.target.value; };
   el.onchange=e=>{ const t=e.target;
+    if(t.dataset.vby!==undefined){ o.outBy=t.value.trim(); try{localStorage.setItem('vby',o.outBy);}catch(x){} return; }
     if(t.dataset.vs){ const k=t.dataset.vk, all=S.lv[k].list.map(v=>v.serial), set=new Set(o.vsel[k]); if(t.checked) set.add(t.dataset.vs); else set.delete(t.dataset.vs); o.vsel[k]=all.filter(sr=>set.has(sr)); vBox(el,o); }
     if(t.dataset.vx){ const k=t.dataset.vx, i=o.vskip.indexOf(k); if(t.checked&&i<0) o.vskip.push(k); if(!t.checked&&i>=0) o.vskip.splice(i,1); vBox(el,o); } };
   el.onclick=e=>{ const t=e.target;
@@ -293,13 +296,16 @@ async function vCheck(o){
     if(!Number.isInteger(n)) throw '상품권 수량은 정수로 넣어 주세요.';
     const got=(o.vsel[k]||[]).length; if(got!==n) throw `「${lot.name}」 상품권 번호를 ${n}장 골라 주세요. (지금 ${got}장)`;
     out.vsel[k]=o.vsel[k].slice(); });
+  if(Object.keys(out.vsel).length&&!String(o.outBy||'').trim()) throw '상품권 출고담당자 이름을 적어 주세요.';
+  out.outBy=String(o.outBy||'').trim();
   return out;
 }
 function vChips(list,kept,tag){ return list.map(sr=>{ const on=kept.includes(sr); return `\x3cspan class="chip" data-vt="${esc(tag+'|'+sr)}" title="${on?'눌러서 돌려놓기':'눌러서 다시 넣기'}" style="cursor:pointer;font-size:11.5px;${on?'':'background:#fff;border:1px dashed var(--line);color:var(--sub);text-decoration:line-through'}">${esc(sr)}\x3c/span>`; }).join(''); }
 function vToggle(arr,orig,sr){ const set=new Set(arr); if(set.has(sr)) set.delete(sr); else set.add(sr); return orig.filter(x=>set.has(x)); }
 function distView(){
   const D = S.dist || (S.dist={date:S.boot.today, sel:[], people:[], note:''}); D.vsel=D.vsel||{}; D.vskip=D.vskip||[];
-  const vo={sel:D.sel,vsel:D.vsel,vskip:D.vskip,need:k=>D.people.reduce((s,p)=>s+num(p.qty[k]),0),people:()=>D.people.map(p=>({name:p.name,q:k=>p.qty[k]}))};
+  if(D.outBy===undefined) D.outBy=vby();
+  const vo={sel:D.sel,vsel:D.vsel,vskip:D.vskip,get outBy(){return D.outBy;},set outBy(v){D.outBy=v;},need:k=>D.people.reduce((s,p)=>s+num(p.qty[k]),0),people:()=>D.people.map(p=>({name:p.name,q:k=>p.qty[k]}))};
   $('#main').innerHTML=expiryCard()+`
   \x3cdiv class="card">\x3ch2>1. 무엇을 나눌까요?\x3c/h2>\x3cdiv class="row">\x3cdiv>\x3clabel>배분일\x3c/label>\x3cinput type="date" id="dDate" value="${D.date}">\x3c/div>\x3c/div>
   \x3clabel>물품 (여러 개 고를 수 있어요)\x3c/label>\x3cdiv id="dPick">\x3c/div>\x3c/div>
@@ -320,7 +326,7 @@ function distView(){
   $('#dGo').onclick=e=>act(e.target, async()=>{
     if(!D.sel.length) throw '물품을 골라 주세요.';
     const vc=await vCheck(vo);
-    const r=await run('createTeamReceipt',{date:D.date,note:D.note,items:D.sel.map(k=>({key:k})),people:D.people,vsel:vc.vsel,vskip:vc.vskip,outBy:vby()});
+    const r=await run('createTeamReceipt',{date:D.date,note:D.note,items:D.sel.map(k=>({key:k})),people:D.people,vsel:vc.vsel,vskip:vc.vskip,outBy:vc.outBy});
     S.dist=null; S.lv=null; await refreshStock(); bumpCount('sign',1);
     distView();
     $('#dDone').innerHTML=`\x3cdiv class="card note">\x3cb>배분 기록에 들어갔어요.\x3c/b> 이제 서명만 받으면 돼요.
@@ -557,7 +563,8 @@ function homeView(){
   const qOf=(r,k)=> r.qty[k]===undefined?1:num(r.qty[k]);
   const lots=()=>H.sel.map(lotOf).filter(Boolean);
   const total=k=>H.rows.filter(r=>r.name).reduce((s,r)=>s+qOf(r,k),0);
-  const vo={sel:H.sel,vsel:H.vsel,vskip:H.vskip,need:k=>total(k),people:()=>H.rows.filter(r=>r.name).map(r=>({name:r.name,q:k=>qOf(r,k)}))};
+  if(H.outBy===undefined) H.outBy=vby();
+  const vo={sel:H.sel,vsel:H.vsel,vskip:H.vskip,get outBy(){return H.outBy||H.manager||'';},set outBy(v){H.outBy=v;},need:k=>total(k),people:()=>H.rows.filter(r=>r.name).map(r=>({name:r.name,q:k=>qOf(r,k)}))};
   const vNotes=()=>{ const keys=H.sel.filter(k=>(H.vsel[k]||[]).length); return keys.length?vSplit(keys,H.vsel,vo.people()).map(vsFlat):[]; };
   const html=()=>{ const L=lots(), vn=vNotes(); let ri=-1; return receiptHtml({ dest:S.boot.dept||'일상동행팀', noTeam:true,
     items:L.map(l=>({name:l.name,inDate:l.inDate,donor:l.donor,inQty:l.inQty,give:total(l.key),remainAfter:H.sent?l.remain:l.remain-total(l.key)})),
@@ -569,7 +576,7 @@ function homeView(){
     const people=H.rows.filter(r=>r.name); if(!H.sel.length||!people.length) throw '물품과 명단을 넣어 주세요.';
     const vc=await vCheck(vo);
     if(!confirm('명단(이름·선택한 주소 또는 생년월일)을 서명이 끝날 때까지만 잠긴 임시 파일에 저장해요. 서명을 마치면 수령증 PDF만 남고 임시 명단 파일은 휴지통으로 보내요. 계속할까요?')) return;
-    await run('requestHome',{later:true,vsel:vc.vsel,vskip:vc.vskip,outBy:vby(),dateMode:H.dateMode,manager:H.manager,date:H.date,count:people.length,items:H.sel.map(k=>({key:k,qty:total(k)})),
+    await run('requestHome',{later:true,vsel:vc.vsel,vskip:vc.vskip,outBy:vc.outBy,dateMode:H.dateMode,manager:H.manager,date:H.date,count:people.length,items:H.sel.map(k=>({key:k,qty:total(k)})),
       people:people.map(r=>({name:r.name,addr:r.addr,idType:H.idType,phone:r.phone||'',birth:r.birth||'',qty:Object.fromEntries(H.sel.map(k=>[k,qOf(r,k)]))}))});
     S.home=null; S.lv=null; refreshStockLater(); if(S.boot.admin) bumpCount('home',1); bumpCount('hsign',1);
     toast('저장했어요. 가정 서명 탭에서 이어서 서명받을 수 있어요.',3500); go('hsign');
@@ -578,7 +585,7 @@ function homeView(){
     checkInputQuantities(H.rows);if(H.sent) throw '이미 요청했어요.'; if(!H.manager) throw '사례 담당자 이름을 골라 주세요.';
     const people=H.rows.filter(r=>r.name); if(!H.sel.length||!people.length) throw '물품과 명단을 넣어 주세요.';
     const vc=await vCheck(vo), hasV=Object.keys(vc.vsel).length;
-    await run('requestHome',{manager:H.manager,date:H.date,count:people.length,items:H.sel.map(k=>({key:k,qty:total(k)})),vsel:vc.vsel,vskip:vc.vskip,outBy:vby(),
+    await run('requestHome',{manager:H.manager,date:H.date,count:people.length,items:H.sel.map(k=>({key:k,qty:total(k)})),vsel:vc.vsel,vskip:vc.vskip,outBy:vc.outBy,
       people:hasV?people.map(r=>({name:r.name,qty:Object.fromEntries(Object.keys(vc.vsel).map(k=>[k,qOf(r,k)]))})):[]});
     H.sent=true; S.lv=null; refreshStockLater(); if(S.boot.admin) bumpCount('home',1);
     $('#hMsg').innerHTML=`\x3cp class="note">min에게 확인 요청을 보냈어요. 기록에는 \x3cb>${people.length}명 · 수량\x3c/b>만 남았어요. 수령증을 다 뽑았으면 \x3cb>명단 지우기\x3c/b>를 눌러 주세요.\x3c/p>`;
