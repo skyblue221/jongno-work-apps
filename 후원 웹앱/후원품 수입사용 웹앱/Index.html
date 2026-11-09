@@ -110,8 +110,8 @@ function expiryCard(){ const L=expiring(); if(!L.length) return '';
   return `\x3cdiv class="card note warn" style="margin-bottom:12px">\x3cb>⏰ 유통기한이 지났거나 ${S.boot.alertDays||30}일 안에 끝나는 물품 ${L.length}개\x3c/b>\x3cbr>${L.map(l=>{const d=daysTo(l.expiry);return `· ${esc(l.name)} — 남은 ${l.remain}${esc(l.unit||'')} · 유통 ${esc(l.expiry)} \x3cb>${d<0?`(${-d}일 지남)`:d===0?'(오늘까지)':`(${d}일 남음)`}\x3c/b>`;}).join('\x3cbr>')}\x3c/div>`; }
 function tabs(){ const c=S.boot.counts||{}; c.stock=expiring().length; if(S.boot.viewer) return [['sign','서명 현황',c.sign],['hsign','가정 서명',c.hsign],['homeok','가정 확인',c.home],['org','유관기관',c.org],['vouch','상품권'],['disp','폐기'],['stock','재고',c.stock]];
   return S.boot.admin
-  ? [['dist','팀 배분'],['sign','서명 현황',c.sign],['home','가정 배분'],['hsign','가정 서명',c.hsign],['homeok','가정 확인',c.home],['org','유관기관',c.org],['vouch','상품권'],['disp','폐기'],['stock','재고',c.stock],['setup','설정']]
-  : [['home','가정 배분'],['hsign','가정 서명',c.hsign]].concat(S.boot.vouch?[['vouch','상품권']]:[]).concat([['stock','재고',c.stock]]); }
+  ? [['dist','팀 배분'],['sign','서명 현황',c.sign],['home','가정 배분'],['hsign','가정 서명',c.hsign],['homeok','가정 확인',c.home],['org','유관기관',c.org],['vouch','상품권'],['disp','폐기'],['stock','재고',c.stock],['free','빈 수령증'],['setup','설정']]
+  : [['home','가정 배분'],['hsign','가정 서명',c.hsign]].concat(S.boot.vouch?[['vouch','상품권']]:[]).concat([['stock','재고',c.stock],['free','빈 수령증']]); }
 function buildNav(){ $('#nav').innerHTML = tabs().map(([k,t,n])=>`\x3cbutton data-k="${k}">${t}${n?`\x3cspan class="dot">${n}\x3c/span>`:''}\x3c/button>`).join(''); $('#nav').onclick=e=>{const b=e.target.closest('button'); if(b) go(b.dataset.k);}; }
 async function refreshStock(fresh){ S.stock = await run('getStock', false,!!fresh); buildNav(); document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.k===S.tab)); }
 /* 저장 직후 재고는 뒤에서 새로 불러옴 (다음 화면이 재고를 쓰지 않을 때만) — 저장 완료 안내를 기다리지 않고 바로 보여 줌 */
@@ -119,7 +119,7 @@ function refreshStockLater(){ refreshStock().catch(e=>console.warn('재고 새�
 function go(k){
   S.tab=k; if(k==='dist'||k==='home') S.lv=null; $('#main').onclick=null; $('#main').oninput=null; document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.k===k));
   if(!S.boot.setupOk && k!=='setup'){ $('#main').innerHTML=`\x3cdiv class="card note">${S.boot.admin?'먼저 \x3cb>설정\x3c/b> 탭에서 시트 칸을 확인해 주세요.':'관리자가 아직 앱을 설정하고 있어요. 조금 뒤에 다시 열어 주세요.'}\x3c/div>`; return; }
-  ({dist:distView,sign:signListView,home:homeView,homeok:homeOkView,vouch:vouchView,hsign:hsignView,org:orgView,disp:dispView,stock:stockView,setup:setupView})[k]();
+  ({dist:distView,sign:signListView,home:homeView,homeok:homeOkView,vouch:vouchView,hsign:hsignView,org:orgView,disp:dispView,stock:stockView,free:freeView,setup:setupView})[k]();
 }
 
 
@@ -149,15 +149,15 @@ function receiptHtml(d){
   let h=`\x3cdiv style="font-family:'Malgun Gothic','Apple SD Gothic Neo',sans-serif;color:#000">
   \x3ch1 style="text-align:center;font-size:24pt;letter-spacing:12px;margin:0 0 14px">수령증\x3c/h1>
   \x3ctable style="width:100%;border-collapse:collapse;margin-bottom:14px">\x3ctr>
-  ${['품번','품목','입고일','후원처','배분처','총 수량','지원수량','잔여수량'].map(t=>`\x3cth style="${th}">${t}\x3c/th>`).join('')}\x3c/tr>
+  ${(d.heads||['품번','품목','입고일','후원처','배분처','총 수량','지원수량','잔여수량']).map(t=>`\x3cth style="${th}">${t}\x3c/th>`).join('')}\x3c/tr>
   ${items.map((it,i)=>`\x3ctr>\x3ctd style="${cell}">${i+1}\x3c/td>\x3ctd style="${cell}">${esc(it.name)}\x3c/td>\x3ctd style="${cell}">${esc(it.inDate)}\x3c/td>\x3ctd style="${cell}">${esc(it.donor||'')}\x3c/td>\x3ctd style="${cell}">${esc(d.dest||'')}\x3c/td>\x3ctd style="${cell}">${it.remainAfter!=null&&it.remainAfter!==''?num(it.remainAfter)+num(it.give):(it.inQty??'')}\x3c/td>\x3ctd style="${cell}">${it.give}\x3c/td>\x3ctd style="${cell}">${it.remainAfter??''}\x3c/td>\x3c/tr>`).join('')}
   \x3c/table>
   \x3ctable style="width:100%;border-collapse:collapse">\x3ctr>
-  ${['연번','성명',d.noTeam?null:'소속팀',identityHeader,'수령일','서명','비고'].filter(Boolean).map(t=>`\x3cth rowspan="3" style="${th}">${t}\x3c/th>`).join('')}
+  ${['연번','성명',d.noTeam?null:'소속팀',identityHeader,'수령일','서명','비고'].filter(Boolean).map(t=>`\x3cth rowspan="3" style="${th}${t==='서명'?'width:24%;min-width:160px;':t==='비고'?'width:8%;':''}">${t}\x3c/th>`).join('')}
   \x3cth colspan="${items.length}" style="${th}">수량\x3c/th>\x3c/tr>\x3ctr>
   ${items.map(it=>`\x3cth style="${th}background:#fff;font-size:9.5pt;word-break:keep-all;min-width:48px">${esc(it.name)}\x3c/th>`).join('')}\x3c/tr>\x3ctr>
   ${items.map(it=>`\x3cth style="${th}background:#fff3b0;font-weight:normal">총 합계: ${it.give}\x3c/th>`).join('')}\x3c/tr>
-  ${d.rows.map((r,i)=>`\x3ctr>\x3ctd style="${cell}">${i+1}\x3c/td>\x3ctd style="${cell}">${esc(r.name)}\x3c/td>${d.noTeam?'':`\x3ctd style="${cell}">${esc(r.team||'')}\x3c/td>`}\x3ctd style="${cell}font-size:9.5pt">${types.length>1?esc((r.idType||'주소')+': '):''}${esc(r.addr||'')}\x3c/td>\x3ctd style="${cell}">${esc(r.date||'')}\x3c/td>\x3ctd style="${cell}height:44px;width:90px">${r.sigUrl?`\x3cimg src="${r.sigUrl}" style="height:40px;max-width:110px">`:''}\x3c/td>\x3ctd style="${cell}${r.noteSmall?'font-size:7.5pt;word-break:break-all;max-width:160px;':''}">${esc(r.note||'')}\x3c/td>${r.qty.map(q=>`\x3ctd style="${cell}">${q||''}\x3c/td>`).join('')}\x3c/tr>`).join('')}
+  ${d.rows.map((r,i)=>`\x3ctr>\x3ctd style="${cell}">${i+1}\x3c/td>\x3ctd style="${cell}">${esc(r.name)}\x3c/td>${d.noTeam?'':`\x3ctd style="${cell}">${esc(r.team||'')}\x3c/td>`}\x3ctd style="${cell}font-size:9.5pt">${types.length>1?esc((r.idType||'주소')+': '):''}${esc(r.addr||'')}\x3c/td>\x3ctd style="${cell}">${esc(r.date||'')}\x3c/td>\x3ctd style="${cell}height:44px;width:160px;min-width:160px">${r.sigUrl?`\x3cimg src="${r.sigUrl}" style="height:40px;max-width:156px">`:''}\x3c/td>\x3ctd style="${cell}width:70px;max-width:110px;${r.noteSmall?'font-size:7.5pt;word-break:break-all;':'font-size:9.5pt;'}">${esc(r.note||'')}\x3c/td>${r.qty.map(q=>`\x3ctd style="${cell}">${q||''}\x3c/td>`).join('')}\x3c/tr>`).join('')}
   \x3c/table>\x3c/div>`;
   return h;
 }
@@ -466,6 +466,63 @@ async function signListView(){
 }
 
 
+function freeView(){
+  const KINDS={buy:['구입일','구입처'],don:['입고일','후원처'],etc:['날짜','제공처']};
+  const F=S.free||(S.free={kind:'buy',date:S.boot.today,dest:S.boot.dept||'',mode:'team',idType:'주소',fill:false,items:[{name:'',inDate:'',src:'',inQty:''}],rows:[]});
+  const qOf=(r,i)=>num(r.qty[i]);
+  const total=i=>F.rows.filter(r=>r.name).reduce((s,r)=>s+qOf(r,i),0);
+  const html=()=>{ const K=KINDS[F.kind], its=F.items.filter(it=>it.name.trim());
+    return receiptHtml({dest:F.dest, noTeam:F.mode==='home', heads:['품번','품목',K[0],K[1],'배분처','총 수량','지원수량','잔여수량'],
+      items:its.map(it=>{ const g=total(F.items.indexOf(it)), q=it.inQty===''?'':num(it.inQty); return {name:it.name.trim(),inDate:it.inDate,donor:it.src,give:g,inQty:q===''?g:q,remainAfter:q===''?'':q-g}; }),
+      rows:F.rows.filter(r=>r.name).map(r=>({name:r.name,team:F.mode==='team'?r.team:'',addr:F.mode==='home'?r.addr:'',idType:F.idType,date:F.fill?F.date:'',sigUrl:'',note:r.note||'',qty:its.map(it=>qOf(r,F.items.indexOf(it))||'')}))}); };
+  $('#main').innerHTML=`\x3cdiv class="note">📝 후원품이 아닌 물품(직접 구입한 물품 등)을 같은 수령증 양식으로 뽑는 곳이에요. \x3cb>후원품 대장·재고에는 아무것도 저장되지 않아요.\x3c/b> 새로고침하면 입력한 내용도 사라져요.\x3c/div>
+  \x3cdiv class="card">\x3ch2>1. 물품\x3c/h2>
+    \x3cdiv class="row">\x3cdiv>\x3clabel>물품 구분\x3c/label>\x3cselect id="fKind">${[['buy','구입한 물품 (구입일·구입처)'],['don','후원품 (입고일·후원처)'],['etc','기타 (날짜·제공처)']].map(o=>`\x3coption value="${o[0]}" ${F.kind===o[0]?'selected':''}>${o[1]}\x3c/option>`).join('')}\x3c/select>\x3c/div>
+    \x3cdiv>\x3clabel>배분처\x3c/label>\x3cinput id="fDest" value="${esc(F.dest)}">\x3c/div>\x3c/div>
+    \x3cdiv id="fItems">\x3c/div>\x3cdiv class="btns">\x3cbutton class="btn sub" id="fAddItem">물품 추가\x3c/button>\x3c/div>\x3c/div>
+  \x3cdiv class="card">\x3ch2>2. 받는 분\x3c/h2>
+    \x3cdiv class="row">\x3cdiv>\x3clabel>수령증 형태\x3c/label>\x3cselect id="fMode">\x3coption value="team" ${F.mode==='team'?'selected':''}>직원 (성명·소속팀)\x3c/option>\x3coption value="home" ${F.mode==='home'?'selected':''}>가정·개인 (성명·주소 또는 생년월일)\x3c/option>\x3c/select>\x3c/div>
+    \x3cdiv>\x3clabel>수령일\x3c/label>\x3cinput type="date" id="fDate" value="${F.date}">\x3c/div>\x3c/div>
+    \x3clabel style="display:flex;gap:6px;align-items:center;color:var(--ink)">\x3cinput type="checkbox" id="fFill" ${F.fill?'checked':''} style="width:auto"> 수령일 칸을 위 날짜로 채워서 출력 (안 하면 빈칸 → 손으로 쓰기)\x3c/label>
+    ${F.mode==='home'?`\x3clabel>식별정보\x3cselect id="fId">\x3coption ${F.idType==='주소'?'selected':''}>주소\x3c/option>\x3coption ${F.idType==='생년월일'?'selected':''}>생년월일\x3c/option>\x3c/select>\x3c/label>`:''}
+    \x3clabel>한 줄에 한 분씩 「이름, ${F.mode==='team'?'소속팀':'주소 또는 생년월일'}」 (엑셀에서 복사해 붙여도 돼요)\x3c/label>\x3ctextarea id="fPaste" placeholder="${F.mode==='team'?'홍길동, 일상동행팀':'홍길동, 종로구 예시로 1'}">\x3c/textarea>
+    \x3cdiv class="btns">\x3cbutton class="btn sub" id="fParse">명단 넣기\x3c/button>${F.mode==='team'?'\x3cinput id="fWho" list="staffList" placeholder="직원 이름 입력·선택" style="flex:1;min-width:140px">\x3cbutton class="btn line" id="fWhoAdd">추가\x3c/button>':`\x3cbutton class="btn line" id="fOne">한 분 추가\x3c/button>${S.boot.fam?'\x3cbutton class="btn sub" id="fFam">이용인 명단에서 고르기\x3c/button>':''}`}\x3c/div>
+    \x3cdatalist id="staffList">${S.staff.map(s=>`\x3coption value="${esc(s.name)}">${esc(s.team)}\x3c/option>`).join('')}\x3c/datalist>\x3cdiv id="fRows" style="margin-top:10px">\x3c/div>\x3c/div>
+  \x3cdiv class="card">\x3ch2>3. 출력\x3c/h2>\x3cp class="muted">서명은 출력한 종이에 받아요.\x3c/p>
+    \x3cdiv class="btns">\x3cbutton class="btn" id="fPrint">인쇄 · PDF\x3c/button>${xlsBtn('fXls')}\x3cbutton class="btn line" id="fClear">모두 지우기\x3c/button>\x3c/div>\x3c/div>`;
+  const drawItems=()=>{ const K=KINDS[F.kind];
+    $('#fItems').innerHTML=`\x3cdiv style="overflow-x:auto">\x3ctable class="tbl">\x3ctr>\x3cth>품목\x3c/th>\x3cth>${K[0]}\x3c/th>\x3cth>${K[1]}\x3c/th>\x3cth>총 수량 \x3cspan class="muted">(비우면 나눈 만큼)\x3c/span>\x3c/th>\x3cth>\x3c/th>\x3c/tr>
+      ${F.items.map((it,i)=>`\x3ctr>\x3ctd>\x3cinput data-ii="${i}" data-f="name" value="${esc(it.name)}" placeholder="예: 생수 2L">\x3c/td>\x3ctd>\x3cinput type="date" data-ii="${i}" data-f="inDate" value="${esc(it.inDate)}">\x3c/td>\x3ctd>\x3cinput data-ii="${i}" data-f="src" value="${esc(it.src)}">\x3c/td>\x3ctd>\x3cinput class="q" inputmode="numeric" data-ii="${i}" data-f="inQty" value="${esc(it.inQty)}">\x3c/td>\x3ctd>${F.items.length>1?`\x3cbutton class="btn line sm" data-xi="${i}">빼기\x3c/button>`:''}\x3c/td>\x3c/tr>`).join('')}\x3c/table>\x3c/div>`; };
+  const drawRows=()=>{ const its=F.items.map((it,i)=>({it,i})).filter(o=>o.it.name.trim());
+    if(!F.rows.length){ $('#fRows').innerHTML='\x3cp class="muted">받는 분을 넣어 주세요.\x3c/p>'; return; }
+    $('#fRows').innerHTML=`\x3cdiv style="overflow-x:auto">\x3ctable class="tbl">\x3ctr>\x3cth>성명\x3c/th>\x3cth>${F.mode==='team'?'소속팀':F.idType}\x3c/th>${its.map(o=>`\x3cth>${esc(o.it.name)}\x3cbr>\x3cspan class="muted" data-tot="${o.i}">합계 ${total(o.i)}\x3c/span>\x3c/th>`).join('')}\x3cth>비고\x3c/th>\x3cth>\x3c/th>\x3c/tr>
+      ${F.rows.map((r,ri)=>`\x3ctr>\x3ctd>\x3cinput data-ri="${ri}" data-f="name" value="${esc(r.name)}">\x3c/td>\x3ctd>\x3cinput data-ri="${ri}" data-f="${F.mode==='team'?'team':'addr'}" value="${esc(F.mode==='team'?r.team:r.addr)}">\x3c/td>${its.map(o=>`\x3ctd>\x3cinput class="q" inputmode="numeric" data-ri="${ri}" data-qi="${o.i}" value="${r.qty[o.i]??''}">\x3c/td>`).join('')}\x3ctd>\x3cinput data-ri="${ri}" data-f="note" value="${esc(r.note||'')}">\x3c/td>\x3ctd>\x3cbutton class="btn line sm" data-xr="${ri}">빼기\x3c/button>\x3c/td>\x3c/tr>`).join('')}\x3c/table>\x3c/div>
+      ${its.length?`\x3cdiv class="btns">\x3cbutton class="btn line sm" id="fAll">모든 분 1개씩 채우기\x3c/button>\x3c/div>`:'\x3cp class="muted">위에 물품 이름을 넣으면 수량 칸이 생겨요.\x3c/p>'}`;
+    const a=$('#fAll'); if(a) a.onclick=()=>{ F.rows.forEach(r=>its.forEach(o=>{ if(r.qty[o.i]===undefined||r.qty[o.i]==='') r.qty[o.i]=1; })); drawRows(); }; };
+  drawItems(); drawRows();
+  $('#fKind').onchange=e=>{ F.kind=e.target.value; drawItems(); };
+  $('#fDest').oninput=e=>{ F.dest=e.target.value; };
+  $('#fMode').onchange=e=>{ F.mode=e.target.value; freeView(); };
+  $('#fDate').onchange=e=>{ F.date=e.target.value; };
+  $('#fFill').onchange=e=>{ F.fill=e.target.checked; };
+  if($('#fId')) $('#fId').onchange=e=>{ F.idType=e.target.value; drawRows(); };
+  $('#fAddItem').onclick=()=>{ F.items.push({name:'',inDate:'',src:'',inQty:''}); drawItems(); };
+  $('#fItems').oninput=e=>{ const t=e.target; if(t.dataset.ii===undefined) return; F.items[+t.dataset.ii][t.dataset.f]=t.value; if(t.dataset.f==='name') drawRows(); };
+  $('#fItems').onclick=e=>{ const i=e.target.dataset.xi; if(i===undefined) return; F.items.splice(+i,1); F.rows.forEach(r=>{ const q={}; Object.keys(r.qty).forEach(k=>{ if(+k<+i) q[k]=r.qty[k]; else if(+k>+i) q[+k-1]=r.qty[k]; }); r.qty=q; }); drawItems(); drawRows(); };
+  $('#fRows').oninput=e=>{ const t=e.target, ri=t.dataset.ri; if(ri===undefined) return; const r=F.rows[+ri];
+    if(t.dataset.qi!==undefined){ r.qty[t.dataset.qi]=t.value; const tt=document.querySelector(`[data-tot="${t.dataset.qi}"]`); if(tt) tt.textContent='합계 '+total(+t.dataset.qi); } else r[t.dataset.f]=t.value; };
+  $('#fRows').onclick=e=>{ const i=e.target.dataset.xr; if(i===undefined) return; F.rows.splice(+i,1); drawRows(); };
+  $('#fParse').onclick=()=>{ $('#fPaste').value.split(/\r?\n/).map(x=>x.trim()).filter(Boolean).forEach(line=>{ const p=line.split(/\t|,/).map(x=>x.trim()), rest=p.slice(1).filter(Boolean).join(' ');
+    F.rows.push(F.mode==='team'?{name:p[0],team:rest||((S.staff.find(x=>x.name===p[0])||{}).team||''),qty:{}}:{name:p[0],addr:rest,qty:{}}); }); $('#fPaste').value=''; drawRows(); };
+  if($('#fWhoAdd')){ const add=()=>{ const n=$('#fWho').value.trim(); if(!n) return; const st=S.staff.find(x=>x.name===n); F.rows.push({name:n,team:st?st.team:'',qty:{}}); $('#fWho').value=''; drawRows(); };
+    $('#fWhoAdd').onclick=add; $('#fWho').onkeydown=e=>{ if(e.key==='Enter') add(); }; }
+  if($('#fOne')) $('#fOne').onclick=()=>{ F.rows.push({name:'',addr:'',qty:{}}); drawRows(); };
+  if($('#fFam')) $('#fFam').onclick=()=>famPick('이용인 명단에서 고르기',L=>{ L.forEach(f=>F.rows.push({name:f.name,addr:F.idType==='생년월일'?f.birth:f.addr,qty:{}})); drawRows(); });
+  const ready=()=>{ if(!F.items.some(it=>it.name.trim())){ toast('물품 이름을 넣어 주세요.'); return false; } if(!F.rows.some(r=>r.name)){ toast('받는 분을 넣어 주세요.'); return false; } return true; };
+  $('#fPrint').onclick=()=>{ if(ready()) printHtml(html(),true); };
+  $('#fXls').onclick=e=>{ if(ready()) toExcel(e.target,html(),'수령증_'+F.date,true); };
+  $('#fClear').onclick=()=>{ if(confirm('입력한 물품과 명단을 모두 지울까요?')){ S.free=null; freeView(); } };
+}
 function homeView(){
   const H = S.home || (S.home={date:S.boot.today, sel:[], rows:[], dateMode:'blank', phoneSign:false,idType:'주소', manager:(()=>{try{return localStorage.getItem('mgr')||'';}catch(e){return '';}})(), sent:false}); H.vsel=H.vsel||{}; H.vskip=H.vskip||[];
   $('#main').innerHTML=expiryCard()+`
