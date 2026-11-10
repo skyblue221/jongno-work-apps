@@ -1,0 +1,86 @@
+<script>
+/* 글자 서식 — 한글 파일을 다 만든 뒤 한 번 더 훑어서 적용
+ *   *글자*   → 기울임
+ *   __글자__ → 밑줄
+ *   ***글자*** → 굵게+기울임 (내려받기 전에 TextStyle.prep(data) 필요)
+ * (굵게 **글자** 는 HwpxGen / EduGen 이 먼저 처리)
+ * 사용: TextStyle.apply(zip) → Promise(zip)   (활동계획서·결과보고서·장애이해교육 모두)
+ */
+var TextStyle = (function () {
+  // 표시용 기호: 기울임 \uE000…\uE001, 밑줄 \uE002…\uE003
+  function mark(t) {
+    return String(t)
+      .replace(/__([^_\n]+?)__/g, '\uE002$1\uE003')
+      .replace(/\*([^*\s](?:[^*\n]*?[^*\s])?)\*/g, '\uE000$1\uE001');
+  }
+  // 글자를 [{t, u, i}] 조각으로 나눔
+  function segs(text) {
+    var out = [], cur = '', i = false, u = false, t = mark(text);
+    function flush() { if (cur) out.push({ t: cur, u: u, i: i }); cur = ''; }
+    for (var k = 0; k < t.length; k++) {
+      var c = t[k];
+      if (c === '\uE000') { flush(); i = true; } else if (c === '\uE001') { flush(); i = false; }
+      else if (c === '\uE002') { flush(); u = true; } else if (c === '\uE003') { flush(); u = false; }
+      else cur += c;
+    }
+    flush();
+    return out;
+  }
+  function has(t) { return /[\uE000-\uE003]/.test(mark(t)); }
+
+  // 내려받기 전에 한 번: ***굵게+기울임*** 을 **(기울임)** 으로 바꿔 둠 (굵게는 HwpxGen/EduGen 이 처리)
+  function prep(d) {
+    if (typeof d === 'string') return d.replace(/\*\*\*([^*\n]+?)\*\*\*/g, '**\uE000$1\uE001**');
+    if (Array.isArray(d)) return d.map(prep);
+    if (d && typeof d === 'object') { var o = {}; for (var k in d) o[k] = prep(d[k]); return o; }
+    return d;
+  }
+
+  function apply(zip) {
+    return Promise.all([zip.file('Contents/section0.xml').async('string'), zip.file('Contents/header.xml').async('string')]).then(function (r) {
+      var sec = r[0], hdr = r[1];
+      var defs = {}, max = 0;
+      hdr.replace(/<hh:charPr id="(\d+)"[\s\S]*?<\/hh:charPr>/g, function (m, id) { defs[id] = m; max = Math.max(max, +id); return m; });
+      var made = {}, added = '';
+      function variant(base, u, i) {
+        if (!u && !i) return base;
+        var key = base + (u ? 'u' : '') + (i ? 'i' : '');
+        if (made[key]) return made[key];
+        var x = defs[base]; if (!x) return base;
+        var id = ++max;
+        x = x.replace(/<hh:charPr id="\d+"/, '<hh:charPr id="' + id + '"');
+        if (i && x.indexOf('<hh:italic') < 0) x = x.replace('<hh:underline', '<hh:italic/><hh:underline');
+        if (u) x = x.replace(/<hh:underline type="NONE"/, '<hh:underline type="BOTTOM"');
+        added += x; made[key] = String(id);
+        return made[key];
+      }
+      var changed = false;
+      sec = sec.replace(/<hp:run charPrIDRef="(\d+)"><hp:t>([^<]*)<\/hp:t><\/hp:run>/g, function (m, id, t) {
+        if (!has(t)) return m;
+        changed = true;
+        return segs(t).map(function (s) {
+          return '<hp:run charPrIDRef="' + variant(id, s.u, s.i) + '"><hp:t>' + s.t + '</hp:t></hp:run>';
+        }).join('');
+      });
+      if (!changed) return zip;
+      hdr = hdr.replace(/<hh:charProperties itemCnt="(\d+)"/, function (_, n) { return '<hh:charProperties itemCnt="' + (+n + Object.keys(made).length) + '"'; });
+      hdr = hdr.replace('</hh:charProperties>', added + '</hh:charProperties>');
+      zip.file('Contents/section0.xml', sec);
+      zip.file('Contents/header.xml', hdr);
+      return zip;
+    });
+  }
+
+  // 미리보기용 (이미 HTML 이스케이프된 글자에 적용, 굵게 처리 전에 호출)
+  function html(s) {
+    return String(s)
+      .replace(/\*\*\*([^*\n]+?)\*\*\*/g, '<b><i>$1</i></b>')
+      .replace(/\*\*([^*\n]+?)\*\*/g, '<b>$1</b>')
+      .replace(/__([^_\n]+?)__/g, '<u>$1</u>')
+      .replace(/\*([^*\s](?:[^*\n]*?[^*\s])?)\*/g, '<i>$1</i>');
+  }
+
+  return { apply: apply, html: html, segs: segs, prep: prep };
+})();
+if (typeof module !== 'undefined') module.exports = TextStyle;
+</script>

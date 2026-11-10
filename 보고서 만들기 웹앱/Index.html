@@ -204,7 +204,7 @@
 
     <div class="card">
       <h2>내용</h2>
-      <div class="hint">✏️ 글 쓰는 법 — 줄 앞에 <b>-</b> 와 띄어쓰기 → 「-」 글머리 / <b>*</b> 와 띄어쓰기 → 「•」 작은 글머리 / <b>**글자**</b> → 굵게</div>
+      <div class="hint">✏️ 글 쓰는 법 — 줄 앞에 <b>-</b> 와 띄어쓰기 → 「-」 글머리 / <b>*</b> 와 띄어쓰기 → 「•」 작은 글머리 / <b>**글자**</b> → 굵게 / <b>*글자*</b> → <i>기울임</i> / <b>***글자***</b> → <b><i>굵게+기울임</i></b> / <b>__글자__</b> → <u>밑줄</u></div>
       <div id="blocks" style="margin-top:12px"></div>
       <div class="addbar">
         <button class="sm" onclick="addBlock('heading')">＋ 소제목(▪)</button>
@@ -286,6 +286,7 @@
 
 <?!= include('HwpxGen'); ?>
 <?!= include('EduGen'); ?>
+<?!= include('TextStyle'); ?>
 <script>
 var doc = null, saved = [], dirty = false, tplB64 = null, filterType = '';
 var PRESETS = HwpxGen.PRESETS;
@@ -320,8 +321,8 @@ function blankEdu(){
   };
 }
 function newEdu(){
-  if (dirty && !confirm('지금 쓰던 내용이 저장되지 않았어요. 새로 시작할까요?')) return;
-  doc = blankEdu(); dirty = false; renderAll(); window.scrollTo(0,0);
+  if (!leaveOk(newEdu)) return;
+  resetAuto(); doc = blankEdu(); dirty = false; renderAll(); window.scrollTo(0,0);
 }
 function eduTitle(d){
   d = d || doc;
@@ -421,10 +422,48 @@ function renderPreview(){
   document.getElementById('datePreview').textContent = t ? '→ 보고서에는 「' + t + '」 로 들어가요' : '';
 }
 function renderStatus(){
-  var s = doc.id ? typeName(doc.type) + ' · ' + (dirty?'저장 안 됨 ●':'저장됨') : '새 보고서' + (dirty?' · 저장 안 됨 ●':'');
+  var st = saving ? '저장 중…' : dirty ? (autoNote || '저장 안 됨 ●') : (lastSaved ? '자동 저장됨 ' + lastSaved : '저장됨');
+  var s = doc.id ? typeName(doc.type) + ' · ' + st : '새 보고서' + (dirty || saving ? ' · ' + st : '');
   document.getElementById('status').textContent = s;
 }
-function markDirty(){ dirty = true; renderStatus(); }
+function markDirty(){ dirty = true; editVer++; autoNote = ''; renderStatus(); scheduleAuto(); }
+
+/* ── 자동 저장: 입력을 멈추고 3초 뒤에 저장 ── */
+var saving = false, editVer = 0, openVer = 0, autoT = null, lastSaved = '', autoNote = '';
+function scheduleAuto(){ clearTimeout(autoT); autoT = setTimeout(autoSave, 3000); }
+function hhmm(){ var n = new Date(); return ('0'+n.getHours()).slice(-2) + ':' + ('0'+n.getMinutes()).slice(-2); }
+function autoSave(){
+  if (!dirty) return;
+  if (!doc.programName){ autoNote = '프로그램명을 쓰면 자동 저장돼요'; renderStatus(); return; }
+  if (saving){ scheduleAuto(); return; }
+  var me = doc, ver = editVer, isNew = !doc.id, d = payload();
+  saving = true; renderStatus();
+  google.script.run.withSuccessHandler(function(r){
+    saving = false;
+    if (me !== doc) return;                 // 그 사이 다른 보고서를 열었으면 무시
+    doc.id = r.id; lastSaved = hhmm();
+    if (editVer === ver) dirty = false; else scheduleAuto();   // 저장 중에 더 쓴 내용은 다시 저장
+    renderStatus();
+    if (isNew) loadList(); else updateListItem(d, r);
+  }).withFailureHandler(function(e){
+    saving = false; autoNote = '자동 저장 실패 — [저장]을 눌러주세요'; renderStatus();
+  }).saveReport(d);
+}
+// 다른 보고서로 넘어가기 전: 저장할 수 있으면 먼저 저장하고 넘어감
+function leaveOk(next){
+  if (saving){ setTimeout(next, 400); return false; }
+  if (!dirty) return true;
+  if (editVer === openVer && !doc.id) return true;   // 복사만 하고 아무것도 안 고쳤으면 저장 안 함
+  if (doc.programName){ save(next); return false; }
+  return confirm('프로그램명이 없어서 저장되지 않았어요. 그래도 넘어갈까요?');
+}
+function resetAuto(){ clearTimeout(autoT); lastSaved = ''; autoNote = ''; openVer = editVer; }
+function updateListItem(d, r){
+  for (var i = 0; i < saved.length; i++) if (saved[i].id === r.id){
+    saved[i].title = d.title; saved[i].programName = d.programName; saved[i].date = d.date || ''; saved[i].updated = r.updated;
+  }
+  renderList();
+}
 
 FIELDS.forEach(function(f){
   document.getElementById(f).addEventListener('input', function(e){
@@ -584,7 +623,8 @@ function renderList(){
   });
 }
 function openReport(id, mode){
-  if (dirty && !confirm('지금 쓰던 내용이 저장되지 않았어요. 그래도 열까요?')) return;
+  if (!leaveOk(function(){ openReport(id, mode); })) return;
+  resetAuto();
   toast('불러오는 중…');
   google.script.run.withSuccessHandler(function(d){
     if (mode==='copy'){ delete d.id; d.date=''; d.dateEnd=''; d.titleAuto = true; d.title = ''; d.photos = [];
@@ -633,11 +673,16 @@ function payload(){
 }
 function save(cb){
   if (!doc.programName){ toast('프로그램명을 먼저 써주세요.'); document.getElementById('programName').focus(); return; }
-  var d = payload();
+  if (saving){ setTimeout(function(){ save(cb); }, 400); return; }   // 자동 저장이 끝난 뒤에
+  clearTimeout(autoT);
+  var me = doc, ver = editVer, d = payload();
+  saving = true; renderStatus();
   google.script.run.withSuccessHandler(function(r){
-    doc.id = r.id; dirty = false; renderStatus(); loadList(); toast('저장했어요.');
+    saving = false;
+    if (me === doc){ doc.id = r.id; if (editVer === ver) dirty = false; lastSaved = hhmm(); }
+    renderStatus(); loadList(); toast('저장했어요.');
     if (cb) cb();
-  }).withFailureHandler(fail).saveReport(d);
+  }).withFailureHandler(function(e){ saving = false; renderStatus(); fail(e); }).saveReport(d);
 }
 var tplCache = {};
 function getTpl(cb, kind){
@@ -676,7 +721,10 @@ function download(){
       getTpl(function(b64){
         var imgs = {}; for (var k in imgCache) if (imgCache[k]) imgs[k] = imgCache[k];
         JSZip.loadAsync(b64, {base64:true}).then(function(z){
-          return isEdu ? EduGen.buildZip(z, d, imgs) : HwpxGen.buildZip(z, d, imgs);
+          var dd = TextStyle.prep(d);   // ***굵게+기울임***
+          return isEdu ? EduGen.buildZip(z, dd, imgs) : HwpxGen.buildZip(z, dd, imgs);
+        }).then(function(z){
+          return TextStyle.apply(z);   // *기울임*, __밑줄__
         }).then(function(z){
           return z.generateAsync({type:'blob', compression:'DEFLATE', mimeType:'application/hwp+zip'});
         }).then(function(blob){
@@ -763,7 +811,7 @@ function renderAtts(){
 
 /* ── 미리보기 · 인쇄 ── */
 function h(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-function rich(s){ return h(s).replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>'); }
+function rich(s){ return TextStyle.html(h(s)); }
 function pvLines(text){
   return String(text||'').split('\n').map(function(ln){
     var m;
@@ -785,7 +833,7 @@ function previewHtml(d){
     var pre = PRESETS[b.preset], rows = (b.rows||[]).filter(function(r){ return r.some(function(x){ return String(x||'').trim(); }); });
     var hc = (b.cols && b.cols.length === pre.cols.length) ? b.cols : pre.cols;
     return '<table class="in"><tr>' + hc.map(function(c, i){ return '<th style="width:' + Math.round(pre.w[i]/396) + '%">' + c + '</th>'; }).join('') + '</tr>' +
-      rows.map(function(r){ return '<tr>' + pre.cols.map(function(_, i){ return pre.align[i]==='l' ? '<td>' + pvLines(r[i]) + '</td>' : '<td class="c">' + h(r[i]).replace(/\n/g,'<br>') + '</td>'; }).join('') + '</tr>'; }).join('') + '</table>';
+      rows.map(function(r){ return '<tr>' + pre.cols.map(function(_, i){ return pre.align[i]==='l' ? '<td>' + pvLines(r[i]) + '</td>' : '<td class="c">' + rich(r[i]).replace(/\n/g,'<br>') + '</td>'; }).join('') + '</tr>'; }).join('') + '</table>';
   }).join('');
   o += '<tr><td class="lb">내용</td><td colspan="3" style="vertical-align:top">' + body + '</td></tr>';
   var B = HwpxGen.budgetCalc(d.budget);
@@ -824,7 +872,7 @@ function previewEduHtml(d){
   var sched = '<p class="ln">2. 일정</p>' + (d.schedules||[]).map(function(sc){
     var rows = (sc.rows||[]).filter(function(r){ return String(r[0]||'').trim() || String(r[1]||'').trim(); });
     return (sc.label ? '<p class="ln">' + h(sc.label) + '</p>' : '') + '<table class="in"><tr><th style="width:39%">시간</th><th>내용</th></tr>' +
-      rows.map(function(r){ return '<tr><td class="c">' + h(r[0]).replace(/\n/g,'<br>') + '</td><td class="c">' + h(r[1]).replace(/\n/g,'<br>') + '</td></tr>'; }).join('') + '</table>';
+      rows.map(function(r){ return '<tr><td class="c">' + rich(r[0]).replace(/\n/g,'<br>') + '</td><td class="c">' + rich(r[1]).replace(/\n/g,'<br>') + '</td></tr>'; }).join('') + '</table>';
   }).join('');
   o += '<tr><td class="lb">일 정<br>및<br>내 용</td><td colspan="3" style="vertical-align:top;border-right:0"><p class="ln"> 1. <b>주요내용</b></p>' + pvLines(d.topics) + '</td><td colspan="2" style="vertical-align:top;border-left:0">' + sched + '</td></tr>';
   o += '<tr>' + lb('평 가') + '<td colspan="5" style="vertical-align:top">' + String(d.evaluation||'').split('\n').map(function(l){ return l.trim() ? '<p class="ln dash" style="text-align:justify">- ' + rich(l.replace(/^\s*-\s+/,'')) + '</p>' : '<p class="ln">&nbsp;</p>'; }).join('') + '</td></tr>';
@@ -873,8 +921,8 @@ function fail(e){
   toast('', 1);
 }
 function newDoc(){
-  if (dirty && !confirm('지금 쓰던 내용이 저장되지 않았어요. 새로 시작할까요?')) return;
-  doc = blankPlan(); dirty = false; renderAll();
+  if (!leaveOk(newDoc)) return;
+  resetAuto(); doc = blankPlan(); dirty = false; renderAll();
 }
 window.addEventListener('beforeunload', function(e){ if (dirty){ e.preventDefault(); e.returnValue=''; } });
 
