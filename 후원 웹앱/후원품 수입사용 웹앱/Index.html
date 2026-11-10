@@ -566,7 +566,7 @@ function homeView(){
   const vo={sel:H.sel,vsel:H.vsel,vskip:H.vskip,get outBy(){return H.manager||'';},set outBy(v){},need:k=>total(k),people:()=>H.rows.filter(r=>r.name).map(r=>({name:r.name,q:k=>qOf(r,k)}))};
   const vNotes=()=>{ const keys=H.sel.filter(k=>(H.vsel[k]||[]).length); return keys.length?vSplit(keys,H.vsel,vo.people()).map(vsFlat):[]; };
   const html=()=>{ const L=lots(), vn=vNotes(); let ri=-1; return receiptHtml({ dest:S.boot.dept||'일상동행팀', noTeam:true,
-    items:L.map(l=>({name:l.name,inDate:l.inDate,donor:l.donor,inQty:l.inQty,give:total(l.key),remainAfter:H.sent?l.remain:l.remain-total(l.key)})),
+    items:L.map(l=>({name:l.name,inDate:l.inDate,donor:l.donor,inQty:l.inQty,give:total(l.key),remainAfter:(H.before&&H.before[l.key]!=null?H.before[l.key]:l.remain)-total(l.key)})),
     rows:H.rows.filter(r=>r.name).map(r=>{ ri++; const n=(vn[ri]||[]).join(', '); return {name:r.name,team:'',addr:r.addr,idType:H.idType,date:H.dateMode==='fill'?H.date:(r.sig?S.boot.today:''),sigUrl:r.sig,note:n,noteSmall:!!n,qty:L.map(l=>qOf(r,l.key))}; }) }); };
   $('#hXls').onclick=e=>{if(!checkHome())return; if(!H.sel.length||!H.rows.some(r=>r.name)) return toast('물품과 명단을 넣어 주세요.'); toExcel(e.target,html(),'가정배분수령증_'+H.date,true); };
   $('#hPrint').onclick=()=>{if(!checkHome())return; if(!H.sel.length||!H.rows.some(r=>r.name)) return toast('물품과 명단을 넣어 주세요.'); printHtml(html(),true); };
@@ -583,10 +583,10 @@ function homeView(){
   $('#hSend').onclick=e=>act(e.target, async()=>{
     checkInputQuantities(H.rows);if(H.sent) throw '이미 요청했어요.'; if(!H.manager) throw '사례 담당자 이름을 골라 주세요.';
     const people=H.rows.filter(r=>r.name); if(!H.sel.length||!people.length) throw '물품과 명단을 넣어 주세요.';
-    const vc=await vCheck(vo), hasV=Object.keys(vc.vsel).length;
+    const vc=await vCheck(vo), hasV=Object.keys(vc.vsel).length, before=Object.fromEntries(H.sel.map(k=>[k,(lotOf(k)||{}).remain]));
     await run('requestHome',{manager:H.manager,date:H.date,count:people.length,items:H.sel.map(k=>({key:k,qty:total(k)})),vsel:vc.vsel,vskip:vc.vskip,outBy:vc.outBy,
       people:hasV?people.map(r=>({name:r.name,qty:Object.fromEntries(Object.keys(vc.vsel).map(k=>[k,qOf(r,k)]))})):[]});
-    H.sent=true; S.lv=null; refreshStockLater(); if(S.boot.admin) bumpCount('home',1);
+    H.before=before; H.sent=true; S.lv=null; refreshStockLater(); if(S.boot.admin) bumpCount('home',1);
     $('#hMsg').innerHTML=`\x3cp class="note">min에게 확인 요청을 보냈어요. 기록에는 \x3cb>${people.length}명 · 수량\x3c/b>만 남았어요. 수령증을 다 뽑았으면 \x3cb>명단 지우기\x3c/b>를 눌러 주세요.\x3c/p>`;
   }, '보내는 중...');
   drawRows(); loadLV(()=>{ if(!H.sent) vBox($('#hV'),vo); });
