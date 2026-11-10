@@ -584,10 +584,10 @@ function homeView(){
     checkInputQuantities(H.rows);if(H.sent) throw '이미 요청했어요.'; if(!H.manager) throw '사례 담당자 이름을 골라 주세요.';
     const people=H.rows.filter(r=>r.name); if(!H.sel.length||!people.length) throw '물품과 명단을 넣어 주세요.';
     const vc=await vCheck(vo), hasV=Object.keys(vc.vsel).length, before=Object.fromEntries(H.sel.map(k=>[k,(lotOf(k)||{}).remain]));
-    await run('requestHome',{manager:H.manager,date:H.date,count:people.length,items:H.sel.map(k=>({key:k,qty:total(k)})),vsel:vc.vsel,vskip:vc.vskip,outBy:vc.outBy,
+    const hid=await run('requestHome',{manager:H.manager,date:H.date,count:people.length,items:H.sel.map(k=>({key:k,qty:total(k)})),vsel:vc.vsel,vskip:vc.vskip,outBy:vc.outBy,
       people:hasV?people.map(r=>({name:r.name,qty:Object.fromEntries(Object.keys(vc.vsel).map(k=>[k,qOf(r,k)]))})):[]});
-    H.before=before; H.sent=true; S.lv=null; refreshStockLater(); if(S.boot.admin) bumpCount('home',1);
-    $('#hMsg').innerHTML=`\x3cp class="note">min에게 확인 요청을 보냈어요. 기록에는 \x3cb>${people.length}명 · 수량\x3c/b>만 남았어요. 수령증을 다 뽑았으면 \x3cb>명단 지우기\x3c/b>를 눌러 주세요.\x3c/p>`;
+    H.before=before; H.sent=true; const keep=html(); run('saveHomePaper',hid,keep).catch(()=>run('saveHomePaper',hid,keep)).catch(()=>toast('확인용 수령증 PDF 저장이 안 됐어요. 인쇄는 그대로 하시면 돼요.')); S.lv=null; refreshStockLater(); if(S.boot.admin) bumpCount('home',1);
+    $('#hMsg').innerHTML=`\x3cp class="note">min에게 확인 요청을 보냈어요. 기록에는 \x3cb>${people.length}명 · 수량\x3c/b>만 남고, 확인용으로 \x3cb>서명 전 수령증 PDF\x3c/b>가 관리자만 여는 폴더에 저장돼요. 수령증을 다 뽑았으면 \x3cb>명단 지우기\x3c/b>를 눌러 주세요.\x3c/p>`;
   }, '보내는 중...');
   drawRows(); loadLV(()=>{ if(!H.sent) vBox($('#hV'),vo); });
   function drawRows(){
@@ -815,8 +815,8 @@ async function homeOkView(){
   const list=await run('listHome'), wait=list.filter(x=>x.status==='확인 대기'), done=list.filter(x=>x.status!=='확인 대기').slice(0,15);
   const line=x=>x.items.map(i=>`${esc(i.name)} ${i.qty}`).join(', ');
   $('#main').innerHTML=`\x3cdiv class="card">\x3ch2>확인 기다리는 가정 배분\x3c/h2>\x3cp class="muted">확인을 누르면 배분 기록에 담당자 이름으로 들어가요. 그 전까지도 재고에서는 미리 빼 두고 있어요.\x3c/p>
-  ${wait.length?`\x3ctable class="tbl">${wait.map(x=>`\x3ctr>\x3ctd>\x3cb>${esc(x.manager)}\x3c/b> · ${esc(x.date)} · ${x.count}명\x3cbr>\x3cspan class="muted">${line(x)}\x3c/span>\x3c/td>\x3ctd style="text-align:right;white-space:nowrap">${x.sign?'':`\x3cbutton class="btn sm line" data-ed="${x.id}">수정\x3c/button> `}\x3cbutton class="btn sm" data-ok="${x.id}">확인\x3c/button> \x3cbutton class="btn sm line" data-no="${x.id}">취소\x3c/button>\x3c/td>\x3c/tr>`).join('')}\x3c/table>`:'\x3cp class="muted">기다리는 요청이 없어요.\x3c/p>'}\x3c/div>
-  \x3cdiv class="card">\x3ch2>최근 처리\x3c/h2>${done.length?`\x3ctable class="tbl">${done.map(x=>`\x3ctr>\x3ctd>${esc(x.manager)} · ${esc(x.date)} · ${x.count}명\x3cbr>\x3cspan class="muted">${line(x)}\x3c/span>\x3c/td>\x3ctd style="white-space:nowrap">\x3cspan class="tag ${x.status==='확인'?'ok':''}">${esc(x.status)}\x3c/span>${x.status==='확인'&&!x.sign?` \x3cbutton class="btn sm line" data-ed="${x.id}">수정\x3c/button>`:''}\x3c/td>\x3c/tr>`).join('')}\x3c/table>`:'\x3cp class="muted">없어요.\x3c/p>'}\x3c/div>`;
+  ${wait.length?`\x3ctable class="tbl">${wait.map(x=>`\x3ctr>\x3ctd>\x3cb>${esc(x.manager)}\x3c/b> · ${esc(x.date)} · ${x.count}명\x3cbr>\x3cspan class="muted">${line(x)}\x3c/span>\x3c/td>\x3ctd style="text-align:right;white-space:nowrap">${x.file?`\x3ca class="btn sm line" href="${esc(x.file)}" target="_blank">📄 수령증\x3c/a> `:''}${x.sign?'':`\x3cbutton class="btn sm line" data-ed="${x.id}">수정\x3c/button> `}\x3cbutton class="btn sm" data-ok="${x.id}">확인\x3c/button> \x3cbutton class="btn sm line" data-no="${x.id}">취소\x3c/button>\x3c/td>\x3c/tr>`).join('')}\x3c/table>`:'\x3cp class="muted">기다리는 요청이 없어요.\x3c/p>'}\x3c/div>
+  \x3cdiv class="card">\x3ch2>최근 처리\x3c/h2>${done.length?`\x3ctable class="tbl">${done.map(x=>`\x3ctr>\x3ctd>${esc(x.manager)} · ${esc(x.date)} · ${x.count}명\x3cbr>\x3cspan class="muted">${line(x)}\x3c/span>\x3c/td>\x3ctd style="white-space:nowrap">${x.file?`\x3ca class="btn sm line" href="${esc(x.file)}" target="_blank">📄 수령증\x3c/a> `:''}\x3cspan class="tag ${x.status==='확인'?'ok':''}">${esc(x.status)}\x3c/span>${x.status==='확인'&&!x.sign?` \x3cbutton class="btn sm line" data-ed="${x.id}">수정\x3c/button>`:''}\x3c/td>\x3c/tr>`).join('')}\x3c/table>`:'\x3cp class="muted">없어요.\x3c/p>'}\x3c/div>`;
   $('#main').onclick=e=>{ const t=e.target; if(t.dataset.ed) return editHomeTotals(list.find(x=>x.id===t.dataset.ed)); const id=t.dataset.ok||t.dataset.no; if(!id) return;
     if(t.dataset.no && !confirm('이 요청을 취소할까요? 미리 빼 둔 재고가 돌아와요.'+((list.find(x=>x.id===id)||{items:[]}).items.some(i=>(i.serials||[]).length)?' 상품권 번호도 관리대장에서 「보유」로 돌아가요.':''))) return;
     act(t, async()=>{ await run('confirmHome',id,!!t.dataset.ok); if(t.dataset.no) S.lv=null; bumpCount('home',-1); refreshStockLater(); toast(t.dataset.ok?'배분 기록에 넣었어요.':'취소했어요.'); homeOkView(); }); };
