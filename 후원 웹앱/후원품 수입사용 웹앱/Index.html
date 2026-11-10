@@ -277,7 +277,7 @@ function vBox(el,o){
       ${got===need&&need?ppl.map((p,i)=>asg[i][k]&&asg[i][k].length?`\x3cdiv class="muted" style="font-size:12.5px">· ${esc(p.name)}: ${asg[i][k].map(esc).join(', ')}\x3c/div>`:'').join(''):''}`}
       ${S.boot.admin?`\x3clabel style="display:flex;gap:6px;align-items:center;color:var(--ink);margin-top:8px">\x3cinput type="checkbox" data-vx="${esc(k)}" ${skip?'checked':''} style="width:auto"> 번호 없이 수량만 내보내기 \x3cspan class="muted">(관리대장에 없는 상품권일 때만)\x3c/span>\x3c/label>`:''}
       \x3cp class="muted" style="margin:6px 0 0">번호와 받는 분 이름은 상품권 관리대장의 출고일·수령자·상태 칸에 같이 기록돼요.\x3c/p>\x3c/div>`; }).join('')
-    +(keys.some(k=>!S.lv[k].locked)?`\x3cdiv class="card">\x3clabel>상품권 출고담당자 \x3cspan class="muted">(관리대장 「출고담당자」 칸에 들어가요)\x3c/span>\x3c/label>\x3cinput data-vby value="${esc(o.outBy||'')}" placeholder="예: 홍길동">\x3c/div>`:'');
+    +(o.askBy&&keys.some(k=>!S.lv[k].locked)?`\x3cdiv class="card">\x3clabel>상품권 출고담당자 \x3cspan class="muted">(관리대장 「출고담당자」 칸에 들어가요)\x3c/span>\x3c/label>\x3cinput data-vby value="${esc(o.outBy||'')}" placeholder="예: 홍길동">\x3c/div>`:'');
   el.oninput=e=>{ if(e.target.dataset.vby!==undefined) o.outBy=e.target.value; };
   el.onchange=e=>{ const t=e.target;
     if(t.dataset.vby!==undefined){ o.outBy=t.value.trim(); try{localStorage.setItem('vby',o.outBy);}catch(x){} return; }
@@ -296,7 +296,7 @@ async function vCheck(o){
     if(!Number.isInteger(n)) throw '상품권 수량은 정수로 넣어 주세요.';
     const got=(o.vsel[k]||[]).length; if(got!==n) throw `「${lot.name}」 상품권 번호를 ${n}장 골라 주세요. (지금 ${got}장)`;
     out.vsel[k]=o.vsel[k].slice(); });
-  if(Object.keys(out.vsel).length&&!String(o.outBy||'').trim()) throw '상품권 출고담당자 이름을 적어 주세요.';
+  if(Object.keys(out.vsel).length&&!String(o.outBy||'').trim()) throw o.askBy?'상품권 출고담당자 이름을 적어 주세요.':'담당자를 골라 주세요.';
   out.outBy=String(o.outBy||'').trim();
   return out;
 }
@@ -305,7 +305,7 @@ function vToggle(arr,orig,sr){ const set=new Set(arr); if(set.has(sr)) set.delet
 function distView(){
   const D = S.dist || (S.dist={date:S.boot.today, sel:[], people:[], note:''}); D.vsel=D.vsel||{}; D.vskip=D.vskip||[];
   if(D.outBy===undefined) D.outBy=vby();
-  const vo={sel:D.sel,vsel:D.vsel,vskip:D.vskip,get outBy(){return D.outBy;},set outBy(v){D.outBy=v;},need:k=>D.people.reduce((s,p)=>s+num(p.qty[k]),0),people:()=>D.people.map(p=>({name:p.name,q:k=>p.qty[k]}))};
+  const vo={askBy:true,sel:D.sel,vsel:D.vsel,vskip:D.vskip,get outBy(){return D.outBy;},set outBy(v){D.outBy=v;},need:k=>D.people.reduce((s,p)=>s+num(p.qty[k]),0),people:()=>D.people.map(p=>({name:p.name,q:k=>p.qty[k]}))};
   $('#main').innerHTML=expiryCard()+`
   \x3cdiv class="card">\x3ch2>1. 무엇을 나눌까요?\x3c/h2>\x3cdiv class="row">\x3cdiv>\x3clabel>배분일\x3c/label>\x3cinput type="date" id="dDate" value="${D.date}">\x3c/div>\x3c/div>
   \x3clabel>물품 (여러 개 고를 수 있어요)\x3c/label>\x3cdiv id="dPick">\x3c/div>\x3c/div>
@@ -563,8 +563,7 @@ function homeView(){
   const qOf=(r,k)=> r.qty[k]===undefined?1:num(r.qty[k]);
   const lots=()=>H.sel.map(lotOf).filter(Boolean);
   const total=k=>H.rows.filter(r=>r.name).reduce((s,r)=>s+qOf(r,k),0);
-  if(H.outBy===undefined) H.outBy=vby();
-  const vo={sel:H.sel,vsel:H.vsel,vskip:H.vskip,get outBy(){return H.outBy||H.manager||'';},set outBy(v){H.outBy=v;},need:k=>total(k),people:()=>H.rows.filter(r=>r.name).map(r=>({name:r.name,q:k=>qOf(r,k)}))};
+  const vo={sel:H.sel,vsel:H.vsel,vskip:H.vskip,get outBy(){return H.manager||'';},set outBy(v){},need:k=>total(k),people:()=>H.rows.filter(r=>r.name).map(r=>({name:r.name,q:k=>qOf(r,k)}))};
   const vNotes=()=>{ const keys=H.sel.filter(k=>(H.vsel[k]||[]).length); return keys.length?vSplit(keys,H.vsel,vo.people()).map(vsFlat):[]; };
   const html=()=>{ const L=lots(), vn=vNotes(); let ri=-1; return receiptHtml({ dest:S.boot.dept||'일상동행팀', noTeam:true,
     items:L.map(l=>({name:l.name,inDate:l.inDate,donor:l.donor,inQty:l.inQty,give:total(l.key),remainAfter:H.sent?l.remain:l.remain-total(l.key)})),
