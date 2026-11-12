@@ -1362,6 +1362,14 @@ function changedOnly_(changes, next) {
   return result;
 }
 
+/** 저장한 칸을 시트에서 다시 읽어 제대로 들어갔는지 확인해요 (다르면 오류로 알려요) */
+function verifyRowWrite_(sheet, headers, rowNumber, rowObject) {
+  SpreadsheetApp.flush();
+  const saved = readSheetRowAsObject_(sheet, headers, rowNumber);
+  const wrong = Object.keys(rowObject).filter((h) => headers.indexOf(h) !== -1 && !sameValue_(h, saved[h], rowObject[h]));
+  if (wrong.length) throw new Error('저장한 내용을 다시 확인해 보니 다른 칸이 있어요: ' + wrong.join(', ') + '. 시트를 열어 확인해주세요.');
+}
+
 function appendRowObject_(sheet, headers, rowObject) {
   sheet.appendRow(headers.map((header) => cellValue_(header, rowObject[header])));
 }
@@ -1486,15 +1494,14 @@ function saveProgramResource_impl_(adminPin, payload) {
       const changes = Object.keys(next)
         .filter((h) => !sameValue_(h, existing[h], next[h]))
         .map((h) => ({ header: h, before: existing[h], after: next[h] }));
-      if (!changes.length) return { ok: true, mode: 'unchanged', id: id };
-      const statusChanged = changes.some((c) => c.header === '모집상태');
-      const infoChanged = changes.some((c) => c.header !== '모집상태');
+      // 수정 창에서 저장하면 내용이 그대로여도 「담당자에게 확인함」으로 기록해요
       const toWrite = changedOnly_(changes, next);
-      if (statusChanged) { toWrite['확인일'] = today_(); toWrite['확인자'] = user; }
-      if (infoChanged) { toWrite['최종수정일'] = today_(); toWrite['수정자'] = user; }
+      toWrite['확인일'] = today_(); toWrite['확인자'] = user;
+      if (changes.length) { toWrite['최종수정일'] = today_(); toWrite['수정자'] = user; }
       writeRow_(sheet, headers, rowNumber, toWrite);
-      logChanges_(user, SHEETS.internalResources, id, name, changes);
-      return { ok: true, mode: 'updated', id: id };
+      verifyRowWrite_(sheet, headers, rowNumber, toWrite);
+      logChanges_(user, SHEETS.internalResources, id, name, changes.length ? changes : [{ header: '정보 확인', before: '', after: '내용 변경 없이 저장·확인' }]);
+      return { ok: true, mode: changes.length ? 'updated' : 'confirmed', id: id };
     }
 
     const rowObject = {};
@@ -1513,6 +1520,7 @@ function saveProgramResource_impl_(adminPin, payload) {
     rowObject['최종수정일'] = today_();
     rowObject['수정자'] = user;
     appendRowObject_(sheet, headers, rowObject);
+    verifyRowWrite_(sheet, headers, sheet.getLastRow(), rowObject);
     logChanges_(user, SHEETS.internalResources, newId, name, [{ header: '신규 등록', before: '', after: name }]);
     return { ok: true, mode: 'created', id: newId };
   } finally {
