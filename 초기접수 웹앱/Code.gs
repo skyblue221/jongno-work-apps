@@ -20,6 +20,7 @@ const EXTERNAL_RESOURCE_HEADERS = [
 
 const INTERNAL_RESOURCE_HEADERS = [
   '내부자원ID',
+  '운영연도',
   '소속팀',
   '사업명',
   '자원명',
@@ -173,27 +174,33 @@ function setupSheets_impl_() {
   ensureStage2Sheets_(true);
 }
 
-function getProgramFinderData() {
+function getProgramFinderData(year) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   if (!ss) throw new Error('연결된 스프레드시트를 찾을 수 없습니다. 시트에서 열린 Apps Script 프로젝트인지 확인해주세요.');
   if (!ss.getSheetByName(SHEETS.internalResources)) {
     throw new Error('프로그램현황 시트를 찾을 수 없습니다. 시트 이름을 확인해주세요.');
   }
   // 상담할 때 여는 화면이라 자주 불림 → 한 번 읽은 내용을 기억해 두고, 저장하거나 시트를 고치면 새로 읽음
-  return finderCached_(() => ({
-    criteria: ss.getSheetByName(SHEETS.criteria) ? getCriteria_() : {},
-    resources: getResources_(true),
-    settings: publicSettings_(),
-    checkRules: getCheckRules_(),
-  }));
+  const wanted = /^\d{4}$/.test(normalizeText_(year)) ? normalizeText_(year) : '';
+  return finderCached_(() => {
+    const info = programYearInfo_(wanted);
+    return {
+      criteria: ss.getSheetByName(SHEETS.criteria) ? getCriteria_() : {},
+      resources: getResources_(true, info.selectedYear),
+      years: info.years,
+      selectedYear: info.selectedYear,
+      settings: publicSettings_(),
+      checkRules: getCheckRules_(),
+    };
+  }, wanted || 'default');
 }
 
 // ── 빠른 찾기 화면 임시 저장(캐시) ──
-function finderCached_(load) {
+function finderCached_(load, key) {
   let cache, prefix;
   try {
     cache = CacheService.getScriptCache();
-    prefix = 'finder-v1:' + (PropertiesService.getDocumentProperties().getProperty('finderRev') || '0');
+    prefix = 'finder-v2:' + (key || 'default') + ':' + (PropertiesService.getDocumentProperties().getProperty('finderRev') || '0');
     const m = JSON.parse(cache.get(prefix) || 'null');
     if (m && m.count > 0) {
       const keys = Array.from({ length: m.count }, (_, i) => prefix + ':' + m.token + ':' + i), parts = cache.getAll(keys);
@@ -219,13 +226,15 @@ function onEdit(e) { bumpFinder_(); }
 /** 저장 기능: 저장이 끝나면(실패해도) 빠른 찾기 화면을 새로 읽게 함 */
 function withFinderRefresh_(fn, args) { try { return fn.apply(null, args); } finally { bumpFinder_(); } }
 
-function getProgramManagementData(adminPin) {
+function getProgramManagementData(adminPin, year) {
   requireEditor_(adminPin);
   ensureStage2Sheets_();
   const sheet = ensureInternalResourceSheet_();
+  if (migrateProgramYears_(sheet)) bumpFinder_();
+  const info = programYearInfo_(year);
   const rows = readTableWithRowNumber_(SHEETS.internalResources)
     .map((row) => programManagementRecordFromRow_(row))
-    .filter((row) => row.id || row.name)
+    .filter((row) => (row.id || row.name) && row.year === info.selectedYear)
     .sort((a, b) => {
       const activeRank = (b.active === 'O' ? 1 : 0) - (a.active === 'O' ? 1 : 0);
       return activeRank || (a.name || '').localeCompare(b.name || '', 'ko');
@@ -238,6 +247,8 @@ function getProgramManagementData(adminPin) {
     ok: true,
     sheetName: sheet.getName(),
     programs: rows,
+    years: info.years,
+    selectedYear: info.selectedYear,
     recruitStatuses: PROGRAM_RECRUIT_STATUSES,
     editableHeaders: PROGRAM_EDITABLE_HEADERS,
     unknownTags: findUnknownProgramTags_(rows),
@@ -246,6 +257,85 @@ function getProgramManagementData(adminPin) {
   };
 }
 
+
+// ── 운영연도: 프로그램 목록을 연도별로 나눠요 (복지정보는 모든 연도 공통) ──
+const LEGACY_PROGRAM_YEAR = '2026';   // 운영연도 칸이 비어 있던 예전 프로그램은 2026년으로 봐요
+/** 입력 확인용: 비어 있으면 2026, 네 자리 연도가 아니면 오류 */
+function programYear_(value) {
+  const v = normalizeText_(value);
+  if (!v) return LEGACY_PROGRAM_YEAR;
+  if (!/^\d{4}$/.test(v) || Number(v) < 2000 || Number(v) > 2100) throw new Error('운영연도는 2026처럼 네 자리 숫자로 입력해주세요.');
+  return v;
+}
+/** 읽기용: 이상한 값이어도 멈추지 않고 2026으로 봐요 */
+function programYearOf_(value) {
+  const v = normalizeText_(value).replace(/\.0+$/, '').replace(/년$/, '');
+  return /^\d{4}$/.test(v) ? v : LEGACY_PROGRAM_YEAR;
+}
+/** 고를 수 있는 연도와 기본 연도: 오늘 이전 자료 중 가장 최근 연도 (2027년 자료가 생겨도 2027년이 되기 전까지는 2026년이 기본) */
+function programYearInfo_(requested) {
+  const now = Utilities.formatDate(new Date(), Session.getScriptTimeZone() || 'Asia/Seoul', 'yyyy');
+  const stored = [...new Set(readTable_(SHEETS.internalResources)
+    .filter((r) => normalizeText_(r['내부자원ID']) || normalizeText_(r['자원명']))
+    .map((r) => programYearOf_(r['운영연도'])))].sort();
+  const want = normalizeText_(requested);
+  const past = stored.filter((y) => y <= now);
+  const selected = /^\d{4}$/.test(want) ? want : (past.length ? past[past.length - 1] : (stored[0] || now));
+  const years = [...new Set(stored.concat([selected, now]))].sort();
+  return { years: years, selectedYear: selected };
+}
+/** 운영연도 칸이 빈 프로그램에 2026을 채워요 (정보 관리를 열 때 한 번). 채운 줄 수를 돌려줘요 */
+function migrateProgramYears_(sheet) {
+  const headers = getSheetHeaders_(sheet), col = headers.indexOf('운영연도') + 1;
+  if (!col || sheet.getLastRow() < 2) return 0;
+  const rows = readTableWithRowNumber_(SHEETS.internalResources)
+    .filter((r) => (normalizeText_(r['내부자원ID']) || normalizeText_(r['자원명'])) && !normalizeText_(r['운영연도']))
+    .map((r) => r.__rowNumber);
+  let group = [];
+  const flush = () => { if (group.length) sheet.getRange(group[0], col, group.length, 1).setValues(group.map(() => [LEGACY_PROGRAM_YEAR])); group = []; };
+  rows.forEach((n) => { if (group.length && n !== group[group.length - 1] + 1) flush(); group.push(n); });
+  flush();
+  return rows.length;
+}
+/** 다음 연도 목록 준비: 올해 프로그램(숨김·종료 제외)을 복사해 내년 초안을 만들어요. 올해 자료는 그대로 */
+function copyProgramsToYear(adminPin, fromYear, toYear) { return withFinderRefresh_(copyProgramsToYear_impl_, arguments); }
+function copyProgramsToYear_impl_(adminPin, fromYear, toYear) {
+  const user = requireAdmin_(adminPin);
+  const from = programYear_(fromYear), to = programYear_(toYear);
+  if (!normalizeText_(fromYear) || !normalizeText_(toYear) || Number(to) !== Number(from) + 1) throw new Error('지금 연도에서 바로 다음 연도로만 복사할 수 있어요.');
+  ensureStage2Sheets_();
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const sheet = ensureInternalResourceSheet_();
+    migrateProgramYears_(sheet);
+    const headers = getSheetHeaders_(sheet);
+    const all = readTableWithRowNumber_(SHEETS.internalResources).filter((r) => normalizeText_(r['내부자원ID']) || normalizeText_(r['자원명']));
+    if (all.some((r) => programYearOf_(r['운영연도']) === to)) throw new Error(to + '년 자료가 이미 있어요. 겹치지 않게 복사하지 않았어요. ' + to + '년을 골라 확인해주세요.');
+    const source = all.filter((r) => programYearOf_(r['운영연도']) === from && normalizeActiveValue_(r['활성여부']) !== 'X' && normalizeText_(r['모집상태']) !== '종료');
+    if (!source.length) throw new Error(from + '년에 복사할 프로그램이 없어요.');
+    let next = Number((generateNextInternalResourceId_(sheet).match(/(\d+)$/) || [0, 1])[1]);
+    const today = today_();
+    const values = source.map((r) => {
+      const o = Object.assign({}, r);
+      o['내부자원ID'] = 'IN-' + String(next++).padStart(3, '0');
+      o['운영연도'] = to;
+      o['모집상태'] = '확인필요';
+      o['확인일'] = ''; o['확인자'] = ''; o['다음확인일'] = '';
+      o['최종수정일'] = today; o['수정자'] = user;
+      return headers.map((h) => {
+        if (!h) return '';
+        const v = cellValue_(h, o[h]);
+        return typeof v === 'string' && /^[0+]\d/.test(v) ? "'" + v : v;   // 연락처 앞자리 0 지키기
+      });
+    });
+    sheet.getRange(sheet.getLastRow() + 1, 1, values.length, headers.length).setValues(values);
+    logChanges_(user, SHEETS.internalResources, '-', to + '년 목록 준비', [{ header: '다음 연도 목록 준비', before: from + '년', after: values.length + '건 복사' }]);
+    return { ok: true, count: values.length, year: to };
+  } finally {
+    lock.releaseLock();
+  }
+}
 
 function yearRollover(adminPin) { return withFinderRefresh_(yearRollover_impl_, arguments); }
 function yearRollover_impl_(adminPin) {
@@ -403,9 +493,10 @@ function ensureDefaultCriteria_(criteriaSheet) {
     .setValues(rowsToAdd);
 }
 
-function getResources_(forFinder) {
+function getResources_(forFinder, year) {
   return {
     internal: readTable_(SHEETS.internalResources)
+      .filter((row) => !year || programYearOf_(row['운영연도']) === year)
       .filter((row) => forFinder
         ? normalizeText_(row['활성여부']).toUpperCase() !== 'X' && Boolean(normalizeText_(row['자원명']))
         : normalizeText_(row['활성여부']) === 'O')
@@ -570,6 +661,7 @@ function programManagementRecordFromRow_(row) {
   return {
     rowNumber: row.__rowNumber,
     id: normalizeText_(row['내부자원ID']),
+    year: programYearOf_(row['운영연도']),
     name: normalizeText_(row['자원명']),
     business: normalizeText_(row['사업명']),
     team: normalizeText_(row['소속팀']),
@@ -1151,7 +1243,7 @@ const EXTERNAL_EDITABLE_HEADERS = EXTERNAL_RESOURCE_HEADERS.filter((h) => ['외�
 
 // 시트 구조 점검은 6시간에 한 번만 (시트가 없어졌으면 바로 다시 점검)
 // 시트 머리글(열 이름)을 코드에서 바꾸면 아래 숫자를 하나 올려주세요.
-const SHEET_SCHEMA_VERSION = 'stage2-v1';
+const SHEET_SCHEMA_VERSION = 'stage2-v2';   // v2: 프로그램현황에 운영연도 칸
 
 function ensureStage2Sheets_(force) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -1409,6 +1501,7 @@ function saveProgramResource_impl_(adminPin, payload) {
     INTERNAL_RESOURCE_HEADERS.forEach((header) => { rowObject[header] = normalizeText_(data[header]); });
     const newId = generateNextInternalResourceId_(sheet);
     rowObject['내부자원ID'] = newId;
+    rowObject['운영연도'] = programYear_(data['운영연도'] || programYearInfo_().selectedYear);
     rowObject['자원명'] = name;
     rowObject['사업명'] = rowObject['사업명'] || name;
     rowObject['자원그룹'] = rowObject['자원그룹'] || '참여자원';
