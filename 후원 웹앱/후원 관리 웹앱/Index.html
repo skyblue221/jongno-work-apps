@@ -8,52 +8,77 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap">
 <style>
-  :root{font-family:system-ui,'Apple SD Gothic Neo','Malgun Gothic',sans-serif;color:#1f2f3a;background:#f6f7f4}
+  /* 후원 업무 도우미 — 대표 색: 벽돌색 */
+  :root{--bg:#f6f4ef;--ink:#1f2421;--sub:#5b625e;--line:#d6d2c8;--line2:#e7e3da;--pri:#9a3b26;--pri-dark:#7a2e1d;--soft:#f6ebe6;--accent:#2e5a7a;--warn:#a8322a;
+    font-family:"Noto Sans KR","Apple SD Gothic Neo","Malgun Gothic",sans-serif;color:var(--ink);background:var(--bg)}
   *{box-sizing:border-box}
-  body{margin:0}
-  header{background:#3b2f63;color:#fff;padding:22px max(18px,calc((100vw - 1100px)/2))}
-  h1{font-size:23px;margin:0 0 5px}header small{color:#d9d2ef}
-  main{max-width:1100px;margin:20px auto;padding:0 16px}
-  nav{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:18px}
-  button{cursor:pointer;border:1px solid #cfc8e0;background:#fff;border-radius:9px;padding:10px 14px;color:#2d2450;font-weight:600;font:inherit;font-weight:600}
-  button.primary{background:#5a479a;color:#fff;border-color:#5a479a}
-  button.selected{background:#ebe6f7;border-color:#5a479a}
+  body{margin:0;word-break:keep-all}
+
+  /* 머리말: 색 띠 대신 서식지형 */
+  header{max-width:1100px;margin:0 auto;padding:26px 16px 14px;border-bottom:2px solid var(--ink)}
+  header::before{content:"종로장애인복지관";display:block;margin-bottom:4px;color:var(--pri);font-size:13px;font-weight:700}
+  h1{font-size:24px;margin:0 0 4px;letter-spacing:-.02em}header small{color:var(--sub)}
+  main{max-width:1100px;margin:0 auto 40px;padding:0 16px}
+
+  /* 메뉴: 밑줄 탭 */
+  nav{display:flex;flex-wrap:wrap;gap:0 4px;margin:0 0 18px;border-bottom:1px solid var(--line)}
+  nav button{border:0;border-bottom:3px solid transparent;border-radius:0;background:none;padding:12px 11px 10px;margin-bottom:-1px;color:var(--sub);font-weight:500}
+  nav button:hover{color:var(--ink);background:none}
+  nav button.selected{color:var(--pri);border-bottom-color:var(--pri);font-weight:700;background:none}
+
+  button{cursor:pointer;border:1px solid var(--line);background:#fff;border-radius:4px;padding:9px 14px;color:var(--ink);font:inherit;font-size:14px;font-weight:500}
+  button:hover{border-color:var(--ink)}
+  button.primary{background:var(--pri);color:#fff;border-color:var(--pri);font-weight:700}
+  button.primary:hover{background:var(--pri-dark)}
+  button.selected{background:var(--soft);border-color:var(--pri)}
   button:disabled{opacity:.5;cursor:not-allowed}
-  button.small{padding:4px 9px;font-size:12px;border-radius:6px}
-  .panel{background:#fff;border:1px solid #e2dfea;border-radius:13px;padding:17px;margin-bottom:14px}
-  h2{font-size:18px;margin:0 0 12px}h3{font-size:15px;margin:16px 0 8px}
-  .muted{color:#6b6880;font-size:13px}.small{font-size:12px}
-  .tools{display:flex;flex-wrap:wrap;gap:9px;align-items:center;margin:10px 0}
-  input,select,textarea{padding:9px;border:1px solid #d4d0e0;border-radius:8px;background:#fff;font:inherit}
+  button.small{padding:3px 8px;font-size:12px;border-radius:3px}
+  button:focus-visible,input:focus,select:focus,textarea:focus,summary:focus-visible{outline:2px solid var(--pri);outline-offset:1px}
+
+  .panel{background:#fff;border:1px solid var(--line);border-radius:6px;padding:18px;margin-bottom:16px}
+  h2{font-size:17px;margin:0 0 12px;letter-spacing:-.01em}h3{font-size:15px;margin:18px 0 8px}
+  .panel>h2{padding-bottom:10px;border-bottom:1px solid var(--line)}
+  .muted{color:var(--sub);font-size:13px}.small{font-size:12px}
+  .tools{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:10px 0}
+  input,select,textarea{padding:9px;border:1px solid var(--line);border-radius:4px;background:#fff;font:inherit;color:var(--ink)}
   .form{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
-  .field{display:flex;flex-direction:column;gap:4px;font-size:13px;font-weight:600}
-  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(170px,100%),1fr));gap:10px;margin:8px 0 12px}
-  .card{border:1px solid #e2dfea;border-radius:11px;padding:13px;background:#fbfaff}
-  .card .metric{font-size:24px;font-weight:800;margin-top:6px}
+  .field{display:flex;flex-direction:column;gap:4px;font-size:13px;font-weight:500}
+
+  /* 숫자 칸: 붙은 칸막이 표처럼 */
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(170px,100%),1fr));gap:0;margin:8px 0 12px;border:1px solid var(--line);border-radius:4px;background:#fff;overflow:hidden}
+  .cards:empty{display:none}
+  .card{border:0;border-right:1px solid var(--line2);border-bottom:1px solid var(--line2);margin:0 -1px -1px 0;padding:13px 15px;background:#fff}
+  .card .metric{font-size:24px;font-weight:700;margin-top:6px;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
   .card button{margin-top:8px}
+
+  /* 표: 장부처럼 머리줄 굵은 선 */
   table{width:100%;border-collapse:collapse}
-  th,td{text-align:left;padding:8px 9px;border-bottom:1px solid #eeecf3;font-size:13px;white-space:nowrap}
-  th{background:#f3f1f8}
-  td.num,th.num{text-align:right}
+  th,td{text-align:left;padding:8px 9px;border-bottom:1px solid var(--line2);font-size:13px;white-space:nowrap}
+  th{background:#f3f1ec;border-bottom:1px solid var(--ink);font-weight:700}
+  td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
   .overflow{overflow:auto}
-  .dashCards{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-top:10px}
-  .dcard{background:#f6f4fb;border-radius:12px;padding:12px 14px}.dcard .n{font-size:24px;font-weight:700;color:#2d2450}.dcard .l{font-size:13px;color:#5b5670}.dcard .d{font-size:12.5px;margin-top:3px}
-  .up{color:#2f6b3a}.down{color:#9b2c2c}.flat{color:#6b6880}
+
+  /* 대시보드 */
+  .dashCards{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:0;margin-top:10px;border:1px solid var(--line);border-radius:4px;overflow:hidden}
+  .dcard{background:#fff;border-right:1px solid var(--line2);border-bottom:1px solid var(--line2);margin:0 -1px -1px 0;padding:13px 15px}
+  .dcard .n{font-size:24px;font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums;letter-spacing:-.02em}.dcard .l{font-size:13px;color:var(--sub)}.dcard .d{font-size:12.5px;margin-top:3px}
+  .up{color:#2e5a4c}.down{color:var(--warn)}.flat{color:var(--sub)}
   .dashCharts{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px}
-  .dashCharts figure{margin:0;border:1px solid #ebe8f2;border-radius:12px;padding:10px 12px}.dashCharts figcaption{font-weight:700;font-size:14px;margin-bottom:6px}
+  .dashCharts figure{margin:0;border:1px solid var(--line);border-radius:4px;padding:10px 12px}.dashCharts figcaption{font-weight:700;font-size:14px;margin-bottom:6px;padding-bottom:6px;border-bottom:1px solid var(--line2)}
   .cbox{position:relative;height:220px}
-  .todo{border:1px solid #ebe8f2;border-radius:10px;margin-bottom:8px}.todo summary{padding:10px 12px;cursor:pointer;font-weight:700}.todo .body{padding:0 12px 10px}
-  .cnt{display:inline-block;min-width:22px;text-align:center;border-radius:10px;padding:1px 7px;font-size:12px;margin-left:6px;background:#eceaf3;color:#2d2450}.cnt.hot{background:#fde8e8;color:#9b2c2c}
-  .overlayPrev{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:50;display:flex;align-items:flex-start;justify-content:center;padding:18px;overflow:auto}.prevBox{background:#fff;border-radius:12px;padding:14px;width:min(900px,100%)}.prevBox iframe{width:100%;height:78vh;border:1px solid #ddd;border-radius:8px}
-  .certGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:4px 12px}.certGrid textarea{width:100%;font:inherit;padding:8px;border:1px solid #cfc8e0;border-radius:8px}
+  .todo{border:1px solid var(--line);border-radius:4px;margin-bottom:8px}.todo summary{padding:10px 12px;cursor:pointer;font-weight:700}.todo .body{padding:0 12px 10px}
+  .cnt{display:inline-block;min-width:22px;text-align:center;border-radius:3px;padding:1px 7px;font-size:12px;margin-left:6px;background:#f3f1ec;color:var(--ink)}.cnt.hot{background:#fbefed;color:var(--warn)}
+
+  .overlayPrev{position:fixed;inset:0;background:rgba(20,24,22,.45);z-index:50;display:flex;align-items:flex-start;justify-content:center;padding:18px;overflow:auto}.prevBox{background:#fff;border:1px solid var(--ink);border-radius:6px;padding:14px;width:min(900px,100%)}.prevBox iframe{width:100%;height:78vh;border:1px solid var(--line);border-radius:4px}
+  .certGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:4px 12px}.certGrid textarea{width:100%;font:inherit;padding:8px;border:1px solid var(--line);border-radius:4px}
   .donorTable{width:100%;table-layout:fixed}.donorTable td{vertical-align:middle;word-break:keep-all}.donorTable th{white-space:normal;word-break:keep-all;font-size:13px}.donorTable td.c{text-align:center}
   .donorTable input.dMemo,.donorTable input.dEnd,.donorTable select{width:100%;box-sizing:border-box;min-width:0}.donorTable .dSave{white-space:nowrap;padding:6px 8px}
-  .pill{display:inline-block;background:#efecf7;padding:3px 8px;border-radius:30px;font-size:12px}
-  .pill.err{background:#fde8e8;color:#9b2c2c}
-  .notice{background:#fff8e6;border:1px solid #efdcaa;border-radius:9px;padding:11px 13px;font-size:13px;margin:10px 0}
-  .balD{background:#fff4d6 !important;font-weight:700;color:#7a4a00}.balN{background:#e3f0fb !important;font-weight:700;color:#1d4f7a}.gsep{border-left:2px solid #c9c4d6 !important}
-  .ok{color:#2f6b3a;font-weight:700}.warn{color:#9b2c2c;font-weight:700}
-  #message{min-height:22px;font-size:13px;margin:6px 0;color:#4b3c86}
+  .pill{display:inline-block;background:var(--soft);color:var(--pri-dark);padding:2px 7px;border-radius:3px;font-size:12px}
+  .pill.err{background:#fbefed;color:var(--warn)}
+  .notice{background:#fbf6ea;border-left:3px solid #b07a1f;padding:11px 13px;font-size:13px;margin:10px 0}
+  .balD{background:#fbf3df !important;font-weight:700;color:#6b4a00}.balN{background:#e8eff5 !important;font-weight:700;color:#1d3f5a}.gsep{border-left:2px solid var(--line) !important}
+  .ok{color:#2e5a4c;font-weight:700}.warn{color:var(--warn);font-weight:700}
+  #message{min-height:22px;font-size:13px;margin:6px 0;color:var(--pri)}
   section[hidden],[hidden]{display:none!important}
   body.readonly .ownerOnly{display:none!important}
   #printArea{display:none}
@@ -73,7 +98,7 @@
     #printArea td.num{text-align:right}#printArea td.c{text-align:center}
     #printArea tr{page-break-inside:avoid}
   }
-  @media(max-width:520px){header{padding:18px}button{padding:9px 11px}th,td{padding:7px}}
+  @media(max-width:520px){header{padding:20px 16px 12px}button{padding:9px 11px}th,td{padding:7px}nav button{padding:10px 8px 8px}}
 </style>
 </head>
 <body>
@@ -83,7 +108,7 @@
 </header>
 <main>
   <nav>
-    <button data-tab="dash" class="ownerOnly selected">📊 대시보드</button>
+    <button data-tab="dash" class="ownerOnly selected">대시보드</button>
     <button data-tab="cms">CMS 출금</button>
     <button data-tab="transfer">정기후원 이체결과</button>
     <button data-tab="bank">통장 정기후원 입력</button>
@@ -137,7 +162,7 @@
       <div id="ledgerCards" class="cards"></div>
       <div id="ledgerRows" class="overflow"></div>
       <div id="orchestraBox" hidden>
-        <h3>🎻 푸르메오케스트라 옮김 명단 <span class="muted small">(회계지출용)</span></h3>
+        <h3>푸르메오케스트라 옮김 명단 <span class="muted small">(회계지출용)</span></h3>
         <div class="tools"><button id="printOrchestra">오케스트라 명단 인쇄 · PDF</button></div>
         <div id="orchestraRows" class="overflow"></div>
       </div>
@@ -374,7 +399,7 @@ const $=id=>document.getElementById(id);
 const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const won=n=>Number(n||0).toLocaleString('ko-KR');
 function api(method,data){return new Promise((res,rej)=>{const r=google.script.run.withSuccessHandler(res).withFailureHandler(e=>rej(Error(e.message||String(e))));data===undefined?r[method]():r[method](data);});}
-function notice(t,err){$('message').textContent=t;$('message').style.color=err?'#9b2c2c':'#4b3c86';}
+function notice(t,err){$('message').textContent=t;$('message').style.color=err?'#a8322a':'#9a3b26';}
 function show(id){document.querySelectorAll('main section').forEach(s=>s.hidden=s.id!==id);document.querySelectorAll('nav button[data-tab]').forEach(b=>b.classList.toggle('selected',b.dataset.tab===id));
   if(id==='donors')loadDonors();if(id==='bank')loadBank();if(id==='monthly')loadMonthlyRecords();if(id==='newdonor')loadNew();if(id==='access')loadAccess();if(id==='cert')initCert();if(id==='dash')loadDash();if(id==='annual')loadAnnualCtx();}
 document.querySelectorAll('nav button[data-tab]').forEach(b=>b.onclick=()=>show(b.dataset.tab));
@@ -1217,7 +1242,7 @@ function legacyCertDialog(result){
 /* ── 대시보드 ── */
 function goDonor(name){return `<b>${esc(name)}</b>`;}
 let dashCharts={},dashInit=false;
-const C_THIS='#5a479a',C_LAST='#b7b1c9',C_NEW='#5a479a',C_END='#e08a3c';
+const C_THIS='#9a3b26',C_LAST='#c9c2b6',C_NEW='#9a3b26',C_END='#2e5a7a';
 function dashDelta(a,b,unit,neutral){if(a==null||b==null)return '<span class="flat">비교할 자료 없음</span>';const d=a-b;if(d===0)return '<span class="flat">— 변동 없음</span>';
   return `<span class="${neutral?'flat':d>0?'up':'down'}">${d>0?'▲':'▼'} ${unit==='원'?won(Math.abs(d))+'원':Math.abs(d)+unit}</span>`;}
 async function loadDash(){
@@ -1235,7 +1260,7 @@ async function loadDash(){
     card(d.yearEnd+'명',`${d.year}년 종결`,'작년보다 '+dashDelta(d.yearEnd,d.prevYearEnd,'명',true))+
     card(yr.amount!=null?won(yr.amount)+'원':'-',`${d.year}년 정기후원 누적`,py.amount!=null?'작년 전체 '+won(py.amount)+'원':'');
   // 챙길 일
-  const todo=(title,list,row,hint)=>`<details class="todo"${list.length?' open':''}><summary>${title}<span class="cnt${list.length?' hot':''}">${list.length}</span></summary><div class="body">${list.length?`<p class="small muted">${hint}</p><table><tbody>${list.map(row).join('')}</tbody></table>`:'<p class="small muted">없어요 👍</p>'}</div></details>`;
+  const todo=(title,list,row,hint)=>`<details class="todo"${list.length?' open':''}><summary>${title}<span class="cnt${list.length?' hot':''}">${list.length}</span></summary><div class="body">${list.length?`<p class="small muted">${hint}</p><table><tbody>${list.map(row).join('')}</tbody></table>`:'<p class="small muted">없어요</p>'}</div></details>`;
   $('dashTodo').innerHTML=
     todo('최근 2번 연속 출금 오류',d.errors,r=>`<tr><td>${goDonor(r.name)} <span class="muted small">${esc(r.no)}</span></td><td>${esc(r.dates.map(dotDate).join(', '))}</td><td>${esc(r.msg)}</td></tr>`,'계좌 잔액·해지 여부를 확인하고 연락이 필요할 수 있어요. 통장 자동이체로 바꾸신 분은 통장 입금을 넣으면 여기서 빠져요.')+
     todo('3개월 넘게 출금(입금)이 없는데 종결일이 없는 분',d.quiet,r=>`<tr><td>${goDonor(r.name)} <span class="muted small">${esc(r.no||'')}</span></td><td>마지막 ${esc(dotDate(r.last))}</td><td><span class="pill">${esc(r.source)}</span></td></tr>`,'후원을 그만두셨다면 「후원자 정보」에서 종결일을, 통장 자동이체로 바꾸셨다면 「통장 정기후원 입력」에 같은 이름·생년월일로 입금을 넣어 주세요.')+
@@ -1245,7 +1270,7 @@ async function loadDash(){
   $('dashCmp').textContent=`${d.year}년 vs ${d.year-1}년`;
   const base={responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
     plugins:{legend:{position:'top',align:'end',labels:{boxWidth:12,boxHeight:12}},tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${c.parsed.y==null?'자료 없음':won(c.parsed.y)}`}}},
-    scales:{x:{grid:{display:false},ticks:{maxRotation:0,autoSkip:true,autoSkipPadding:6}},y:{beginAtZero:true,grid:{color:'#eeecf3'},ticks:{callback:v=>won(v)}}}};
+    scales:{x:{grid:{display:false},ticks:{maxRotation:0,autoSkip:true,autoSkipPadding:6}},y:{beginAtZero:true,grid:{color:'#e7e3da'},ticks:{callback:v=>won(v)}}}};
   const draw=(id,cfg)=>{const canvas=$(id);if(!canvas)return;
     if(dashCharts[id]){dashCharts[id].destroy();delete dashCharts[id];}
     const box=canvas.parentNode;let warning=box.querySelector('.chartWarning');
@@ -1260,13 +1285,13 @@ async function loadDash(){
     {label:(d.year-1)+'년',data:P0.map(x=>x.amount),backgroundColor:C_LAST,borderRadius:4,maxBarThickness:18}]},options:base});
   draw('chFlow',{type:'bar',data:{labels,datasets:[
     {label:'신규',data:T.map(x=>x.newCount),backgroundColor:C_NEW,borderRadius:4,maxBarThickness:16},
-    {label:'종결',data:T.map(x=>x.endCount),backgroundColor:C_END,borderRadius:4,maxBarThickness:16}]},options:Object.assign({},base,{scales:{x:{grid:{display:false},ticks:{maxRotation:0,autoSkip:true,autoSkipPadding:6}},y:{beginAtZero:true,grid:{color:'#eeecf3'},ticks:{precision:0}}}})});
+    {label:'종결',data:T.map(x=>x.endCount),backgroundColor:C_END,borderRadius:4,maxBarThickness:16}]},options:Object.assign({},base,{scales:{x:{grid:{display:false},ticks:{maxRotation:0,autoSkip:true,autoSkipPadding:6}},y:{beginAtZero:true,grid:{color:'#e7e3da'},ticks:{precision:0}}}})});
   draw('chIncome',line(T,P0,'income'));
   // 표
   const f=v=>v==null?'-':won(v);
   $('dashTable').innerHTML=`<table><thead><tr><th>월</th><th class="num">실인원 ${d.year}</th><th class="num">${d.year-1}</th><th class="num">금액 ${d.year}</th><th class="num">${d.year-1}</th><th class="num">신규</th><th class="num">종결</th><th class="num">총수입 ${d.year}</th><th class="num">${d.year-1}</th></tr></thead><tbody>${T.map((x,i)=>`<tr><td>${labels[i]}</td><td class="num">${f(x.people)}</td><td class="num">${f(P0[i].people)}</td><td class="num">${f(x.amount)}</td><td class="num">${f(P0[i].amount)}</td><td class="num">${x.newCount}</td><td class="num">${x.endCount}</td><td class="num">${f(x.income)}</td><td class="num">${f(P0[i].income)}</td></tr>`).join('')}</tbody></table>`;
   // 연도별
-  $('dashYears').innerHTML=d.years.length?`<table><thead><tr><th>연도</th><th class="num">월평균 실인원</th><th class="num">한 해 동안 참여한 정기후원자</th><th class="num">정기후원 금액</th><th class="num">신규</th><th class="num">종결</th><th class="num">후원금 총수입</th></tr></thead><tbody>${d.years.slice().reverse().map(r=>`<tr${r.year===d.year?' style="font-weight:700;background:#f6f4fb"':''}><td>${r.year}년${r.months&&r.months<12?` <span class="muted small">(${r.months}개월)</span>`:''}</td><td class="num">${r.avgPeople==null?'-':r.avgPeople+'명'}</td><td class="num">${r.uniquePeople}명</td><td class="num">${won(r.amount)}원</td><td class="num">${r.newCount}명</td><td class="num">${r.endCount}명</td><td class="num">${r.income==null?'-':won(r.income)+'원'+(r.incomeMonths<12?` <span class="muted small">(${r.incomeMonths}개월)</span>`:'')}</td></tr>`).join('')}</tbody></table><p class="small muted">자료가 12개월이 안 되는 해는 괄호에 개월 수가 나와요. 앱에 올린 자료 기준이에요.</p>`:'<p class="muted">아직 자료가 없어요.</p>';
+  $('dashYears').innerHTML=d.years.length?`<table><thead><tr><th>연도</th><th class="num">월평균 실인원</th><th class="num">한 해 동안 참여한 정기후원자</th><th class="num">정기후원 금액</th><th class="num">신규</th><th class="num">종결</th><th class="num">후원금 총수입</th></tr></thead><tbody>${d.years.slice().reverse().map(r=>`<tr${r.year===d.year?' style="font-weight:700;background:#f6ebe6"':''}><td>${r.year}년${r.months&&r.months<12?` <span class="muted small">(${r.months}개월)</span>`:''}</td><td class="num">${r.avgPeople==null?'-':r.avgPeople+'명'}</td><td class="num">${r.uniquePeople}명</td><td class="num">${won(r.amount)}원</td><td class="num">${r.newCount}명</td><td class="num">${r.endCount}명</td><td class="num">${r.income==null?'-':won(r.income)+'원'+(r.incomeMonths<12?` <span class="muted small">(${r.incomeMonths}개월)</span>`:'')}</td></tr>`).join('')}</tbody></table><p class="small muted">자료가 12개월이 안 되는 해는 괄호에 개월 수가 나와요. 앱에 올린 자료 기준이에요.</p>`:'<p class="muted">아직 자료가 없어요.</p>';
 }
 </script>
 <script>
