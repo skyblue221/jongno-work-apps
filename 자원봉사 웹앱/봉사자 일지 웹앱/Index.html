@@ -10,442 +10,228 @@
   >
 
   <style>
+    @import url("https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap");
+
+    /* ── 기본 색: 종이 배경 + 짙은 초록 한 가지 ── */
     :root {
-      --background: #f5f6f8;
+      --background: #f6f4ef;
       --panel: #ffffff;
-      --text: #202124;
-      --subtext: #5f6368;
-      --border: #d8dce1;
-      --primary: #2457a7;
-      --primary-dark: #17468d;
-      --error: #b3261e;
-      --success: #176b36;
+      --text: #1f2421;
+      --subtext: #5b625e;
+      --border: #d6d2c8;
+      --line: #1f2421;
+      --primary: #2e5a4c;
+      --primary-dark: #21443a;
+      --soft: #eef3f0;
+      --error: #a8322a;
+      --success: #2e5a4c;
     }
 
-    * {
-      box-sizing: border-box;
-    }
+    * { box-sizing: border-box; }
 
     body {
       margin: 0;
-      padding: 20px 14px 40px;
+      padding: 28px 16px 48px;
       background: var(--background);
       color: var(--text);
-      font-family:
-        Arial,
-        "Apple SD Gothic Neo",
-        "Noto Sans KR",
-        sans-serif;
+      font-family: "Noto Sans KR", "Apple SD Gothic Neo", sans-serif;
+      font-size: 16px;
+      line-height: 1.55;
+      word-break: keep-all;
+      counter-reset: section;
     }
 
-    .container {
-      width: 100%;
-      max-width: 680px;
-      margin: 0 auto;
-    }
+    .container { width: 100%; max-width: 640px; margin: 0 auto; }
 
+    /* ── 머리말: 가운데 정렬 대신 서식지처럼 왼쪽 + 굵은 밑줄 ── */
     .header {
-      margin-bottom: 18px;
-      text-align: center;
+      margin-bottom: 24px;
+      padding-bottom: 16px;
+      border-bottom: 2px solid var(--line);
+      text-align: left;
     }
-
-    .header h1 {
-      margin: 0 0 8px;
-      font-size: 27px;
-    }
-
-    .header p {
-      margin: 0;
-      color: var(--subtext);
-      line-height: 1.6;
-    }
-
-    .card {
-      margin-bottom: 16px;
-      padding: 22px;
-      background: var(--panel);
-      border-radius: 16px;
-      box-shadow: 0 3px 14px rgba(0, 0, 0, 0.06);
-    }
-
-    .section-title {
-      margin: 0 0 18px;
-      font-size: 19px;
-    }
-
-    .field {
-      margin-bottom: 18px;
-    }
-
-    .field:last-child {
-      margin-bottom: 0;
-    }
-
-    label,
-    legend {
+    .header::before {
+      content: "종로장애인복지관";
       display: block;
-      margin-bottom: 7px;
-      font-size: 15px;
+      margin-bottom: 6px;
+      color: var(--primary);
+      font-size: 14px;
       font-weight: 700;
     }
+    .header h1 { margin: 0 0 6px; font-size: 26px; font-weight: 700; letter-spacing: -0.02em; }
+    .header p { margin: 0; color: var(--subtext); line-height: 1.6; }
 
-    .required {
-      color: var(--error);
+    /* ── 카드: 그림자 빼고 얇은 테두리 ── */
+    .card {
+      margin-bottom: 20px;
+      padding: 22px 20px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 6px;
     }
 
-    input,
-    textarea,
-    select {
+    /* ── 칸 제목: 1, 2, 3 번호가 자동으로 붙음 ── */
+    .section-title {
+      counter-increment: section;
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      margin: 0 0 18px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--border);
+      font-size: 18px;
+      font-weight: 700;
+    }
+    .section-title::before {
+      content: counter(section) ".";
+      color: var(--primary);
+    }
+
+    .field { margin-bottom: 18px; }
+    .field:last-child { margin-bottom: 0; }
+
+    label, legend { display: block; margin-bottom: 6px; font-size: 15px; font-weight: 500; }
+    .required { color: var(--error); font-weight: 700; }
+
+    input, textarea, select {
       width: 100%;
       min-height: 48px;
       padding: 11px 12px;
       border: 1px solid var(--border);
-      border-radius: 9px;
-      background: white;
+      border-radius: 4px;
+      background: #fff;
       color: var(--text);
       font-family: inherit;
       font-size: 16px;
     }
-
-    input:focus,
-    textarea:focus,
-    select:focus {
+    input:focus, textarea:focus, select:focus {
       border-color: var(--primary);
-      outline: 3px solid rgba(36, 87, 167, 0.14);
+      outline: 2px solid var(--primary);
+      outline-offset: 1px;
     }
+    textarea { min-height: 120px; resize: vertical; line-height: 1.6; }
 
-    textarea {
-      min-height: 120px;
-      resize: vertical;
-      line-height: 1.6;
-    }
+    .two-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    fieldset { margin: 0; padding: 0; border: 0; }
 
-    .two-columns {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 12px;
-    }
-
-    fieldset {
-      margin: 0;
-      padding: 0;
-      border: 0;
-    }
-
-    .radio-group {
-      display: flex;
-      gap: 10px;
-    }
-
+    /* ── 선택지: 고른 쪽이 분명하게 보이도록 ── */
+    .radio-group { display: flex; gap: 8px; }
     .radio-option {
-      display: flex;
-      flex: 1;
-      align-items: center;
-      gap: 8px;
-      min-height: 48px;
-      margin: 0;
-      padding: 10px 13px;
-      border: 1px solid var(--border);
-      border-radius: 9px;
-      font-weight: 400;
-      cursor: pointer;
+      display: flex; flex: 1; align-items: center; gap: 10px;
+      min-height: 48px; margin: 0; padding: 10px 14px;
+      border: 1px solid var(--border); border-radius: 4px;
+      background: #fff; font-weight: 400; cursor: pointer;
     }
-
-    .radio-option input {
-      width: 20px;
-      height: 20px;
-      min-height: auto;
-      margin: 0;
-    }
-
-    .search-wrap {
-      position: relative;
-    }
-
-    .search-results {
-      display: none;
-      position: absolute;
-      z-index: 20;
-      top: calc(100% + 4px);
-      left: 0;
-      right: 0;
-      max-height: 240px;
-      overflow-y: auto;
-      border: 1px solid var(--border);
-      border-radius: 9px;
-      background: white;
-      box-shadow: 0 8px 22px rgba(0, 0, 0, 0.12);
-    }
-
-    .search-result-button {
-      display: block;
-      width: 100%;
-      min-height: 44px;
-      padding: 10px 12px;
-      border: 0;
-      border-radius: 0;
-      background: white;
-      color: var(--text);
-      text-align: left;
-      font-size: 16px;
-      font-weight: 400;
-    }
-
-    .search-result-button:hover,
-    .search-result-button:focus {
-      background: #f1f5fb;
-      outline: none;
-    }
-
-    .empty-result {
-      padding: 12px;
-      color: var(--subtext);
-      font-size: 14px;
-    }
-
-    .volunteer-info {
-      display: none;
-      margin-top: 12px;
-      padding: 14px;
-      background: #f1f5fb;
-      border-radius: 9px;
-      color: #344054;
-      line-height: 1.7;
-    }
-
-    .verify-button {
-      width: 100%;
-      background: #e8eef8;
+    .radio-option:has(input:checked) {
+      border-color: var(--primary);
+      background: var(--soft);
       color: var(--primary-dark);
+      font-weight: 700;
     }
+    .radio-option input { width: 20px; height: 20px; min-height: auto; margin: 0; accent-color: var(--primary); }
 
-    .volunteer-info.ok {
-      background: #e8f4ec;
-      color: var(--success);
+    .search-wrap { position: relative; }
+    .search-results {
+      display: none; position: absolute; z-index: 20; top: calc(100% + 4px); left: 0; right: 0;
+      max-height: 240px; overflow-y: auto;
+      border: 1px solid var(--line); border-radius: 4px; background: #fff;
     }
+    .search-result-button {
+      display: block; width: 100%; min-height: 44px; padding: 10px 12px;
+      border: 0; border-radius: 0; background: #fff; color: var(--text);
+      text-align: left; font-size: 16px; font-weight: 400;
+    }
+    .search-result-button:hover, .search-result-button:focus { background: var(--soft); outline: none; }
+    .empty-result { padding: 12px; color: var(--subtext); font-size: 14px; }
 
-    .volunteer-info.fail {
-      background: #fcebea;
-      color: var(--error);
+    /* ── 안내 상자: 색 박스 대신 왼쪽 줄 ── */
+    .volunteer-info {
+      display: none; margin-top: 12px; padding: 12px 14px;
+      border-left: 3px solid var(--border); background: #f8f7f3; line-height: 1.7;
     }
+    .volunteer-info.ok { border-left-color: var(--success); background: var(--soft); color: var(--success); }
+    .volunteer-info.fail { border-left-color: var(--error); background: #fbefed; color: var(--error); }
 
-    .meal-note {
-      margin: 8px 0 0;
-      color: var(--subtext);
-      font-size: 14px;
-      line-height: 1.5;
-    }
+    .verify-button { width: 100%; background: #fff; color: var(--primary); border: 1px solid var(--primary); }
+    .verify-button:hover:not(:disabled) { background: var(--soft); }
+
+    .meal-note, .signature-guide { margin: 8px 0 0; color: var(--subtext); font-size: 14px; line-height: 1.5; }
 
     .notice-box {
-      margin-top: 12px;
-      padding: 14px;
-      background: #f8f9fa;
-      border-radius: 9px;
-      color: var(--subtext);
-      font-size: 14px;
-      line-height: 1.6;
+      margin-top: 12px; padding: 12px 14px;
+      border-left: 3px solid var(--border); background: #f8f7f3;
+      color: var(--subtext); font-size: 14px; line-height: 1.6;
     }
 
-    .suggestion-list {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      margin-top: 10px;
-    }
-
+    .suggestion-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
     .suggestion-button {
-      min-height: 38px;
-      padding: 8px 11px;
-      border: 1px solid var(--border);
-      border-radius: 9px;
-      background: #f8f9fa;
-      color: var(--text);
-      font-size: 14px;
-      font-weight: 400;
+      min-height: 38px; padding: 7px 12px;
+      border: 1px solid var(--border); border-radius: 4px;
+      background: #fff; color: var(--text); font-size: 14px; font-weight: 400;
     }
+    .suggestion-button:hover { border-color: var(--primary); color: var(--primary); }
 
-    .suggestion-button:hover {
-      background: #f1f5fb;
-    }
-
+    /* ── 활동시간: 장부 한 줄처럼 ── */
     .time-result {
-      margin-top: 14px;
-      padding: 15px;
-      background: #f1f5fb;
-      border-radius: 10px;
-      line-height: 1.6;
+      display: flex; justify-content: space-between; align-items: baseline;
+      margin-top: 20px; padding-top: 14px;
+      border-top: 1px dashed var(--border); line-height: 1.6;
     }
+    .time-result strong { color: var(--primary-dark); font-size: 20px; }
 
-    .time-result strong {
-      color: var(--primary-dark);
-      font-size: 18px;
-    }
-
+    /* ── 서명란: 종이 서명칸처럼 밑줄 ── */
     .canvas-wrap {
-      position: relative;
-      width: 100%;
-      height: 210px;
-      overflow: hidden;
-      border: 2px solid #555;
-      border-radius: 10px;
-      background: white;
+      position: relative; width: 100%; height: 210px; overflow: hidden;
+      border: 1px solid var(--line); border-radius: 4px;
+      background:
+        linear-gradient(var(--border), var(--border)) left 20px bottom 46px / calc(100% - 40px) 1px no-repeat,
+        #fff;
     }
-
-    canvas {
-      display: block;
-      width: 100%;
-      height: 100%;
-      background: white;
-      touch-action: none;
-      cursor: crosshair;
-    }
-
-    .signature-guide {
-      margin: 8px 0 0;
-      color: var(--subtext);
-      font-size: 14px;
-      line-height: 1.5;
-    }
+    canvas { display: block; width: 100%; height: 100%; background: transparent; touch-action: none; cursor: crosshair; }
 
     .confirm-box {
-      display: flex;
-      align-items: flex-start;
-      gap: 10px;
-      margin-bottom: 18px;
-      padding: 14px;
-      background: #f8f9fa;
-      border-radius: 9px;
-      line-height: 1.6;
+      display: flex; align-items: flex-start; gap: 10px;
+      margin-bottom: 18px; padding: 14px;
+      border: 1px solid var(--border); border-radius: 4px; line-height: 1.6;
     }
-
-    .confirm-box input {
-      flex: 0 0 auto;
-      width: 21px;
-      height: 21px;
-      min-height: auto;
-      margin: 2px 0 0;
-    }
-
-    .confirm-box label {
-      margin: 0;
-      font-weight: 400;
-      cursor: pointer;
-    }
+    .confirm-box:has(input:checked) { border-color: var(--primary); background: var(--soft); }
+    .confirm-box input { flex: 0 0 auto; width: 21px; height: 21px; min-height: auto; margin: 2px 0 0; accent-color: var(--primary); }
+    .confirm-box label { margin: 0; font-weight: 400; cursor: pointer; }
 
     button {
-      min-height: 52px;
-      padding: 12px 17px;
-      border: 0;
-      border-radius: 9px;
-      font-family: inherit;
-      font-size: 17px;
-      font-weight: 700;
-      cursor: pointer;
+      min-height: 52px; padding: 12px 17px;
+      border: 0; border-radius: 4px;
+      font-family: inherit; font-size: 17px; font-weight: 700; cursor: pointer;
     }
+    button:disabled { opacity: 0.55; cursor: not-allowed; }
 
-    button:disabled {
-      opacity: 0.55;
-      cursor: not-allowed;
-    }
-
-    .clear-button {
-      width: 100%;
-      margin-top: 12px;
-      background: #e7e9ec;
-      color: var(--text);
-    }
-
-    .submit-button {
-      width: 100%;
-      background: var(--primary);
-      color: white;
-    }
-
-    .submit-button:hover:not(:disabled) {
-      background: var(--primary-dark);
-    }
+    .clear-button { width: 100%; margin-top: 12px; background: #fff; color: var(--text); border: 1px solid var(--border); }
+    .submit-button { width: 100%; min-height: 56px; background: var(--primary); color: #fff; }
+    .submit-button:hover:not(:disabled) { background: var(--primary-dark); }
 
     #message {
-      display: none;
-      margin-top: 16px;
-      padding: 14px;
-      border-radius: 9px;
-      font-weight: 700;
-      line-height: 1.6;
+      display: none; margin-top: 16px; padding: 12px 14px;
+      border-left: 3px solid; font-weight: 700; line-height: 1.6;
     }
+    #message.success { display: block; border-color: var(--success); background: var(--soft); color: var(--success); }
+    #message.error { display: block; border-color: var(--error); background: #fbefed; color: var(--error); }
 
-    #message.success {
-      display: block;
-      background: #e8f4ec;
-      color: var(--success);
-    }
+    .loading { padding: 16px; color: var(--subtext); text-align: center; }
 
-    #message.error {
-      display: block;
-      background: #fcebea;
-      color: var(--error);
-    }
-
-    .loading {
-      padding: 16px;
-      color: var(--subtext);
-      text-align: center;
-    }
-
-    .completion {
-      display: none;
-      padding: 28px 22px;
-      text-align: center;
-    }
-
-    .completion h2 {
-      margin: 0 0 12px;
-      font-size: 24px;
-    }
-
-    .completion p {
-      margin: 7px 0;
-      line-height: 1.6;
-    }
-
-    .log-id {
-      margin: 18px 0;
-      padding: 14px;
-      background: #f1f5fb;
-      border-radius: 9px;
-      font-weight: 700;
-    }
-
-    .new-entry-button {
-      width: 100%;
-      margin-top: 12px;
-      background: #e7e9ec;
-      color: var(--text);
-    }
+    .completion { display: none; padding: 28px 22px; text-align: center; }
+    .completion h2 { margin: 0 0 12px; font-size: 24px; }
+    .completion p { margin: 7px 0; line-height: 1.6; }
+    .log-id { margin: 18px 0; padding: 14px; border: 1px dashed var(--primary); border-radius: 4px; font-weight: 700; }
+    .new-entry-button { width: 100%; margin-top: 12px; background: #fff; color: var(--text); border: 1px solid var(--border); }
 
     @media (max-width: 520px) {
-      body {
-        padding: 14px 10px 30px;
-      }
-
-      .card {
-        padding: 19px 16px;
-      }
-
-      .two-columns {
-        grid-template-columns: 1fr;
-        gap: 0;
-      }
-
-      .radio-group {
-        flex-direction: column;
-      }
-
-      .canvas-wrap {
-        height: 190px;
-      }
+      body { padding: 20px 12px 32px; }
+      .card { padding: 19px 16px; }
+      .two-columns { grid-template-columns: 1fr; gap: 0; }
+      .radio-group { flex-direction: column; }
+      .canvas-wrap { height: 190px; }
     }
-  </style>
+</style>
 </head>
 
 <body>

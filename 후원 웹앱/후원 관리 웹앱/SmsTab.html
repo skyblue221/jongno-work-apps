@@ -1,12 +1,12 @@
 <!-- 후원자 문자 명단 화면 · Index.html이 불러와서 붙여요 (min만) -->
 <style>
   #sms .smsTop{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
-  #sms .smsCount{font-weight:700;color:#2d2450}
-  #sms .noPhone{color:#9b2c2c;font-size:12px;font-weight:700}
-  #sms .pill.warn{background:#fff3d6;color:#6b4a00}
-  #sms .pill.pin{background:#e3f0fb;color:#1d4f7a}
+  #sms .smsCount{font-weight:700;color:var(--pri)}
+  #sms .noPhone{color:var(--warn);font-size:12px;font-weight:700}
+  #sms .pill.warn{background:#fbf6ea;color:#6b4a00}
+  #sms .pill.pin{background:#e8eff5;color:#1d3f5a}
   #sms tr.off td{opacity:.55}
-  #sms details.smsMiss{border:1px solid #efdcaa;background:#fffaf0;border-radius:10px;padding:10px 12px;margin-top:10px}
+  #sms details.smsMiss{border:1px solid var(--line);border-left:3px solid #b07a1f;background:#fbf6ea;border-radius:4px;padding:10px 12px;margin-top:10px}
   #sms details.smsMiss summary{cursor:pointer;font-weight:700}
   #sms .smsTable td{white-space:normal;word-break:keep-all;vertical-align:middle}
   @media(max-width:520px){#sms .hideSm{display:none}}
@@ -14,7 +14,7 @@
 
 <section id="sms" hidden>
   <div class="panel">
-    <h2>📱 후원자 문자 명단 <span class="muted small" style="font-weight:400">화면 10/31 ③ · 서버 <span id="smsVer">?</span></span></h2>
+    <h2>후원자 문자 명단 <span class="muted small" style="font-weight:400">화면 10/31 ③ · 서버 <span id="smsVer">?</span></span></h2>
     <p class="muted">달을 고르면 <b>그 달 정기후원자(CMS·통장)</b>, <b>신규후원자</b>, <b>📌 고정한 분</b>이 자동으로 체크돼요. 희망이음 <b>후원금·후원품 수입 내역</b> 엑셀을 올리면 그 달 후원하신 분(기업 포함)도 더해져요. 연락처는 이 시트의 <b>「후원자연락처」</b> 탭에서 읽기만 하고, 앱에는 저장하지 않아요.</p>
     <div class="tools">
       <select id="smsYear" aria-label="연도"></select><select id="smsMonth" aria-label="월"></select>
@@ -39,7 +39,7 @@
       <button id="smsMail" hidden>✉ 메일 주소 복사</button>
       <button id="smsReset">자동 체크로 되돌리기</button>
     </div>
-    <p id="smsNote" class="small" style="color:#4b3c86;min-height:18px"></p>
+    <p id="smsNote" class="small" style="color:#9a3b26;min-height:18px"></p>
     <div id="smsRows" class="overflow"></div>
     <div id="smsMissBox"></div>
   </div>
@@ -53,7 +53,7 @@
   const msg=t=>{$('smsNote').textContent=t;};
 
   // 메뉴에 탭 버튼 넣기 (확인서·증서 앞)
-  const btn=document.createElement('button');btn.dataset.tab='sms';btn.textContent='📱 문자 명단';
+  const btn=document.createElement('button');btn.dataset.tab='sms';btn.textContent='문자 명단';
   const before=document.querySelector('nav button[data-tab=cert]');
   before?before.parentNode.insertBefore(btn,before):document.querySelector('nav').appendChild(btn);
   btn.onclick=()=>{show('sms');smsInit();};
