@@ -9,7 +9,7 @@ var HwpxGen = (function () {
   // ── 스타일 번호 (원본 양식 header.xml 기준) ──  sp: 줄 간격(%)
   var P = {
     center: { id: 6, sp: 160 }, value: { id: 11, sp: 160 }, goal: { id: 21, sp: 160, ind: 1000 },
-    heading: { id: 0, sp: 160 }, line: { id: 13, sp: 150 }, dash: { id: 14, sp: 150, ind: 1000 }, sub: { id: 19, sp: 150, ind: 1000 },
+    heading: { id: 0, sp: 160 }, line: { id: 13, sp: 160 }, dash: { id: 14, sp: 160, ind: 1000 }, sub: { id: 19, sp: 160, ind: 1000 },
     cellCenter: { id: 9, sp: 140 }, cellLine: { id: 15, sp: 140 }, cellDash: { id: 12, sp: 140, ind: 1000 }, cellSub: { id: 18, sp: 140, ind: 1000 },
     right: { id: 7, sp: 160 }
   };
@@ -25,8 +25,20 @@ var HwpxGen = (function () {
     schedule:  { cols: ['시간', '내용', '비고'], w: [8785, 22694, 8121], align: ['c', 'l', 'c'] },
     roles:     { cols: ['연번', '이름', '업무분장', '비고'], w: [3125, 8905, 16546, 11024], align: ['c', 'c', 'l', 'c'] },
     lecturers: { cols: ['연번', '이름', '생년월일', '성별', '장애유형', '비고'], w: [3125, 6500, 7500, 4500, 7500, 10475], align: ['c', 'c', 'c', 'c', 'c', 'c'] },
-    campaign:  { cols: ['구분', '내용', '준비사항'], w: [7000, 21000, 11600], align: ['c', 'l', 'l'] }
+    campaign:  { cols: ['구분', '내용', '준비사항'], w: [7000, 21000, 11600], align: ['c', 'l', 'l'] },
+    roles2:    { cols: ['이름', '부서/직위', '업무분장', '비고'], w: [7000, 9600, 17000, 6000], align: ['c', 'c', 'l', 'c'] },
+    progress:  { cols: ['일정', '내용', '비고'], w: [8000, 24600, 7000], align: ['c', 'l', 'c'] },
+    custom:    { cols: ['구분', '내용'], w: [12000, 27600], align: ['c', 'l'] }   // 칸 수를 마음대로 (block.cols 기준)
   };
+  // 자유 표: 칸 수·너비를 제목 칸 글자로 정함 (연번은 좁게, 내용·주소 등은 넓게)
+  function presetOf(block) {
+    var pre = PRESETS[block.preset] || PRESETS.schedule;
+    if (block.preset !== 'custom') return pre;
+    var cols = (block.cols && block.cols.length) ? block.cols : pre.cols;
+    var wt = cols.map(function (c) { c = String(c || ''); return /연번|번호|^no/i.test(c) ? 0.5 : /내용|주소|업무|설명|의견|비고/.test(c) ? (/비고/.test(c) ? 0.8 : 2) : 1; });
+    var tw = wt.reduce(function (a, b) { return a + b; }, 0);
+    return { cols: cols, w: wt.map(function (x) { return Math.round(39600 * x / tw); }), align: cols.map(function (c) { return /내용|업무|설명|의견/.test(String(c)) ? 'l' : 'c'; }) };
+  }
 
   var seq = 0;
   function nid() { seq++; return 1100000000 + seq; }
@@ -106,35 +118,87 @@ var HwpxGen = (function () {
       '<hp:sz width="' + w + '" widthRelTo="ABSOLUTE" height="' + h + '" heightRelTo="ABSOLUTE" protect="0"/>' +
       '<hp:pos treatAsChar="1" affectLSpacing="0" flowWithText="1" allowOverlap="0" holdAnchorAndSO="0" vertRelTo="PARA" horzRelTo="COLUMN" vertAlign="TOP" horzAlign="LEFT" vertOffset="0" horzOffset="0"/>' +
       '<hp:outMargin left="0" right="0" top="0" bottom="0"/><hp:shapeComment>그림입니다.</hp:shapeComment></hp:pic>';
-    return { x: pOpen(align === 'l' ? P.line : P.center) + '<hp:run charPrIDRef="5">' + x + '<hp:t/></hp:run></hp:p>', h: h + 300 };
+    return { x: pOpen(align === 'l' ? P.line : align === 'r' ? P.right : P.center) + '<hp:run charPrIDRef="5">' + x + '<hp:t/></hp:run></hp:p>', h: h + 300 };
   }
 
   // ── 안쪽 표 (일정표, 업무분장 등) → {x, h} ──
-  function innerTable(block) {
-    var pre = PRESETS[block.preset] || PRESETS.schedule;
+  // 표 칸 합치기·정렬 (활동계획서·실행계획서 공통)
+  //   block.mergeCols: [칸 번호…] — 그 칸이 비어 있으면 위 칸과 하나로 합침 (예전 block.merge = 앞에서 몇 칸)
+  //   block.align: ['c'|'l', …] — 칸마다 가운데/왼쪽 (없으면 양식 기본값)
+  function mergeColsOf(block, n) {
+    if (Array.isArray(block.mergeCols)) return block.mergeCols.filter(function (c) { return c < n; });
+    var m = Math.min(Number(block.merge) || 0, n), out = []; for (var i = 0; i < m; i++) out.push(i); return out;
+  }
+  function spansOf(block, rows, n) {
+    var span = rows.map(function () { return []; }), skip = rows.map(function () { return []; });
+    mergeColsOf(block, n).forEach(function (c) {
+      var anchor = -1;
+      rows.forEach(function (r, i) {
+        if (!String(r[c] == null ? '' : r[c]).trim() && anchor >= 0) { skip[i][c] = true; span[anchor][c] = (span[anchor][c] || 1) + 1; }
+        else anchor = i;
+      });
+    });
+    return { span: span, skip: skip };
+  }
+  // 표 행 사진: block.rowPics[행] = [{fileId, w, h, align:'c'|'r'}] → 그 행의 내용 칸(왼쪽 정렬 칸, 없으면 마지막 칸) 글 아래에
+  var IMGS = {};
+  function dataRows(block) {
+    var pics = block.rowPics || [];
+    return (block.rows || []).map(function (r, i) { return { r: r || [], pics: (pics[i] || []).filter(function (p) { return p && IMGS[p.fileId]; }) }; })
+      .filter(function (x) { return x.pics.length || x.r.some(function (v) { return String(v || '').trim(); }); });
+  }
+  function picCol(al) { var i = al.indexOf('l'); return i >= 0 ? i : al.length - 1; }
+  function cellPics(pics, tw) {
+    return pics.map(function (p) { return picPara(IMGS[p.fileId], p.fileId, Math.min(tw, 20000), 11500, p.align === 'r' ? 'r' : 'c'); }).filter(Boolean);
+  }
+  function alignOf(block, pre) {
+    return pre.cols.map(function (_, c) { var a = (block.align || [])[c]; return a === 'l' || a === 'c' ? a : pre.align[c]; });
+  }
+
+  function innerTable(block, availW) {
+    var pre = presetOf(block);
     var cols = (block.cols && block.cols.length === pre.cols.length) ? block.cols : pre.cols, n = cols.length, w = pre.w;
-    var rows = (block.rows || []).filter(function (r) { return r && r.some(function (x) { return String(x || '').trim(); }); });
-    var total = rows.length + 1, trs = '', H = 0;
-    function bf(rowIdx, c) {
+    if (availW) { var tw0 = sum(w, 0, n); w = w.map(function (x) { return Math.floor(x * availW / tw0); }); }
+    var dr = dataRows(block), rows = dr.map(function (x) { return x.r; });
+    var total = rows.length + 1, al = alignOf(block, pre), sp = spansOf(block, rows, n), pc = picCol(al);
+    function bf(rowIdx, c, rs) {
       var last = c === n - 1, first = c === 0;
       if (rowIdx === 0) return first ? 13 : last ? 14 : 12;
-      if (rowIdx === total - 1) return first ? 7 : last ? 8 : 11;
+      if (rowIdx + (rs || 1) === total) return first ? 7 : last ? 8 : 11;
       return first ? 9 : last ? 10 : 6;
     }
-    function row(ri, contents) {
-      var rh = Math.max(1300, Math.max.apply(null, contents.map(function (b) { return b.h; })) + CELL_VPAD + 100);
-      H += rh;
-      return '<hp:tr>' + contents.map(function (b, c) {
-        return cell({ r: ri, c: c, w: w[c], h: rh, bf: bf(ri, c), body: b.x });
-      }).join('') + '</hp:tr>';
-    }
-    trs += row(0, cols.map(function (t, c) { return para(P.cellCenter, t, w[c] - CELL_PAD); }));
+    // 행 높이
+    var bodies = [cols.map(function (t, c) { return para(P.cellCenter, t, w[c] - CELL_PAD); })];
     rows.forEach(function (r, ri) {
-      trs += row(ri + 1, cols.map(function (_, c) {
+      bodies.push(cols.map(function (_, c) {
+        if (sp.skip[ri][c]) return null;
         var v = r[c] == null ? '' : r[c], tw = w[c] - CELL_PAD;
-        return pre.align[c] === 'l' ? lines(v, tw, P.cellLine, P.cellDash, P.cellSub) : simpleLines(v, tw, P.cellCenter);
+        var body = al[c] === 'l' ? lines(v, tw, P.cellLine, P.cellDash, P.cellSub) : simpleLines(v, tw, P.cellCenter);
+        if (c === pc && dr[ri].pics.length) body = join([body].concat(cellPics(dr[ri].pics, tw)));
+        return body;
       }));
     });
+    function rsOf(ri, c) { return ri === 0 ? 1 : (sp.span[ri - 1][c] || 1); }
+    var hs = bodies.map(function (bs, ri) {
+      var m = 1300;
+      bs.forEach(function (b, c) { if (b && rsOf(ri, c) === 1) m = Math.max(m, b.h + CELL_VPAD + 100); });
+      return m;
+    });
+    bodies.forEach(function (bs, ri) {
+      bs.forEach(function (b, c) {
+        var rs = rsOf(ri, c); if (!b || rs === 1) return;
+        var have = sum(hs, ri, rs), need = b.h + CELL_VPAD + 100;
+        if (need > have) hs[ri + rs - 1] += need - have;
+      });
+    });
+    var trs = bodies.map(function (bs, ri) {
+      return '<hp:tr>' + bs.map(function (b, c) {
+        if (!b) return '';
+        var rs = rsOf(ri, c);
+        return cell({ r: ri, c: c, rs: rs, w: w[c], h: sum(hs, ri, rs), bf: bf(ri, c, rs), body: b.x });
+      }).join('') + '</hp:tr>';
+    }).join('');
+    var H = sum(hs, 0, total);
     return {
       x: pOpen(P.line) + '<hp:run charPrIDRef="5">' + tblOpen(nid(), total, n, sum(w, 0, n), H, 3, 0, false) + trs + '</hp:tbl><hp:t/></hp:run></hp:p>',
       h: H + 566 + 400
@@ -250,20 +314,29 @@ var HwpxGen = (function () {
         cell({ r: r, c: 2, cs: 3, w: sum(W, 2, 3), h: hh, bf: 29, body: lab('산출내역').x }),
         cell({ r: r, c: 5, w: W[5], h: hh, bf: 30, body: lab('금액').x })]);
       heights.push(hh);
+      // 구분을 비워둔 줄은 위 구분 칸과 합침 (한 구분 안에서 금액을 나눠 적을 때)
+      var amt = function (n) { return d.wonMark ? '₩' + won(n).replace('원', '') : won(n); };
+      var catRs = B.cats.map(function (cat, k) {
+        if (k > 0 && !String(cat.category || '').trim()) return 0;
+        var n = 1; while (k + n < B.cats.length && !String(B.cats[k + n].category || '').trim()) n++;
+        return n;
+      });
       B.cats.forEach(function (cat, k) {
         var rr = r + 1 + k, dw = sum(W, 2, 3) - CELL_PAD;
         var det = cat.items.length ? join(cat.items.map(function (it) {
           return para(P.right, '**' + (it.name || '') + '**' + itemRest(it), dw, C.budget, C.budgetName);
         })) : para(P.right, '', dw);
         var catP = para(P.center, cat.category, W[1] - CELL_PAD), h = rowH(det, catP);
-        rowsX.push([cell({ r: rr, c: 1, w: W[1], h: h, bf: 25, body: catP.x }),
-          cell({ r: rr, c: 2, cs: 3, w: sum(W, 2, 3), h: h, bf: 33, body: det.x }),
-          cell({ r: rr, c: 5, w: W[5], h: h, bf: 34, body: para(P.center, won(cat.total), W[5], C.budget).x })]);
+        var cells = [];
+        if (catRs[k]) cells.push(cell({ r: rr, c: 1, rs: catRs[k], w: W[1], h: h * catRs[k], bf: 25, body: catP.x }));
+        cells.push(cell({ r: rr, c: 2, cs: 3, w: sum(W, 2, 3), h: h, bf: 33, body: det.x }),
+          cell({ r: rr, c: 5, w: W[5], h: h, bf: 34, body: para(P.center, amt(cat.total), W[5], C.budget).x }));
+        rowsX.push(cells);
         heights.push(h);
       });
       var rt = r + 1 + B.cats.length;
       rowsX.push([cell({ r: rt, c: 1, cs: 4, w: sum(W, 1, 4), h: 2100, bf: 26, body: lab('계').x }),
-        cell({ r: rt, c: 5, w: W[5], h: 2100, bf: 32, body: para(P.center, won(B.total), W[5], C.bold).x })]);
+        cell({ r: rt, c: 5, w: W[5], h: 2100, bf: 32, body: para(P.center, amt(B.total), W[5], C.bold).x })]);
       heights.push(2100);
       var bl = heights.reduce(function (s, x) { return s + x; }, 0);
       rowsX[0].unshift(cell({ r: r, c: 0, rs: rowsX.length, w: W[0], h: bl, bf: 27, body: lab(isResult ? '결산' : '소요예산').x }));
@@ -323,7 +396,7 @@ var HwpxGen = (function () {
   // 템플릿 section0.xml → 새 문서
   function buildSection(tpl, d, images) {
     seq = 0; picList = [];
-    images = images || {};
+    images = images || {}; IMGS = images;
     var i = tpl.indexOf('<hp:tbl ');
     var depth = 0, re = /<hp:tbl |<\/hp:tbl>/g, m, end = -1;
     re.lastIndex = i;
@@ -342,6 +415,12 @@ var HwpxGen = (function () {
 
   // header.xml 에 내용 칸용 테두리 3개 추가 (이미 있으면 그대로)
   function patchHeader(h) {
+    // 본문 줄 간격 150% → 160% (원본 활동계획서 한글 파일 기준: 본문 160%, 표 안 140%)
+    [13, 14, 19].forEach(function (id) {
+      h = h.replace(new RegExp('(<hh:paraPr id="' + id + '"[\\s\\S]*?</hh:paraPr>)'), function (m) {
+        return m.replace(/(<hh:lineSpacing type="PERCENT" value=")\d+/g, '$1160');
+      });
+    });
     if (h.indexOf('<hh:borderFill id="' + BF_CONTENT_FIRST + '"') >= 0) return h;
     function bfXml(id, top, bottom) {
       function side(n, t) { return t ? '<hh:' + n + ' type="SOLID" width="' + t + '" color="#BBBBBB"/>' : '<hh:' + n + ' type="NONE" width="0.1 mm" color="#000000"/>'; }
@@ -376,7 +455,16 @@ var HwpxGen = (function () {
       });
   }
 
-  return { buildZip: buildZip, buildSection: buildSection, budgetCalc: budgetCalc, dateText: dateText, defaultTitle: defaultTitle, baseName: baseName, PRESETS: PRESETS, won: won, itemAmount: itemAmount };
+  // 다른 생성기(SaupGen)가 같이 쓰는 부품
+  var lib = {
+    P: P, C: C, FULL_W: FULL_W, CELL_PAD: CELL_PAD, CELL_VPAD: CELL_VPAD, BF_FIRST: BF_CONTENT_FIRST, BF_MID: BF_CONTENT_MID, BF_LAST: BF_CONTENT_LAST,
+    para: para, lines: lines, simpleLines: simpleLines, join: join, cell: cell, tblOpen: tblOpen, sum: sum, nid: nid, esc: esc,
+    innerTable: innerTable, spansOf: spansOf, alignOf: alignOf, mergeColsOf: mergeColsOf, picPara: picPara, attachments: attachments, patchHeader: patchHeader, presetOf: presetOf, pOpen: pOpen,
+    begin: function (imgs) { seq = 0; picList = []; IMGS = imgs || {}; }, pics: function () { return picList.slice(); },
+    dataRows: dataRows, picCol: picCol, cellPics: cellPics
+  };
+
+  return { lib: lib, buildZip: buildZip, buildSection: buildSection, budgetCalc: budgetCalc, dateText: dateText, defaultTitle: defaultTitle, baseName: baseName, PRESETS: PRESETS, won: won, itemAmount: itemAmount };
 })();
 if (typeof module !== 'undefined') module.exports = HwpxGen;
 </script>

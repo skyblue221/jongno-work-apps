@@ -7,11 +7,11 @@
  * 사용: TextStyle.apply(zip) → Promise(zip)   (활동계획서·결과보고서·장애이해교육 모두)
  */
 var TextStyle = (function () {
-  // 표시용 기호: 기울임 \uE000…\uE001, 밑줄 \uE002…\uE003
+  // 표시용 기호: 기울임 …, 밑줄 …
   function mark(t) {
     return String(t)
-      .replace(/__([^_\n]+?)__/g, '\uE002$1\uE003')
-      .replace(/\*([^*\s](?:[^*\n]*?[^*\s])?)\*/g, '\uE000$1\uE001');
+      .replace(/__([^_\n]+?)__/g, '$1')
+      .replace(/\*([^*\s](?:[^*\n]*?[^*\s])?)\*/g, '$1');
   }
   // 글자를 [{t, u, i}] 조각으로 나눔
   function segs(text) {
@@ -19,18 +19,18 @@ var TextStyle = (function () {
     function flush() { if (cur) out.push({ t: cur, u: u, i: i }); cur = ''; }
     for (var k = 0; k < t.length; k++) {
       var c = t[k];
-      if (c === '\uE000') { flush(); i = true; } else if (c === '\uE001') { flush(); i = false; }
-      else if (c === '\uE002') { flush(); u = true; } else if (c === '\uE003') { flush(); u = false; }
+      if (c === '') { flush(); i = true; } else if (c === '') { flush(); i = false; }
+      else if (c === '') { flush(); u = true; } else if (c === '') { flush(); u = false; }
       else cur += c;
     }
     flush();
     return out;
   }
-  function has(t) { return /[\uE000-\uE003]/.test(mark(t)); }
+  function has(t) { return /[-]/.test(mark(t)); }
 
   // 내려받기 전에 한 번: ***굵게+기울임*** 을 **(기울임)** 으로 바꿔 둠 (굵게는 HwpxGen/EduGen 이 처리)
   function prep(d) {
-    if (typeof d === 'string') return d.replace(/\*\*\*([^*\n]+?)\*\*\*/g, '**\uE000$1\uE001**');
+    if (typeof d === 'string') return d.replace(/\*\*\*([^*\n]+?)\*\*\*/g, '**$1**');
     if (Array.isArray(d)) return d.map(prep);
     if (d && typeof d === 'object') { var o = {}; for (var k in d) o[k] = prep(d[k]); return o; }
     return d;

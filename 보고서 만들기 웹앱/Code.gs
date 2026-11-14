@@ -1,10 +1,12 @@
 /**
- * 보고서 만들기 웹앱 — 활동계획서 / 결과보고서 / 장애이해교육 결과보고서를 칸 채우고 한글(HWPX)로 내려받기
+ * 보고서 만들기 웹앱 — 활동계획서·결과보고 / 실행계획서·사업결과보고서 / 장애이해교육 결과보고서를 칸 채우고 한글(HWPX)로 내려받기
  * 구글시트에 붙어 있는(바인딩) Apps Script 프로젝트로 사용합니다.
  * 저장 시트: 「보고서」 (없으면 자동으로 만들어요)
  */
 var SHEET_NAME = '보고서';
 var HEADERS = ['ID', '종류', '프로그램명', '날짜', '제목', '수정일', '데이터'];
+// 시트 「종류」 칸에 들어가는 이름 (활동결과보고는 예전 저장분과 맞추려고 「결과보고서」 그대로)
+var TYPE_LABEL = { plan: '활동계획서', result: '결과보고서', edu: '장애이해교육', exec: '실행계획서', execResult: '사업결과보고서' };
 
 function doGet() {
   return HtmlService.createTemplateFromFile('Index').evaluate()
@@ -63,7 +65,7 @@ function saveReport(data) {
     var json = JSON.stringify(data);
     if (json.length > 49000) throw new Error('내용이 너무 길어서 저장할 수 없어요. (글자 수를 조금 줄여주세요)');
     var now = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm');
-    var values = [data.id, data.type === 'edu' ? '장애이해교육' : data.type === 'result' ? '결과보고서' : '활동계획서', data.programName || '',
+    var values = [data.id, TYPE_LABEL[data.type] || '활동계획서', data.programName || '',
       data.date || '', data.title || '', now, json];
     var row = findRow_(sh, data.id);
     if (row) sh.getRange(row, 1, 1, values.length).setValues([values]);

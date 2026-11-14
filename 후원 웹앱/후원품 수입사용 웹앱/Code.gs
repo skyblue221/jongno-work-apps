@@ -617,7 +617,27 @@ function requestHome(p,requestId) {
 }
 function listHome() {
   needView_();
-  return ownRows_('HOME').slice(-60).reverse().map(x => ({ id: x.r[0], date: ymd_(x.r[1]), manager: x.r[2], by: x.r[3], count: x.r[4], items: JSON.parse(x.r[5] || '[]'), status: x.r[6], done: ymd_(x.r[7]), sign: x.r[9] }));
+  return ownRows_('HOME').slice(-60).reverse().map(x => ({ id: x.r[0], date: ymd_(x.r[1]), manager: x.r[2], by: x.r[3], count: x.r[4], items: JSON.parse(x.r[5] || '[]'), status: x.r[6], done: ymd_(x.r[7]), sign: x.r[9], file: x.r[10] ? 'https://drive.google.com/file/d/' + x.r[10] + '/view' : '' }));
+}
+/** 종이 서명 가정 배분: 등록할 때 뽑은 수령증(서명 전)을 관리자 확인용 PDF로 보관 */
+function saveHomePaper(id, html) {
+  needOrg_();
+  const x = ownRows_('HOME').find(y => y.r[0] === id);
+  if (!x) throw new Error('요청을 찾을 수 없어요.');
+  if (!homeAccess_(x)) throw new Error('만든 사람과 관리자만 저장할 수 있어요.');
+  if (x.r[9]) throw new Error('나중에 서명받는 명단은 서명이 끝나면 따로 저장돼요.');
+  if (String(html || '').length > 3000000) throw new Error('수령증이 너무 커요.');
+  const d = ymd_(x.r[1]) || today_();
+  const blob = Utilities.newBlob(pdfColorHtml_(String(html)), 'text/html', 'r.html').getAs('application/pdf')
+    .setName('가정배분 수령증(서명 전)_' + d + '_' + str_(x.r[2]) + '.pdf');
+  const f = folder_(['가정배분 수령증', d.slice(0, 4), d.slice(5, 7)]).createFile(blob);
+  const lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    const y = ownRows_('HOME').find(z => z.r[0] === id);
+    if (y.r[10]) { try { DriveApp.getFileById(y.r[10]).setTrashed(true); } catch (e) {} }
+    own_('HOME').getRange(y.row, 11).setValue(f.getId());
+  } finally { lock.releaseLock(); }
+  return true;
 }
 function confirmHome(id, ok,requestId) {
   needAdmin_();
