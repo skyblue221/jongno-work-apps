@@ -82,6 +82,41 @@
   section[hidden],[hidden]{display:none!important}
   body.readonly .ownerOnly{display:none!important}
   #printArea{display:none}
+/* ===== 화면 다듬기 (2026-11) · 관리 화면형 · 벽돌색 · 출력 양식은 그대로 · 이 블록만 지우면 서식지형 모양 ===== */
+:root{--bg:#fff;--ink:#1d2329;--sub:#5d6670;--line:#dde1e6;--line2:#eceff2;--pri:#9a3b26;--pri-dark:#7a2e1d;--soft:#f6ebe6;--accent:#2e5a7a;background:#fff}
+body{background:#fff}
+/* 맨 위: 기관명 줄 */
+header{display:flex;align-items:baseline;gap:4px 12px;flex-wrap:wrap;max-width:1140px;padding:20px 20px 4px;border-bottom:0}
+header::before{content:none}
+header h1{font-size:15px;font-weight:400;color:var(--sub);margin:0;letter-spacing:0}
+header h1::before{content:"종로장애인복지관";font-size:19px;font-weight:700;color:var(--ink);margin-right:12px;letter-spacing:-.01em}
+header small{margin-left:auto;font-size:13px}
+main{max-width:1140px;padding:0 20px}
+/* 메뉴: 밑줄 탭, 간격 넓게 */
+nav{gap:0 28px;margin:0 0 30px}
+nav button{padding:15px 0 12px;font-size:15px;color:var(--ink);font-weight:400}
+nav button:hover{color:var(--pri)}
+nav button.selected{color:var(--pri);border-bottom-color:var(--pri);font-weight:700}
+/* 칸: 그림자·둥근 모서리 없이 */
+.panel{border-radius:0;padding:20px 22px;margin-bottom:20px}
+.panel>h2{font-size:18px;padding-bottom:0;border-bottom:0}
+.cards,.dashCards,.dashCharts figure,.todo,.recordDisclosure>summary{border-radius:0}
+input,select,textarea{border-color:#c9cfd6;border-radius:2px}
+button{border-color:#c9cfd6;border-radius:2px}
+button:hover{border-color:var(--pri)}
+button.small{border-radius:2px}
+/* 표: 위에 굵은 선 + 회색 머리줄 */
+main table,dialog table{border-top:2px solid var(--pri)}
+main th,dialog th{background:#f4f6f8;border-bottom:1px solid var(--line);color:var(--ink)}
+main tbody tr:hover{background:#f8f9fa}
+.recordDisclosure>summary{background:#f4f6f8}
+.cnt{background:#f4f6f8;border-radius:2px}
+.pill{border-radius:2px}
+/* 안내 상자: 왼쪽 줄 */
+.notice{background:#f4f6f8;border-left-color:var(--pri)}
+dialog,.prevBox{border-radius:2px;border-color:var(--line);border-top:3px solid var(--pri)}
+.dialogHeader{border-bottom:1px solid var(--line)}
+@media(max-width:640px){header h1::before{display:block;margin:0 0 2px}nav{gap:0 20px}.panel{padding:16px}}
   @media print{
     body{background:#fff}
     header,main{display:none!important}
