@@ -1,0 +1,580 @@
+<script>
+/* 실행계획서 / 사업결과보고서 HWPX 생성기
+ * 활동계획서 틀(Template.gs)의 글꼴(나눔고딕)을 쓰고, 제목·표·선·줄간격·글자 크기는 원본 실행계획서(.hwp)를 분석해 맞췄어요.
+ *   - 줄 간격 160%, 본문 10pt, 제목 칸 11pt 굵게, 성과지표·산출식 9pt
+ *   - 성과목표·업무분장·예산은 큰 표 자체의 칸을 나눠서 (표 안에 표 X)
+ *   SaupGen.buildZip(zip, data, images) → Promise(zip)
+ *   data.type: 'exec'(실행계획서) | 'execResult'(사업결과보고서)
+ * (HwpxGen.html 을 먼저 불러와야 해요)
+ */
+var SaupGen = (function () {
+  var L = HwpxGen.lib, P0 = L.P, PAD = L.CELL_PAD, VPAD = L.CELL_VPAD;
+  var FULL = 50442;
+  // 바깥 표 기본 칸 경계: [묶음 제목 | 제목 | 작은 제목 | 내용 | 제목 | 내용]
+  var W = [3600, 5600, 6400, 14221, 6400, 14221];
+  var X = [0]; W.forEach(function (w, i) { X.push(X[i] + w); });
+  var X2 = X[2], CW = FULL - X2;           // 내용 칸 시작 위치·너비
+  var HALF = X2 + (CW >> 1);
+  var FUNDS = ['보조금', '사업비', '후원금', '법인전입금', '공모사업'];
+
+  // ── 숫자 ──
+  function num(v) { return Number(String(v == null ? '' : v).replace(/[^\d.\-]/g, '')) || 0; }
+  function won(n) { return HwpxGen.won(n); }
+  function comma(n) { return won(n).replace('원', ''); }
+  function pct(a, b) {
+    if (!num(b)) return '';
+    var v = Math.round(num(a) / num(b) * 1000) / 10;
+    return (v % 1 === 0 ? v.toFixed(0) : v.toFixed(1)) + '%';
+  }
+  function qtyParts(q) {
+    return String(q == null ? '' : q).split(/[×xX*\s,]+/).filter(function (t) { return /\d/.test(t); })
+      .map(function (t) { return { n: num(t), t: t }; });
+  }
+  function itemAmount(it) {
+    if (!num(it.price)) return 0;
+    return Math.round(qtyParts(it.qty).reduce(function (s, p) { return s * p.n; }, num(it.price)));
+  }
+  // 원본 양식처럼 「10,000원×35명=350,000」
+  function itemFormula(it) {
+    if (!num(it.price)) return '';
+    var parts = qtyParts(it.qty).map(function (p) { return p.t; });
+    return won(it.price) + (parts.length ? '×' + parts.join('×') : '') + '=' + comma(itemAmount(it));
+  }
+  function budgetTotals(b) {
+    b = b || {};
+    var inc = (b.income || []).filter(function (it) { return it.name || num(it.price); });
+    var exp = (b.expense || []).filter(function (it) { return it.name || num(it.price); });
+    function tot(a) { return a.reduce(function (s, it) { return s + itemAmount(it); }, 0); }
+    return { inc: inc, exp: exp, incTotal: tot(inc), expTotal: tot(exp) };
+  }
+  function exeRows(list) { return (list || []).filter(function (it) { return it.name || num(it.budget) || num(it.spent); }); }
+  function exeTotals(list) {
+    var a = 0, b = 0; exeRows(list).forEach(function (it) { a += num(it.budget); b += num(it.spent); });
+    return { a: a, b: b };
+  }
+
+  // ── 글자 조립 ──
+  function fundText(d) {
+    var opts = FUNDS.slice();
+    if (d.funding && opts.indexOf(d.funding) < 0) opts[1] = d.funding;
+    return opts.map(function (f) { return (f === d.funding ? '■ ' : '□ ') + f; }).join('    ');
+  }
+  function planText(d) {
+    var r = String(d.planReal || '').trim(), c = String(d.planCount || '').trim(), out;
+    if (r && c) out = '실인원: ' + r + '명          연인원: ' + c + '명';
+    else if (r) out = r + '명';
+    else if (c) out = '연인원: ' + c + '명';
+    else out = '';
+    if (String(d.planNote || '').trim()) out += (out ? '\n' : '') + d.planNote;
+    return out;
+  }
+  function planTextShort(d) {
+    var r = String(d.planReal || '').trim(), c = String(d.planCount || '').trim();
+    if (r && c) return '실인원: ' + r + '명\n연인원: ' + c + '명';
+    return r ? r + '명' : c ? '연인원: ' + c + '명' : '';
+  }
+  function actualText(d) {
+    var r = String(d.actualReal || '').trim(), c = String(d.actualCount || '').trim();
+    function one(a, p) { var x = pct(a, p); return a + '명' + (x ? '(' + x + ')' : ''); }
+    var pr = String(d.planReal || '').trim(), pc = String(d.planCount || '').trim();
+    if (r && c) return '실인원: ' + one(r, pr) + '\n연인원: ' + one(c, pc);
+    if (r) return one(r, pr || pc);
+    if (c) return '연인원: ' + one(c, pc);
+    return '';
+  }
+  function defaultTitle(d) {
+    var y = String(d.year || '').trim();
+    return '「' + (y ? y + '년 ' : '') + (d.programName || '') + '」 ' + (d.type === 'execResult' ? '결과보고서' : '실행계획서');
+  }
+
+  // ══ 스타일 등록 (틀 header.xml 에 줄간격·글자크기·테두리를 덧붙임) ══
+  var S;   // 이번 문서의 스타일 모음
+  function startStyles(header, d) {
+    function cnt(tag) { var m = header.match(new RegExp('<hh:' + tag + ' itemCnt="(\\d+)"')); return m ? +m[1] : 0; }
+    var maxBf = 0; header.replace(/<hh:borderFill id="(\d+)"/g, function (_, id) { maxBf = Math.max(maxBf, +id); });
+    S = { h: header, paraN: cnt('paraProperties'), charN: cnt('charProperties'), bfN: maxBf, addP: [], addC: [], addB: [], bfKeys: {} };
+    function clonePara(id, sp) {
+      var m = header.match(new RegExp('<hh:paraPr id="' + id + '"[\\s\\S]*?</hh:paraPr>'));
+      var nid = S.paraN + S.addP.length;
+      S.addP.push(m[0].replace(/<hh:paraPr id="\d+"/, '<hh:paraPr id="' + nid + '"').replace(/(<hh:lineSpacing type="PERCENT" value=")\d+/g, '$1' + sp));
+      return nid;
+    }
+    function cloneChar(id, height) {
+      var m = header.match(new RegExp('<hh:charPr id="' + id + '"[\\s\\S]*?</hh:charPr>'));
+      var nid = S.charN + S.addC.length;
+      S.addC.push(m[0].replace(/<hh:charPr id="\d+"/, '<hh:charPr id="' + nid + '"').replace(/height="\d+"/, 'height="' + height + '"'));
+      return String(nid);
+    }
+    var SP = 160;
+    S.P = {};
+    ['heading', 'line', 'dash', 'sub', 'center', 'value', 'right', 'cellCenter', 'cellLine', 'cellDash', 'cellSub'].forEach(function (k) {
+      S.P[k] = { id: clonePara(P0[k].id, SP), sp: SP, ind: P0[k].ind };
+    });
+    // 예산 칸(원본): 가운데·왼쪽·오른쪽 195%, 산출식 오른쪽 120% / 추진일정표 130%
+    S.P.bud = { id: clonePara(P0.center.id, 195), sp: 195 };
+    S.P.budL = { id: clonePara(P0.line.id, 195), sp: 195 };
+    S.P.budR = { id: clonePara(P0.right.id, 195), sp: 195 };
+    S.P.budF = { id: clonePara(P0.right.id, 120), sp: 120 };
+    S.P.g130 = { id: clonePara(P0.cellCenter.id, 130), sp: 130 };
+    var sm = String((d && d.smallSize) || '9') === '10';
+    S.C = { normal: '5', bold: '6', small: sm ? '5' : cloneChar(5, 900), smallBold: sm ? '6' : cloneChar(6, 900), label: cloneChar(6, 1100), title: cloneChar(10, 1600), b9: cloneChar(6, 900) };
+  }
+  // 테두리: {l,r,t,b: [종류, 굵기, 색], fill, bs(대각선)}
+  function bf(spec) {
+    var key = JSON.stringify(spec);
+    if (S.bfKeys[key]) return S.bfKeys[key];
+    var id = S.bfN + 1 + S.addB.length;
+    function side(n, s) { return '<hh:' + n + ' type="' + s[0] + '" width="' + s[1] + ' mm" color="' + s[2] + '"/>'; }
+    S.addB.push('<hh:borderFill id="' + id + '" threeD="0" shadow="0" centerLine="NONE" breakCellSeparateLine="0"><hh:slash type="NONE" Crooked="0" isCounter="0"/>' +
+      '<hh:backSlash type="' + (spec.bs ? 'CENTER' : 'NONE') + '" Crooked="0" isCounter="0"/>' +
+      side('leftBorder', spec.l) + side('rightBorder', spec.r) + side('topBorder', spec.t) + side('bottomBorder', spec.b) +
+      '<hh:diagonal type="SOLID" width="0.12 mm" color="#5D5D5D"/>' +
+      (spec.fill ? '<hc:fillBrush><hc:winBrush faceColor="' + spec.fill + '" hatchColor="#999999" alpha="0"/></hc:fillBrush>' : '') + '</hh:borderFill>');
+    S.bfKeys[key] = id;
+    return id;
+  }
+  function finishHeader() {
+    var h = S.h;
+    function inject(tag, close, add) {
+      if (!add.length) return;
+      h = h.replace(new RegExp('<hh:' + tag + ' itemCnt="(\\d+)"'), function (_, n) { return '<hh:' + tag + ' itemCnt="' + (+n + add.length) + '"'; });
+      h = h.replace('</hh:' + close + '>', add.join('') + '</hh:' + close + '>');
+    }
+    inject('paraProperties', 'paraProperties', S.addP);
+    inject('charProperties', 'charProperties', S.addC);
+    inject('borderFills', 'borderFills', S.addB);
+    return h;
+  }
+
+  // ── 문단 ──
+  function para(st, t, w, c, b) { return L.para(st, t, w, c, b); }
+  function join(a) { return L.join(a); }
+  // 줄 문법: 「- 」 → - 글머리, 「* 」 → • 작은 글머리
+  function lines(text, w, cell, charId) {
+    var P = S.P, plain = cell ? P.cellLine : P.line, dash = cell ? P.cellDash : P.dash, sub = cell ? P.cellSub : P.sub;
+    var c = charId || S.C.normal, bd = charId === S.C.small ? S.C.smallBold : S.C.bold;
+    return join(String(text == null ? '' : text).replace(/\r/g, '').split('\n').map(function (ln) {
+      var m, st = plain, t = ln;
+      if ((m = ln.match(/^\s*-\s+(.*)$/)) || (m = ln.match(/^\s*-$/))) { st = dash; t = m[1] || ''; }
+      else if ((m = ln.match(/^\s*[*•·]\s+(.*)$/))) { st = sub; t = m[1]; }
+      return para(st, t, w, c, bd);
+    }));
+  }
+  function centerLines(t, w, charId) {
+    return join(String(t == null ? '' : t).replace(/\r/g, '').split('\n').map(function (l) { return para(S.P.center, l, w, charId || S.C.normal, charId === S.C.small ? S.C.smallBold : S.C.bold); }));
+  }
+  function labTxt(t, w) { return join(String(t).split('\n').map(function (l) { return para(S.P.center, l, w, S.C.label); })); }
+  function boldC(t, w) { return para(S.P.center, t, w, S.C.bold); }
+
+  // 긴 글은 빈 줄(엔터 두 번)이 있는 곳에서만 행을 나눔 — 쪽이 바뀔 때 그 자리에서 넘어가도록
+  function textChunks(text, w) {
+    var groups = [], cur = [];
+    String(text == null ? '' : text).replace(/\r/g, '').split('\n').forEach(function (ln) {
+      cur.push(ln);
+      if (!ln.trim() && cur.length > 1) { groups.push(cur); cur = []; }
+    });
+    if (cur.length) groups.push(cur);
+    var out = groups.map(function (g) { return lines(g.join('\n'), w); });
+    return out.length ? out : [para(S.P.line, '', w)];
+  }
+
+  // ══ 안쪽 표 (추진일정표·세부 진행표·자유 표 등) ══
+  // 원본 안쪽 표: 모든 선 0.12mm 검정, 머리 줄 아래만 이중선 0.7mm, 머리 바탕 #D6D6D6
+  var IN = { thin: ['SOLID', '0.12', '#000000'], dbl: ['DOUBLE_SLIM', '0.7', '#000000'] };
+  function inBf(o, r, n, nR, nHdr) {
+    return bf({
+      l: IN.thin, r: IN.thin,
+      t: (r === nHdr && !o.hdr) ? IN.dbl : IN.thin, b: o.hdrLast ? IN.dbl : IN.thin,
+      fill: o.hdr ? '#D6D6D6' : null, bs: !!o.diag
+    });
+  }
+  // rows: [[{c,cs,rs,body,hdr,hdrLast,diag,valign}]]
+  function grid(w, rows) {
+    var n = w.length, nR = rows.length, hs = [];
+    // 안쪽 표는 높이를 넉넉하지 않게 어림 (모자라면 한글이 열 때 늘려요)
+    rows.forEach(function (cells, r) {
+      var m = 1000;
+      cells.forEach(function (o) { if ((o.rs || 1) === 1) m = Math.max(m, o.body.h + VPAD); });
+      hs[r] = m;
+    });
+    rows.forEach(function (cells, r) {
+      cells.forEach(function (o) {
+        var rs = o.rs || 1; if (rs === 1) return;
+        var have = L.sum(hs, r, rs), need = o.body.h + VPAD;
+        if (need > have) hs[r + rs - 1] += need - have;
+      });
+    });
+    var H = L.sum(hs, 0, nR), nHdr = 0;
+    while (nHdr < nR && rows[nHdr].some(function (o) { return o.hdr; })) nHdr++;
+    var trs = rows.map(function (cells, r) {
+      return '<hp:tr>' + cells.map(function (o) {
+        return L.cell({ r: r, c: o.c, rs: o.rs, cs: o.cs, w: L.sum(w, o.c, o.cs || 1), h: L.sum(hs, r, o.rs || 1), bf: inBf(o, r, n, nR, nHdr), body: o.body.x, valign: o.valign });
+      }).join('') + '</hp:tr>';
+    }).join('');
+    return {
+      x: L.pOpen(S.P.line) + '<hp:run charPrIDRef="5">' + L.tblOpen(L.nid(), nR, n, L.sum(w, 0, n), H, 3, 0, false) + trs + '</hp:tbl><hp:t/></hp:run></hp:p>',
+      h: H + 566 + 400
+    };
+  }
+  function widths(total, weights) {
+    var t = weights.reduce(function (a, b) { return a + b; }, 0), out = weights.map(function (x) { return Math.floor(total * x / t); });
+    out[out.length - 1] += total - out.reduce(function (a, b) { return a + b; }, 0);
+    return out;
+  }
+  function leaves(b) {
+    var out = [];
+    (b.months || []).forEach(function (m) {
+      var k = Number(m.weeks) || 0;
+      if (k) for (var i = 1; i <= k; i++) out.push(i + '주'); else out.push(m.name || '');
+    });
+    return out;
+  }
+  // 추진일정표 (왼쪽 위 칸에 대각선)
+  function gantt(b, avail) {
+    var lv = leaves(b), nL = lv.length, P = S.P;
+    if (!nL) return para(P.line, '', avail);
+    var two = (b.months || []).some(function (m) { return Number(m.weeks) > 0; });
+    var taskW = Math.max(9000, Math.round(avail * (nL > 8 ? 0.26 : 0.3)));
+    var w = [taskW].concat(widths(avail - taskW, lv.map(function () { return 1; })));
+    var h0 = [{ c: 0, rs: two ? 2 : 1, hdr: true, hdrLast: true, diag: true, body: para(P.cellCenter, '', taskW) }], h1 = [], c = 1;
+    (b.months || []).forEach(function (m) {
+      var k = Number(m.weeks) || 0;
+      if (k) {
+        h0.push({ c: c, cs: k, hdr: true, body: para(P.g130, m.name || '', L.sum(w, c, k) - PAD, S.C.b9) });
+        for (var i = 1; i <= k; i++) h1.push({ c: c + i - 1, hdr: true, hdrLast: true, body: para(P.g130, i + '주', w[c + i - 1] - PAD, S.C.b9) });
+        c += k;
+      } else {
+        h0.push({ c: c, rs: two ? 2 : 1, hdr: true, hdrLast: true, body: para(P.g130, m.name || '', w[c] - PAD, S.C.b9) });
+        c += 1;
+      }
+    });
+    if (!two) h0.forEach(function (o) { o.hdrLast = true; });
+    var rows = [h0]; if (two) rows.push(h1);
+    (b.rows || []).filter(function (r) { return String(r.task || '').trim() || (r.marks || []).some(Boolean); }).forEach(function (r) {
+      var cells = [{ c: 0, body: join(String(r.task || '').split('\n').map(function (l) { return para(P.g130, l, taskW - PAD); })) }];
+      for (var i = 0; i < nL; i++) cells.push({ c: i + 1, body: para(P.g130, (r.marks || [])[i] ? '⇨' : '', w[i + 1] - PAD) });
+      rows.push(cells);
+    });
+    return grid(w, rows);
+  }
+  // 표 블록 — b.merge: 앞에서부터 몇 칸까지 「빈 칸은 위 칸과 합치기」
+  function tableBlock(b, avail) {
+    var pre = L.presetOf(b), cols = (b.cols && b.cols.length === pre.cols.length) ? b.cols : pre.cols, n = cols.length;
+    var w = widths(avail, pre.w);
+    var dr = L.dataRows(b), data = dr.map(function (x) { return x.r; });
+    var al = L.alignOf(b, pre), sp = L.spansOf(b, data, n), span = sp.span, skip = sp.skip, pc = L.picCol(al);
+    var rows = [cols.map(function (t, c) { return { c: c, hdr: true, hdrLast: true, body: boldC(t, w[c] - PAD) }; })];
+    data.forEach(function (r, i) {
+      var cells = [];
+      for (var c = 0; c < n; c++) {
+        if (skip[i][c]) continue;
+        var v = r[c] == null ? '' : r[c], tw = w[c] - PAD;
+        var body = al[c] === 'l' ? lines(v, tw, true) : centerLines(v, tw);
+        if (c === pc && dr[i].pics.length) body = join([body].concat(L.cellPics(dr[i].pics, tw)));
+        cells.push({ c: c, rs: span[i][c] || 1, body: body });
+      }
+      rows.push(cells);
+    });
+    return grid(w, rows);
+  }
+  function blockChunks(blocks, w) {
+    var chunks = [], pending = null, avail = w - PAD;
+    function push(part) { if (pending) { part = join([pending, part]); pending = null; } chunks.push(part); }
+    (blocks || []).forEach(function (b) {
+      if (b.kind === 'heading') { var hp = para(S.P.heading, b.text || '', avail); pending = pending ? join([pending, hp]) : hp; return; }
+      if (b.kind === 'gantt') { push(gantt(b, avail)); return; }
+      if (b.kind === 'table') { push(tableBlock(b, avail)); return; }
+      textChunks(b.text, avail).forEach(push);
+    });
+    if (pending) chunks.push(pending);
+    return chunks.length ? chunks : [para(S.P.line, '', avail)];
+  }
+
+  // ══ 바깥 큰 표 — 칸을 위치(x)와 너비로 놓으면 열 번호는 자동으로 계산 ══
+  // 원본 양식의 선: 바깥 양옆 선 없음, 항목(섹션) 사이 0.4mm, 사업기본정보 안 항목 사이 0.2mm, 한 항목 안 0.12mm
+  // 칸: {x, w, rs, body, kind:'lab'(회색 제목)|'sub'(작은 제목, 흰 바탕)|'hd'(진회색 표 머리)|'val', t/b:'NONE'}
+  var T4 = '0.4', T2 = '0.2', T1 = '0.12';
+  function outerTable(d, images) {
+    var isRes = d.type === 'execResult', rows = [], tops = [];
+    function R(cells, top) { rows.push(cells); tops.push(top || T1); return rows.length - 1; }
+    function lab(x, w, t, rs) { return { x: x, w: w, rs: rs, kind: 'lab', body: labTxt(t, w - PAD) }; }
+    function sub(x, w, t, rs) { return { x: x, w: w, rs: rs, kind: 'sub', body: centerLines(t, w - PAD) }; }
+    function val(x, w, body, o) { var c = { x: x, w: w, body: body }; for (var k in (o || {})) c[k] = o[k]; return c; }
+    // 제목 칸 + 내용 덩어리(빈 줄마다 한 행, 행 사이 선은 안 보이게)
+    function section(title, chunks, lx, top) {
+      lx = lx || 0;
+      chunks.forEach(function (ch, k) {
+        var cells = [];
+        if (k === 0) cells.push(lab(lx, X2 - lx, title, chunks.length));
+        cells.push(val(X2, CW, ch, { t: k > 0 ? 'NONE' : null, b: k < chunks.length - 1 ? 'NONE' : null }));
+        R(cells, k === 0 ? top : T1);
+      });
+    }
+    // 제목 칸 + 여러 행 (업무분장·예산·성과목표처럼 칸을 나눈 것)
+    function block(title, rowList, lx, top) {
+      lx = lx || 0;
+      rowList.forEach(function (cells, k) {
+        if (k === 0) cells.unshift(lab(lx, X2 - lx, title, rowList.length));
+        R(cells, k === 0 ? top : (cells.top || T1));
+      });
+    }
+    var P = S.P, C = S.C;
+
+    // 제목 (표의 첫 행) + 빈 행
+    var NO = ['NONE', '0.1', '#000000'], TRI = ['SLIM_THICK_SLIM', '1.0', '#000000'];
+    R([val(0, FULL, para(P.center, d.title || defaultTitle(d), FULL - PAD, C.title), { bd: { l: NO, r: NO, t: TRI, b: TRI } })]);
+    R([val(0, FULL, para(P.center, '', FULL - PAD), { bd: { l: NO, r: NO, t: TRI, b: ['SOLID', T4, '#000000'] } })]);
+
+    section(isRes ? '사 업 명' : '사업명', [centerLines(d.programName, CW - PAD)], 0, T4);
+    if (!isRes) {
+      section('배경 및 필요성', textChunks(d.background, CW - PAD), 0, T4);
+      // 성과목표: 목표 한 줄 + [평가지표 | 평가방법] 두 칸
+      var gs = (d.goals || []).filter(function (g) { return g.title || g.indicators || g.methods; }), gr = [];
+      gs.forEach(function (g, i) {
+        gr.push([val(X2, CW, para(P.line, '∎성과목표 ' + (i + 1) + ' ' + (g.title || ''), CW - PAD))]);
+        var hw = HALF - X2;
+        gr.push([
+          val(X2, hw, join([para(P.cellLine, '↳평가지표', hw - PAD), lines(g.indicators, hw - PAD, true, C.small)])),
+          val(HALF, FULL - HALF, join([para(P.cellLine, '↳평가방법', FULL - HALF - PAD), lines(g.methods, FULL - HALF - PAD, true, C.small)]))
+        ]);
+      });
+      if (gr.length) block('성과목표\n(성과지표)', gr, 0, T4);
+    }
+
+    // ── 사업 기본 정보 (원본처럼 아래 항목들을 모두 묶음) ──
+    var g0 = rows.length;
+    function gSection(title, chunks) { section(title, chunks, X[1], T2); }
+    function gBlock(title, rl) { block(title, rl, X[1], T2); }
+    R([lab(X[1], W[1], isRes ? '재원구분' : '재원'), val(X2, CW, centerLines(fundText(d), CW - PAD))], T4);
+    if (String(d.place || '').trim())
+      R([lab(X[1], W[1], '사업기간'), val(X2, W[2] + W[3], centerLines(d.period, W[2] + W[3] - PAD)),
+        lab(X[4], W[4], '장  소'), val(X[5], W[5], centerLines(d.place, W[5] - PAD))], T1);
+    else R([lab(X[1], W[1], '사업기간'), val(X2, CW, centerLines(d.period, CW - PAD))], T1);
+    if (!isRes) {
+      var tRows = [['계획인원', planText(d)], ['대상자', d.target], [d.selectLabel || '선정방법', d.selectText]]
+        .filter(function (x, i) { return i === 0 || String(x[1] || '').trim(); });
+      tRows.forEach(function (x, k) {
+        var cells = [];
+        if (k === 0) cells.push(lab(X[1], W[1], '사업대상', tRows.length));
+        cells.push(sub(X2, W[2], x[0]), val(X[3], FULL - X[3], lines(x[1], FULL - X[3] - PAD)));
+        R(cells, k === 0 ? T2 : T1);
+      });
+      if (String(d.fee || '').trim()) R([lab(X[1], W[1], '이용료'), val(X2, CW, centerLines(d.fee, CW - PAD))], T2);
+      gSection('세부추진\n계획', blockChunks(d.blocks, CW));
+      if (String(d.resources || '').trim()) gSection('자원 활용', textChunks(d.resources, CW - PAD));
+      if (String(d.promo || '').trim()) gSection('홍보\n(필요시)', textChunks(d.promo, CW - PAD));
+      var rr = d.roles && (d.roles.rows || []).filter(function (r) { return r.some(function (x) { return String(x || '').trim(); }); });
+      if (rr && rr.length) gBlock('업무분장\n(필요시)', rolesRows(d.roles, rr));
+      gBlock('예  산', budgetPlanRows(d));
+    } else {
+      R([lab(X[1], W[1], '사업대상'), sub(X2, W[2], '계획인원'), val(X[3], W[3], centerLines(planTextShort(d), W[3] - PAD)),
+        sub(X[4], W[4], '총 참여인원\n(목표대비%)'), val(X[5], W[5], centerLines(actualText(d), W[5] - PAD))], T2);
+      if (String(d.participants || '').trim()) gSection('참여자', textChunks(d.participants, CW - PAD));
+      gSection('세부추진\n내용', blockChunks(d.blocks, CW));
+    }
+    rows[g0].unshift(lab(0, X[1], '사업\n기본\n정보', rows.length - g0));
+
+    if (isRes) {
+      if (String(d.processEval || '').trim()) section('과정 평가', textChunks(d.processEval, CW - PAD), 0, T4);
+      if (String(d.resources || '').trim()) section('자원 활용\n현황', textChunks(d.resources, CW - PAD), 0, T4);
+      var gsr = goalsResult(d.goals);
+      if (gsr.length) section('사업성과\n평가', gsr, 0, T4);
+      block('예산집행\n내역', budgetResultRows(d), 0, T4);
+      if (String(d.improve || '').trim()) section('향후개선\n사항', textChunks(d.improve, CW - PAD), 0, T4);
+      var ps = (d.photos || []).filter(function (p) { return images[p.fileId]; });
+      if (ps.length) {
+        var pr = [], hw = HALF - X2;
+        for (var i = 0; i < ps.length; i += 2) {
+          pr.push([ps[i], ps[i + 1]].map(function (p, j) {
+            var x = j ? HALF : X2, ww = j ? FULL - HALF : hw, body;
+            if (!p) body = para(P.center, '', ww - PAD);
+            else body = join([L.picPara(images[p.fileId], p.fileId, ww - PAD, 13500)].concat(String(p.caption || '').trim() ? [centerLines(p.caption, ww - PAD)] : []));
+            return val(x, ww, body);
+          }));
+        }
+        block('사진자료', pr, 0, T4);
+      }
+    }
+    return emit(rows, tops);
+  }
+
+  // 업무분장 — 큰 표 칸을 나눠서 (머리 줄: 굵게, 흰 바탕)
+  function rolesRows(roles, rr) {
+    var pre = L.presetOf({ preset: 'roles2' }), cols = (roles.cols && roles.cols.length === 4) ? roles.cols : pre.cols;
+    var w = widths(CW, [7319, 13372, 16263, 4554]), x = [X2]; w.forEach(function (ww, i) { x.push(x[i] + ww); });
+    var out = [cols.map(function (t, c) { return { x: x[c], w: w[c], body: boldC(t, w[c] - PAD) }; })];
+    rr.forEach(function (r) {
+      out.push(r.map(function (v, c) {
+        return { x: x[c], w: w[c], body: pre.align[c] === 'l' ? lines(v, w[c] - PAD, true) : centerLines(v, w[c] - PAD) };
+      }));
+    });
+    return out;
+  }
+
+  // 예산 (실행계획서) — 원본: 머리 줄 진회색, 항목 9pt, 지출 내용은 위(항목명·왼쪽) / 아래(산출식·오른쪽), 사이 선은 안 보이게
+  function budgetPlanRows(d) {
+    var P = S.P, C = S.C, B = budgetTotals(d.budget);
+    var w = widths(CW, [9514, 5850, 14216, 7374, 4554]), x = [X2]; w.forEach(function (ww, i) { x.push(x[i] + ww); });
+    function th(c, t, cs, rs) { var ww = L.sum(w, c, cs || 1); return { x: x[c], w: ww, rs: rs, kind: 'hd', body: para(P.bud, t, ww - PAD, C.bold) }; }
+    var out = [[th(0, '수입', 2), th(2, '지출', 2), th(4, '비고', 1, 2)], [th(0, '내용'), th(1, '금액'), th(2, '내용'), th(3, '금액')]];
+    var n = Math.max(1, B.inc.length, B.exp.length), bodyRows = n * 2;
+    var notesInCol = B.exp.concat(B.inc).some(function (it) { return num(it.price) && String(it.note || '').trim(); });
+    function g(c, body, o) { var cell = { x: x[c], w: w[c], body: body }; for (var k in (o || {})) cell[k] = o[k]; return cell; }
+    function sm(st, t, c) { return para(st, t, w[c] - PAD, C.small, C.smallBold); }
+    function itemCells(it, c) {
+      var top = g(c, it ? sm(P.budL, it.name || '', c) : sm(P.budL, '', c), { b: 'NONE' });
+      var subT = !it ? '' : num(it.price) ? itemFormula(it) : (it.note || '');
+      return [top, g(c, sm(P.budF, subT, c), { t: 'NONE' })];
+    }
+    function amt(it, c) { return sm(P.budR, it ? (itemAmount(it) ? won(itemAmount(it)) : '-') : '', c); }
+    for (var i = 0; i < n; i++) {
+      var a = B.inc[i], e = B.exp[i], r1 = [], r2 = [];
+      if (!B.inc.length) { if (i === 0) r1.push({ x: x[0], w: w[0] + w[1], rs: bodyRows + 1, body: para(P.bud, '해당사항 없음', w[0] + w[1] - PAD, C.small) }); }
+      else { var ic = itemCells(a, 0); r1.push(ic[0]); r2.push(ic[1]); r1.push(g(1, amt(a, 1), { rs: 2 })); }
+      var ec = itemCells(e, 2); r1.push(ec[0]); r2.push(ec[1]);
+      r1.push(g(3, amt(e, 3), { rs: 2 }));
+      if (notesInCol) {
+        var nt = [a, e].filter(function (it) { return it && num(it.price) && it.note; }).map(function (it) { return it.note; }).join('\n');
+        r1.push(g(4, centerLines(nt, w[4] - PAD, C.small), { rs: 2 }));
+      } else if (i === 0) r1.push(g(4, para(P.bud, '-', w[4] - PAD), { rs: bodyRows + 1 }));
+      out.push(r1, r2);
+    }
+    var last = [];
+    if (B.inc.length) last.push(g(0, para(P.bud, '총계', w[0] - PAD, C.bold)), g(1, para(P.budR, won(B.incTotal), w[1] - PAD, C.bold)));
+    last.push(g(2, para(P.bud, '총계', w[2] - PAD, C.bold)), g(3, para(P.budR, won(B.expTotal), w[3] - PAD, C.bold)));
+    if (notesInCol) last.push(g(4, para(P.bud, '', w[4] - PAD)));
+    out.push(last);
+    return out;
+  }
+
+  // 예산집행내역 (결과보고서)
+  function budgetResultRows(d) {
+    var P = S.P, C = S.C, ex = d.exe || {}, w = widths(CW, [0.09, 0.29, 0.16, 0.16, 0.13, 0.17]), x = [X2]; w.forEach(function (ww, i) { x.push(x[i] + ww); });
+    function th(c, t, cs, rs) { var ww = L.sum(w, c, cs || 1); return { x: x[c], w: ww, rs: rs, kind: 'hd', body: para(P.bud, t, ww - PAD, C.bold) }; }
+    function g(c, body, o) { var cell = { x: x[c], w: w[c], body: body }; for (var k in (o || {})) cell[k] = o[k]; return cell; }
+    function cl(c, t, b) { return para(P.bud, t, w[c] - PAD, b ? C.bold : C.small, C.smallBold); }
+    var out = [[th(0, '구분', 1, 2), th(1, '예산계획', 2), th(3, '집행현황', 2), th(5, '비고', 1, 2)],
+      [th(1, '내 용'), th(2, '금 액(A)'), th(3, '집행액(B)'), th(4, '집행률(B/A)')]];
+    [['세입', ex.income], ['세출', ex.expense]].forEach(function (p) {
+      var items = exeRows(p[1]), T = exeTotals(p[1]);
+      if (!items.length) items = [{ name: '-', none: true }];
+      items.forEach(function (it, k) {
+        var cells = [];
+        if (k === 0) cells.push(g(0, para(P.bud, p[0], w[0] - PAD, C.bold), { rs: items.length + 1 }));
+        cells.push(g(1, cl(1, it.name)), g(2, cl(2, it.none ? '-원' : won(it.budget))), g(3, cl(3, it.none ? '-원' : won(it.spent))),
+          g(4, cl(4, it.none ? '-%' : (pct(it.spent, it.budget) || '-'))), g(5, centerLines(it.note, w[5] - PAD, C.small)));
+        out.push(cells);
+      });
+      out.push([g(1, cl(1, '합계', true)), g(2, cl(2, won(T.a), true)), g(3, cl(3, won(T.b), true)), g(4, cl(4, pct(T.b, T.a) || '-%', true)), g(5, cl(5, ''))]);
+    });
+    return out;
+  }
+
+  // 사업성과 평가 (결과보고서)
+  function goalsResult(goals) {
+    var out = [], P = S.P, cw = CW - PAD;
+    (goals || []).filter(function (g) { return g.title || g.indicators || g.result; }).forEach(function (g, i) {
+      var parts = [para(P.line, '**∎성과목표 ' + (i + 1) + ' : ' + (g.title || '') + '**', cw)];
+      if (String(g.indicators || '').trim()) parts.push(para(P.line, '• 평가지표', cw), lines(g.indicators, cw));
+      parts.push(para(P.line, '**↳ 평가결과 :**', cw));
+      var rc = textChunks(g.result, cw);
+      out.push(join(parts.concat([rc[0]])));
+      out = out.concat(rc.slice(1));
+    });
+    return out;
+  }
+
+  // 칸 배치 → XML
+  function emit(rows, tops) {
+    var nR = rows.length;
+    var xs = [];
+    rows.forEach(function (cells) { cells.forEach(function (o) { xs.push(o.x, o.x + o.w); }); });
+    xs.sort(function (a, b) { return a - b; });
+    var bounds = [];
+    xs.forEach(function (v) { if (!bounds.length || v - bounds[bounds.length - 1] > 150) bounds.push(v); });
+    bounds[bounds.length - 1] = FULL;
+    function col(v) { var best = 0; bounds.forEach(function (b, i) { if (Math.abs(b - v) < Math.abs(bounds[best] - v)) best = i; }); return best; }
+    var colW = []; for (var i = 0; i < bounds.length - 1; i++) colW.push(bounds[i + 1] - bounds[i]);
+    function obj(o) { return /<hp:(tbl|pic) /.test(o.body.x); }
+    var hs = rows.map(function (cells) {
+      var m = 1000;
+      cells.forEach(function (o) { if ((o.rs || 1) === 1 && obj(o)) m = Math.max(m, o.body.h + VPAD + 200); });
+      return m;
+    });
+    hs[0] = 3125; hs[1] = 2125;   // 제목 행, 빈 행 (원본 높이)
+    rows.forEach(function (cells, r) {
+      cells.forEach(function (o) {
+        var rs = o.rs || 1; if (rs === 1 || !obj(o)) return;
+        var have = L.sum(hs, r, rs), need = o.body.h + VPAD + 200;
+        if (need > have) hs[r + rs - 1] += need - have;
+      });
+    });
+    function line(wd) { return ['SOLID', wd, '#000000']; }
+    var NONE = ['NONE', '0.1', '#000000'];
+    var xml = rows.map(function (cells, r) {
+      return '<hp:tr>' + cells.map(function (o) {
+        var c = col(o.x), cs = col(o.x + o.w) - c, rs = o.rs || 1;
+        var spec = o.bd || {
+          l: c === 0 ? NONE : line(T1),
+          r: c + cs === colW.length ? NONE : line(T1),
+          t: o.t === 'NONE' ? NONE : line(tops[r]),
+          b: o.b === 'NONE' ? NONE : line(r + rs === nR ? T4 : tops[r + rs])
+        };
+        if (!o.bd) spec.fill = (o.kind === 'lab') ? '#E5E5E5' : (o.kind === 'hd') ? '#B8B8B8' : null;
+        return L.cell({ r: r, c: c, rs: rs, cs: cs, w: L.sum(colW, c, cs), h: L.sum(hs, r, rs), bf: bf(spec), body: o.body.x, valign: o.valign });
+      }).join('') + '</hp:tr>';
+    }).join('');
+    return L.tblOpen(1927477144, nR, colW.length, FULL, L.sum(hs, 0, nR), 1, 0) + xml + '</hp:tbl>';
+  }
+
+  function cutFirstTable(tpl) {
+    var i = tpl.indexOf('<hp:tbl ');
+    var depth = 0, re = /<hp:tbl |<\/hp:tbl>/g, m, end = -1;
+    re.lastIndex = i;
+    while ((m = re.exec(tpl))) {
+      if (m[0] === '<hp:tbl ') depth++; else { depth--; if (depth === 0) { end = m.index + 9; break; } }
+    }
+    return [i, end];
+  }
+  function buildSection(tpl, header, d, images) {
+    images = images || {}; L.begin(images);
+    startStyles(L.patchHeader(header), d);
+    var se = cutFirstTable(tpl);
+    var out = tpl.slice(0, se[0]) + outerTable(d, images) + tpl.slice(se[1]);
+    // 활동계획서 틀의 제목 상자는 지움 — 실행계획서는 제목이 큰 표의 첫 행 (원본 양식)
+    var ti = out.indexOf('<hp:tbl id="1927477143"');
+    if (ti >= 0) out = out.slice(0, ti) + out.slice(out.indexOf('</hp:tbl>', ti) + 9);
+    out = out.replace(/pageBreak="TABLE"/g, 'pageBreak="CELL"');
+    var att = L.attachments(d, images);
+    if (att) out = out.replace(/<\/hs:sec>\s*$/, att + '</hs:sec>');
+    return { xml: out, header: finishHeader(), pics: L.pics() };
+  }
+
+  function buildZip(zip, d, images) {
+    images = images || {};
+    return Promise.all([zip.file('Contents/section0.xml').async('string'), zip.file('Contents/header.xml').async('string'), zip.file('Contents/content.hpf').async('string')])
+      .then(function (r) {
+        var res = buildSection(r[0], r[1], d, images);
+        zip.file('Contents/section0.xml', res.xml);
+        zip.file('Contents/header.xml', res.header);
+        var items = '';
+        res.pics.forEach(function (p) {
+          zip.file('BinData/' + p.binId + '.jpg', images[p.fileId].b64, { base64: true });
+          items += '<opf:item id="' + p.binId + '" href="BinData/' + p.binId + '.jpg" media-type="image/jpeg" isEmbeded="1"/>';
+        });
+        var hpf = r[2].replace(/<opf:item id="image\d+"[^>]*\/>/g, '');
+        if (items) hpf = hpf.replace('</opf:manifest>', items + '</opf:manifest>');
+        zip.file('Contents/content.hpf', hpf);
+        zip.file('mimetype', 'application/hwp+zip', { compression: 'STORE' });
+        return zip;
+      });
+  }
+
+  return {
+    buildZip: buildZip, defaultTitle: defaultTitle, FUNDS: FUNDS,
+    fundText: fundText, planText: planText, planTextShort: planTextShort, actualText: actualText, pct: pct, num: num,
+    itemAmount: itemAmount, itemFormula: itemFormula, budgetTotals: budgetTotals, exeRows: exeRows, exeTotals: exeTotals, leaves: leaves
+  };
+})();
+if (typeof module !== 'undefined') module.exports = SaupGen;
+</script>

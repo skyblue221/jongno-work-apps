@@ -4,6 +4,7 @@
 <base target="_top">
 <meta charset="utf-8">
 <title>보고서 만들기</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
   :root{--bg:#F6F5F2;--card:#fff;--ink:#222;--sub:#666;--line:#E2DFD8;--main:#2F6B5E;--main2:#E7F0EE;--warn:#B54A2A;--warn2:#FBEDE8}
@@ -38,14 +39,23 @@
   .seg button{border:0;border-radius:0}
   .seg button.on{background:var(--main);color:#fff}
   /* 목록 */
-  #list .item{border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:8px;cursor:pointer}
+  /* 목록: 화면 높이 안에서만 스크롤, 왼쪽 칸은 내려가도 따라옴 */
+  aside .card{position:sticky;top:64px;margin-bottom:0}
+  #filter{display:flex;gap:4px;border:0;border-radius:0}
+  #filter button{padding:3px 9px;font-size:13px;border:1px solid var(--line);border-radius:14px}
+  #list{max-height:560px;max-height:min(560px, calc(100vh - 250px));overflow-y:auto;overscroll-behavior:contain;margin-right:-6px;padding-right:6px}
+  @media (max-width:900px){aside .card{position:static}#list{max-height:360px}}
+  #list .item{border:1px solid var(--line);border-radius:10px;padding:7px 10px;margin-bottom:6px;cursor:pointer}
   #list .item:hover{border-color:var(--main)}
   #list .item.on{border-color:var(--main);background:var(--main2)}
   #list .t{font-weight:600;font-size:14px}
   #list .m{font-size:12px;color:var(--sub)}
   .tag{display:inline-block;font-size:11px;padding:1px 6px;border-radius:6px;background:var(--main2);color:var(--main);margin-right:4px}
   .tag.res{background:var(--warn2);color:var(--warn)}
-  #list .acts{margin-top:6px;display:flex;gap:4px;flex-wrap:wrap}
+  #list .acts{margin-top:6px;display:none;gap:4px;flex-wrap:wrap}
+  /* 버튼은 지금 열어둔 보고서에서만 보임 (마우스를 올려도 목록이 움직이지 않게) */
+  #list .item.on .acts{display:flex}
+  #list .t{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   /* 내용 블록 */
   .blk{border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:10px;background:#FCFCFB}
   .blk .bh{display:flex;align-items:center;gap:6px;margin-bottom:6px;font-size:13px;color:var(--sub)}
@@ -61,6 +71,14 @@
   table.grid td textarea{border:0;border-radius:0;min-height:36px;padding:6px;font-size:14px}
   table.grid td.x{width:34px;text-align:center;vertical-align:middle}
   .addbar{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+  table.grid tr.colset td{background:#F4F3EF;padding:3px 4px;font-size:12px;color:var(--sub);white-space:nowrap}
+  table.grid tr.colset select{width:auto;padding:1px 4px;font-size:12px;margin-right:4px}
+  table.grid tr.colset label{display:inline;margin:0;font-size:12px}
+  table.grid tr.colset input[type=checkbox]{width:auto;margin:0 2px 0 0;vertical-align:middle}
+  table.grid td.x .picbtn{display:block;cursor:pointer;padding:2px;font-size:15px;text-align:center}
+  .cellpics{display:flex;flex-wrap:wrap;gap:6px;padding:4px 6px}
+  .cellpics select{width:auto;padding:1px 4px;font-size:12px;margin-top:2px;display:block}
+  .thumb.sm{width:90px;height:68px}
   /* 예산 */
   .cat{border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:10px}
   .cat .ch{display:flex;gap:8px;align-items:center;margin-bottom:6px}
@@ -72,6 +90,45 @@
   table.bud td.amt{text-align:right;white-space:nowrap;width:110px}
   .total{text-align:right;font-size:17px;font-weight:700;margin-top:6px}
   .flag{border-color:var(--warn)!important;background:var(--warn2)}
+  /* 새로 만들기 메뉴 */
+  .newmenu{position:relative}
+  .menu{display:none;position:absolute;top:110%;left:0;background:#fff;border:1px solid var(--line);border-radius:10px;padding:6px;box-shadow:0 6px 20px rgba(0,0,0,.18);z-index:30;min-width:230px}
+  .menu.open{display:block}
+  .menu button{display:block;width:100%;text-align:left;border:0;background:#fff;color:var(--ink);padding:8px 10px}
+  .menu button:hover{background:var(--main2)}
+  .menu small{color:var(--sub);font-size:12px}
+  .seg.wrap{flex-wrap:wrap}
+  .tag.ex{background:#E4ECF7;color:#2F5D8A}
+  .tag.exr{background:#F7EBD9;color:#8A5A1E}
+  /* 실행계획서 · 사업결과보고서 */
+  #execForm.isRes .xp{display:none!important}
+  #execForm:not(.isRes) .xr{display:none!important}
+  .r3{grid-template-columns:1fr 1fr 1fr}.r12{grid-template-columns:110px 1fr}
+  @media (max-width:640px){.r3,.r12{grid-template-columns:1fr}}
+  .goal{border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:10px;background:#FCFCFB}
+  .goal .bh{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--sub)}
+  .mon{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:8px}
+  .mon span{display:inline-flex;gap:2px;align-items:center;border:1px solid var(--line);border-radius:8px;padding:2px 4px;background:#fff}
+  .mon input{width:64px;padding:3px 5px}.mon select{width:auto;padding:3px}
+  table.gt{border-collapse:collapse;width:100%}
+  table.gt th{font-size:11.5px;background:#EEE;font-weight:600;padding:3px 2px;border:1px solid var(--line);white-space:nowrap}
+  table.gt td{border:1px solid var(--line);text-align:center;padding:0}
+  table.gt td.tk{text-align:left;min-width:150px}
+  table.gt td.tk textarea{border:0;border-radius:0;min-height:30px;padding:4px 6px;font-size:14px}
+  table.gt td.mk{cursor:pointer;font-size:16px;color:var(--main);min-width:30px;user-select:none}
+  table.gt td.mk:hover{background:var(--main2)}
+  .gwrap{overflow-x:auto}
+  .cap{width:150px;margin-top:4px;font-size:12.5px;padding:4px 6px}
+  .pg .x6 .lb{width:auto}
+  .pg .x6 td.hd{background:#B8B8B8}
+  .pg table.main.x6{border:0}
+  .pg .x6 td.lb{background:#E5E5E5;font-size:14px}
+  .pg .x6 td{border-left:1px solid #000;border-right:1px solid #000}
+  .pg .x6 .in th{background:#D6D6D6}
+  .pg .x6 .in tr:first-child th{border-bottom:3px double #000}
+  
+  .pg .ttl2{text-align:center;font-size:21px;font-weight:700;padding:8px;margin:0 0 14px;border-top:4px double #000;border-bottom:4px double #000}
+  .pg .x6 .gl{background:#F2F2F2;font-weight:700;text-align:center}
   #toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#222;color:#fff;padding:10px 18px;border-radius:10px;font-size:14px;display:none;z-index:99}
   .empty{color:var(--sub);font-size:13px;text-align:center;padding:16px 0}
   /* 사진 */
@@ -118,6 +175,47 @@
   .pg .ln{margin:0}.pg .dash{padding-left:14px;text-indent:-10px}.pg .sub{padding-left:24px;text-indent:-10px}
   .pg .ph img{max-width:100%;max-height:260px;display:block;margin:auto}
   .pg .attimg{max-width:100%;display:block;margin:6px auto}
+  /* ===== 화면 다듬기 (2026-11) · 먹색 + 자주 · 입력 화면만 바뀌고 미리보기·인쇄 양식(.pg)은 그대로 · 이 블록만 지우면 예전 모양 ===== */
+  :root{--bg:#f6f4ef;--card:#fff;--ink:#1f2421;--sub:#5b625e;--line:#d6d2c8;--main:#2a2d2c;--main2:#eeebe4;--acc:#7a2f55;--acc2:#f5ebf0;--warn:#a8322a;--warn2:#fbefed}
+  body{font-family:"Noto Sans KR","Pretendard","Apple SD Gothic Neo","Malgun Gothic",sans-serif;word-break:keep-all}
+  /* 머리 띠 → 서식지형 머리말 (위에 붙어 다니는 건 그대로) */
+  header{background:var(--bg);color:var(--ink);border-bottom:2px solid var(--ink);padding:10px 20px}
+  header h1{font-size:19px;letter-spacing:-.02em}
+  header h1::before{content:"종로장애인복지관";display:block;font-size:12px;font-weight:700;color:var(--acc);margin-bottom:1px}
+  header .st{color:var(--sub);opacity:1}
+  header button{border-color:var(--line)}
+  header button.pri,button.pri{background:var(--acc);border-color:var(--acc);color:#fff;font-weight:700}
+  header button.pri:hover,button.pri:hover{background:#5f2442}
+  /* 버튼·입력칸 */
+  button{border-radius:4px}
+  button:hover{border-color:var(--ink)}
+  input,textarea,select{border-radius:4px}
+  input:focus,textarea:focus{outline:2px solid var(--acc);outline-offset:0;border-color:var(--acc)}
+  .seg{border-radius:4px}
+  .seg button.on{background:var(--main);color:#fff}
+  #filter button{border-radius:3px}
+  #filter button.on{background:var(--main);border-color:var(--main);color:#fff}
+  /* 카드: 제목 아래 밑줄 */
+  .card{border-radius:6px}
+  .card h2{padding-bottom:8px;border-bottom:1px solid var(--line)}
+  .preview{color:var(--acc)}
+  .hint{border-radius:0;background:#f3f1ec;border-left:3px solid var(--line)}
+  /* 저장 목록 */
+  #list .item{border-radius:4px}
+  #list .item:hover{border-color:var(--ink)}
+  #list .item.on{border-color:var(--ink);background:var(--main2)}
+  .tag{border-radius:3px}
+  /* 내용 블록·예산·성과목표 상자 */
+  .blk,.cat,.goal,.sess,div.att{border-radius:4px;background:#fdfcfa}
+  .blk.head{background:var(--main2)}
+  table.grid th,table.gt th{background:#f3f1ec}
+  table.gt td.mk{color:var(--acc)}
+  table.gt td.mk:hover{background:var(--acc2)}
+  .menu{border-radius:4px;box-shadow:0 4px 14px rgba(0,0,0,.12)}
+  .menu button:hover{background:var(--main2)}
+  .upl{border-radius:4px;border-color:var(--acc);color:var(--acc)}
+  .thumb{border-radius:4px}
+  #toast{border-radius:4px;background:var(--ink)}
   @media print{
     html,body{background:#fff!important}
     *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
@@ -153,8 +251,14 @@
 <header>
   <h1>📄 보고서 만들기</h1>
   <span class="st" id="status">새 보고서</span>
-  <button onclick="newDoc()">＋ 새 활동계획서</button>
-  <button onclick="newEdu()">＋ 장애이해교육 보고서</button>
+  <div class="newmenu">
+    <button onclick="toggleNew(event)">＋ 새로 만들기 ▾</button>
+    <div class="menu" id="newMenu">
+      <button onclick="closeNew();newDoc()">활동계획서 <small>— 한 장짜리</small></button>
+      <button onclick="closeNew();newExec()">실행계획서 <small>— 사업 단위</small></button>
+      <button onclick="closeNew();newEdu()">장애이해교육 결과보고서</button>
+    </div>
+  </div>
   <button onclick="save()">저장</button>
   <button onclick="openPreview()">미리보기·인쇄</button>
   <button class="pri" onclick="download()">한글(HWPX)로 내려받기</button>
@@ -164,10 +268,10 @@
   <!-- 왼쪽: 저장된 보고서 -->
   <aside>
     <div class="card">
-      <h2>저장된 보고서</h2>
+      <h2>저장된 보고서 <small id="listCount"></small></h2>
       <input id="q" placeholder="찾기 (예: 씨네큐브)" oninput="renderList()">
-      <div style="margin:8px 0" class="seg" id="filter">
-        <button class="on" data-v="">전체</button><button data-v="활동계획서">계획서</button><button data-v="결과보고서">결과보고서</button><button data-v="장애이해교육">교육</button>
+      <div style="margin:8px 0" class="seg wrap" id="filter">
+        <button class="on" data-v="">전체</button><button data-v="활동계획서">활동계획</button><button data-v="결과보고서">활동결과</button><button data-v="실행계획서">실행계획</button><button data-v="사업결과보고서">사업결과</button><button data-v="장애이해교육">교육</button>
       </div>
       <div id="list"><div class="empty">불러오는 중…</div></div>
     </div>
@@ -179,7 +283,7 @@
     <div class="card">
       <h2>기본 정보 <small id="typeLabel"></small></h2>
       <div class="seg" id="typeSeg">
-        <button data-v="plan">활동계획서</button><button data-v="result">결과보고서</button>
+        <button data-v="plan">활동계획서</button><button data-v="result">활동결과보고</button>
       </div>
       <label>프로그램명</label>
       <input id="programName" placeholder="예: 장애이해 마을이음캠페인(씨네큐브 11회차) 활동계획">
@@ -217,7 +321,9 @@
     </div>
 
     <div class="card">
-      <h2 id="budgetTitle">소요예산</h2>
+      <h2><span id="budgetTitle">소요예산</span>
+        <select id="wonMark" style="width:auto;margin-left:auto;font-size:13px;padding:3px 6px" title="금액 칸·계 표시 방식"><option value="">276,000원</option><option value="1">₩276,000</option></select></h2>
+      <div class="hint" style="margin:0 0 10px">한 구분 안에서 금액을 나눠 적으려면 「＋ 구분 추가」 후 <b>구분 이름을 비워두세요</b> — 위 구분 칸과 합쳐지고 금액은 따로 나와요.</div>
       <div id="budget"></div>
       <button class="sm" onclick="addCat()">＋ 구분 추가</button>
       <div class="total" id="budgetTotal"></div>
@@ -261,6 +367,108 @@
     </div>
    </div>
 
+   <!-- 실행계획서 · 사업결과보고서 -->
+   <div id="execForm" style="display:none">
+    <div class="card">
+      <h2>기본 정보 <small id="xTypeLabel"></small></h2>
+      <div class="seg" id="xTypeSeg"><button data-v="exec">실행계획서</button><button data-v="execResult">사업결과보고서</button></div>
+      <div class="row r12">
+        <div><label>연도</label><input id="xYear" placeholder="2027"></div>
+        <div><label>사업명</label><input id="xProgramName" placeholder="예: 열린 마을 만들기"></div>
+      </div>
+      <label>문서 제목 (맨 위 큰 제목) — 연도·사업명을 쓰면 자동으로 채워져요</label>
+      <input id="xTitle">
+      <label>재원</label>
+      <div class="seg wrap" id="xFund"></div>
+      <label>작은 글씨 크기 — 성과목표의 평가지표·평가방법, 예산 산출식, 비고</label>
+      <select id="xSmallSize" style="width:auto"><option value="9">9pt (원본 양식처럼)</option><option value="10">10pt (본문과 같게)</option></select>
+      <div class="row r2">
+        <div><label>사업기간 (글자 그대로 들어가요)</label><input id="xPeriod" placeholder="2026년 4월 ~ 2026년 11월">
+          <div class="dates" style="margin-top:4px;font-size:12.5px;color:var(--sub)">날짜로 채우기 <input type="date" id="xP1"> ~ <input type="date" id="xP2"></div></div>
+        <div><label>장소 (비워두면 사업기간 칸이 넓어져요)</label><textarea id="xPlace" rows="1"></textarea></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>사업대상</h2>
+      <div class="row r2">
+        <div><label>계획 실인원 (명)</label><input id="xPlanReal" placeholder="12"></div>
+        <div><label>계획 연인원 (명) — 없으면 비워두세요</label><input id="xPlanCount" placeholder="120"></div>
+      </div>
+      <div class="row r2 xr">
+        <div><label>실제 참여 실인원 (명)</label><input id="xActualReal"></div>
+        <div><label>실제 참여 연인원 (명)</label><input id="xActualCount"></div>
+      </div>
+      <div class="preview xr" id="xActualPv"></div>
+      <div class="xp">
+        <label>계획인원 아래 덧붙일 말 (없어도 돼요)</label>
+        <textarea id="xPlanNote" rows="1" placeholder="* 사업계획상 모집 인원은 6명이나, 신청인원이 많아 …"></textarea>
+        <label>대상자</label>
+        <textarea id="xTarget" rows="2" placeholder="- 장애당사자 5명, 비장애인 7명 → 총 12명"></textarea>
+        <div class="row r12">
+          <div><label>제목</label><select id="xSelectLabel"><option>선정방법</option><option>선정기준</option></select></div>
+          <div><label>내용</label><textarea id="xSelectText" rows="1" placeholder="- 선착순 접수"></textarea></div>
+        </div>
+        <label>이용료 (없으면 비워두세요 — 칸이 빠져요)</label>
+        <input id="xFee" placeholder="150,000원(30,000원/일)">
+      </div>
+      <div class="xr"><label>참여자</label><textarea id="xParticipants" rows="2"></textarea></div>
+    </div>
+
+    <div class="card xp">
+      <h2>배경 및 필요성</h2>
+      <div class="hint">문단마다 줄 앞에 <b>- </b> 를 쓰면 「-」 글머리로 들어가요.</div>
+      <textarea id="xBackground" rows="6" style="margin-top:8px" placeholder="- 문단마다 줄 앞에 「- 」"></textarea>
+    </div>
+
+    <div class="card">
+      <h2 id="xGoalsTitle">성과목표</h2>
+      <div id="xGoals"></div>
+      <button class="sm" onclick="doc.goals.push({title:'',indicators:'',methods:'',result:''});markDirty();renderGoals()">＋ 성과목표 추가</button>
+    </div>
+
+    <div class="card">
+      <h2 id="xBlocksTitle">세부추진계획</h2>
+      <div class="hint">✏️ 소제목·글·표를 필요한 만큼 넣고 ▲▼로 순서를 바꿔요. 상점 목록·만족도조사 구성안·참여자 명단 같은 표는 <b>자유 표</b>로 (칸 수를 정할 수 있어요).</div>
+      <div id="xblocks" style="margin-top:12px"></div>
+      <div class="addbar">
+        <button class="sm" onclick="addBlock('heading')">＋ 소제목</button>
+        <button class="sm" onclick="addBlock('text')">＋ 글</button>
+        <button class="sm" onclick="addBlock('gantt')">＋ 추진일정표</button>
+        <button class="sm" onclick="addBlock('progress')">＋ 세부 진행표</button>
+        <button class="sm" onclick="addBlock('custom')">＋ 자유 표</button>
+        <button class="sm" onclick="addBlock('roles2')">＋ 업무분장표</button>
+        <button class="sm" onclick="addBlock('lecturers')">＋ 강사 명단표</button>
+      </div>
+    </div>
+
+    <div class="card xr">
+      <h2>과정 평가</h2>
+      <textarea id="xProcess" rows="8" placeholder="예: 가. 준비과정평가 / 나. 진행과정평가"></textarea>
+    </div>
+
+    <div class="card">
+      <h2 id="xResTitle">자원활용</h2>
+      <textarea id="xResources" rows="2" placeholder="- 기관명 : 연계 내용"></textarea>
+      <div class="xp"><label>홍보 (필요할 때만 — 비워두면 칸이 빠져요)</label><textarea id="xPromo" rows="2" placeholder="- 관내 이용인 대상 SMS 발송 / 1회"></textarea></div>
+    </div>
+
+    <div class="card xp">
+      <h2>업무분장 <small>필요할 때만 넣어요</small></h2>
+      <div id="xRoles"></div>
+    </div>
+
+    <div class="card">
+      <h2 id="xBudgetTitle">예산</h2>
+      <div id="xBudget"></div>
+    </div>
+
+    <div class="card xr">
+      <h2>향후 개선사항</h2>
+      <textarea id="xImprove" rows="8" placeholder="예: 1. 제언 / 2. 향후 계획"></textarea>
+    </div>
+   </div>
+
     <div class="card" id="photoCard">
       <h2>활동사진 <small>2장씩 나란히 들어가요</small></h2>
       <div class="thumbs" id="photos"></div>
@@ -286,26 +494,20 @@
 
 <?!= include('HwpxGen'); ?>
 <?!= include('EduGen'); ?>
+<?!= include('SaupGen'); ?>
 <?!= include('TextStyle'); ?>
 <script>
 var doc = null, saved = [], dirty = false, tplB64 = null, filterType = '';
 var PRESETS = HwpxGen.PRESETS;
-var BLOCK_NAMES = {heading:'소제목', text:'글', schedule:'일정표', roles:'업무분장표', lecturers:'강사 명단표', campaign:'캠페인 내용표'};
+var BLOCK_NAMES = {heading:'소제목', text:'글', schedule:'일정표', roles:'업무분장표', lecturers:'강사 명단표', campaign:'캠페인 내용표', gantt:'추진일정표', progress:'세부 진행표', custom:'자유 표', roles2:'업무분장표'};
+function isExec(d){ d = d || doc; return d && (d.type==='exec' || d.type==='execResult'); }
 
 function blankPlan() {
   return {
     type:'plan', programName:'', title:'', titleAuto:true, date:'', dateEnd:'', timeStart:'', timeEnd:'',
-    place:'', participants:'', manager:'이선민 사회복지사', goal:'',
-    blocks:[
-      {kind:'heading', text:'세부진행내용'},
-      {kind:'text', text:'1) 사전준비사항\n- \n\n2) 사전 홍보방안\n- 온라인: 복지관 홈페이지, 인스타, 카카오채널\n- 오프라인: 기관 게시판\n\n3) 세부일정'},
-      {kind:'table', preset:'schedule', rows:[['','',''],['','',''],['','','']]},
-      {kind:'heading', text:'업무분장'},
-      {kind:'table', preset:'roles', rows:[['1','','사업진행 총괄','일상동행팀 팀장'],['2','이선민','계획서 및 결과보고 작성','사회복지사']]},
-      {kind:'heading', text:'평가방법'},
-      {kind:'text', text:'- 성과목표 : 참여자 반응을 통한 질적 평가\n- 산출목표 : 장애인식개선 캠페인 실시 여부 및 당일 참여자 수'}
-    ],
-    budget:[{category:'캠페인 진행비', items:[{name:'', price:'', qty:'', unit:'명'}]}],
+    place:'', participants:'', manager:'', goal:'',
+    blocks:[],
+    budget:[{category:'', items:[{name:'', price:'', qty:'', unit:''}]}],
     photos:[], attachments:[]
   };
 }
@@ -330,7 +532,7 @@ function eduTitle(d){
   who = String(who).split('\n')[0]; if (who.length > 24) who = who.slice(0,24) + '…';
   return '장애이해교육 결과보고서' + (who ? ' (' + who + ')' : '');
 }
-function typeName(t){ return t==='edu' ? '장애이해교육' : t==='result' ? '결과보고서' : '활동계획서'; }
+function typeName(t){ return t==='edu' ? '장애이해교육' : t==='result' ? '활동결과보고' : t==='exec' ? '실행계획서' : t==='execResult' ? '사업결과보고서' : '활동계획서'; }
 
 /* ── 장애이해교육 입력 화면 ── */
 var EDU_FIELDS = {eduProgram:'programName', eduGoal:'goal', eduTime:'time', eduPlace:'place', eduTopics:'topics', eduEval:'evaluation'};
@@ -391,6 +593,446 @@ function renderEduPreview(){
 }
 function updEduTotal(){ document.getElementById('eduTotal').textContent = '총 ' + EduGen.total(doc) + '명 (인원 칸을 더해서 자동으로 들어가요)'; }
 
+/* ── 새로 만들기 메뉴 ── */
+function toggleNew(e){ e.stopPropagation(); document.getElementById('newMenu').classList.toggle('open'); }
+function closeNew(){ document.getElementById('newMenu').classList.remove('open'); }
+document.addEventListener('click', closeNew);
+
+/* ══ 실행계획서 · 사업결과보고서 ══ */
+function monthsFromNow(n){
+  var m = new Date().getMonth(), out = [];
+  for (var i = 0; i < n; i++) out.push({name: ((m + i) % 12 + 1) + '월', weeks: 0});
+  return out;
+}
+function blankGantt(){
+  var ms = monthsFromNow(4);
+  return {kind:'gantt', months: ms, rows: ['사업 계획 및 정보수집','사업 실행계획서 작성','참여자 모집 및 홍보','사업 진행','결과보고 및 정산'].map(function(t){ return {task:t, marks:[]}; })};
+}
+function defaultRoles(){
+  return [['', '', '', ''], ['', '', '', '']];
+}
+function blankExec(){
+  return {
+    type:'exec', year: String(new Date().getFullYear() + (new Date().getMonth() >= 10 ? 1 : 0)), programName:'', title:'', titleAuto:true,
+    funding:'사업비', period:'', place:'', planReal:'', planCount:'', planNote:'', target:'', selectLabel:'선정방법', selectText:'', fee:'',
+    background:'', goals:[{title:'', indicators:'', methods:'', result:''}],
+    blocks:[],
+    resources:'', promo:'', roles:null,
+    budget:{income:[], expense:[{name:'', price:'', qty:'', note:''}]},
+    photos:[], attachments:[]
+  };
+}
+function newExec(){
+  if (!leaveOk(newExec)) return;
+  resetAuto(); doc = blankExec(); dirty = false; renderAll(); window.scrollTo(0,0);
+}
+// 실행계획서 → 사업결과보고서
+function toExecResult(d){
+  d.sourcePlanId = d.id; delete d.id;
+  d.type = 'execResult'; d.titleAuto = true; d.title = '';
+  d.photos = [];
+  (d.goals||[]).forEach(function(g){ g.result = g.result || ''; });
+  if (d.roles && (d.roles.rows||[]).length){
+    d.blocks.push({kind:'heading', text:'업무분장'}, {kind:'table', preset:'roles2', cols:d.roles.cols, rows:d.roles.rows});
+  }
+  d.participants = d.participants || d.target || '';
+  d.actualReal = ''; d.actualCount = '';
+  d.processEval = ''; d.improve = '';
+  function conv(list){
+    return (list||[]).filter(function(it){ return it.name || SaupGen.num(it.price); }).map(function(it){
+      return {name: it.name, budget: SaupGen.itemAmount(it) || '', spent:'', note: ''};
+    });
+  }
+  d.exe = {income: conv((d.budget||{}).income), expense: conv((d.budget||{}).expense)};
+  return d;
+}
+
+var X_FIELDS = {xYear:'year', xProgramName:'programName', xTitle:'title', xPeriod:'period', xPlace:'place',
+  xPlanReal:'planReal', xPlanCount:'planCount', xPlanNote:'planNote', xTarget:'target', xSelectText:'selectText', xFee:'fee',
+  xActualReal:'actualReal', xActualCount:'actualCount', xParticipants:'participants', xBackground:'background',
+  xProcess:'processEval', xResources:'resources', xPromo:'promo', xImprove:'improve'};
+Object.keys(X_FIELDS).forEach(function(id){
+  var e = document.getElementById(id), key = X_FIELDS[id];
+  e.addEventListener('input', function(){
+    doc[key] = e.value;
+    if (key==='title') doc.titleAuto = !e.value;
+    if ((key==='programName' || key==='year') && doc.titleAuto){ doc.title = SaupGen.defaultTitle(doc); document.getElementById('xTitle').value = doc.title; }
+    if (/plan|actual/.test(key)) renderActualPv();
+    if (e.tagName==='TEXTAREA') autoGrow(e);
+    markDirty();
+  });
+});
+document.getElementById('xSelectLabel').addEventListener('change', function(e){ doc.selectLabel = e.target.value; markDirty(); });
+document.getElementById('xSmallSize').addEventListener('change', function(e){ doc.smallSize = e.target.value; markDirty(); });
+['xP1','xP2'].forEach(function(id){
+  document.getElementById(id).addEventListener('change', function(){
+    function f(v){ if (!v) return ''; var p = v.split('-').map(Number); return p[0] + '년 ' + p[1] + '월 ' + p[2] + '일'; }
+    var a = f(document.getElementById('xP1').value), b = f(document.getElementById('xP2').value);
+    doc.period = a && b ? a + ' ~ ' + b : (a || b);
+    document.getElementById('xPeriod').value = doc.period; markDirty();
+  });
+});
+document.querySelectorAll('#xTypeSeg button').forEach(function(b){
+  b.onclick = function(){
+    if (b.dataset.v === doc.type) return;
+    if (b.dataset.v === 'execResult' && !doc.exe){
+      if (!confirm('사업결과보고서로 바꿀까요? 예산은 집행내역으로, 업무분장은 세부추진내용 안으로 옮겨져요.\n(원래 실행계획서도 남겨두려면 [취소] 후 왼쪽 목록의 「→ 사업결과보고서 만들기」를 쓰세요)')) return;
+      var id = doc.id; toExecResult(doc); doc.id = id; delete doc.sourcePlanId;
+    } else doc.type = b.dataset.v;
+    if (doc.titleAuto) doc.title = SaupGen.defaultTitle(doc);
+    markDirty(); renderAll();
+  };
+});
+
+function renderExec(){
+  var isRes = doc.type==='execResult';
+  document.getElementById('execForm').classList.toggle('isRes', isRes);
+  document.querySelectorAll('#xTypeSeg button').forEach(function(b){ b.classList.toggle('on', b.dataset.v===doc.type); });
+  if (doc.titleAuto || !doc.title){ doc.titleAuto = true; doc.title = SaupGen.defaultTitle(doc); }
+  Object.keys(X_FIELDS).forEach(function(id){ var e = document.getElementById(id); e.value = doc[X_FIELDS[id]] == null ? '' : doc[X_FIELDS[id]]; if (e.tagName==='TEXTAREA') setTimeout(function(){ autoGrow(e); }); });
+  document.getElementById('xSelectLabel').value = doc.selectLabel || '선정방법';
+  document.getElementById('xSmallSize').value = doc.smallSize || '9';
+  document.getElementById('xP1').value = ''; document.getElementById('xP2').value = '';
+  document.getElementById('xGoalsTitle').textContent = isRes ? '사업성과 평가' : '성과목표 (성과지표)';
+  document.getElementById('xBlocksTitle').textContent = isRes ? '세부추진내용' : '세부추진계획';
+  document.getElementById('xResTitle').textContent = isRes ? '자원 활용 현황' : '자원활용';
+  document.getElementById('xBudgetTitle').textContent = isRes ? '예산집행내역' : '예산';
+  renderFund(); renderActualPv(); renderGoals(); renderBlocks(); renderRoles(); renderXBudget();
+}
+function renderFund(){
+  var box = document.getElementById('xFund'); box.innerHTML = '';
+  var opts = SaupGen.FUNDS.concat(['사업수입']);
+  opts.forEach(function(f){
+    box.appendChild(el('button', {class: doc.funding===f ? 'on' : '', on:{click:function(){ doc.funding = f; markDirty(); renderFund(); }}, text:f}));
+  });
+}
+function renderActualPv(){
+  var t = SaupGen.actualText(doc).replace(/\n/g, ' / ');
+  document.getElementById('xActualPv').textContent = t ? '→ 총 참여인원 칸: ' + t : '';
+}
+function phd(e, t){ e.placeholder = t; return e; }
+function renderGoals(){
+  var box = document.getElementById('xGoals'); box.innerHTML = '';
+  var isRes = doc.type==='execResult';
+  if (!doc.goals) doc.goals = [];
+  doc.goals.forEach(function(g, i){
+    var t = el('input', {placeholder:'예: 지역 내 장애인 편의시설을 점검하고 개선방안을 확인한다.'}); t.value = g.title || '';
+    t.addEventListener('input', function(){ g.title = t.value; markDirty(); });
+    var kids = [
+      el('div', {class:'bh'}, [el('b', {text:'∎성과목표 ' + (i+1)}), el('span', {style:'flex:1'}),
+        el('button', {class:'sm ghost del', on:{click:function(){ if(confirm('이 성과목표를 지울까요?')){ doc.goals.splice(i,1); markDirty(); renderGoals(); } }}, text:'✕'})]),
+      t, el('label', {text:'평가지표'}), phd(ta(g.indicators, function(v){ g.indicators = v; }, 2), '예: - 자원봉사자 만족도 조사 실시 여부')
+    ];
+    if (isRes) kids.push(el('label', {text:'평가결과 (목표 대비 실적, 질적 평가 등)'}), phd(ta(g.result, function(v){ g.result = v; }, 5), '예: 1. 목표 대비 실적 평가 / 2. 질적 평가'));
+    else kids.push(el('label', {text:'평가방법'}), phd(ta(g.methods, function(v){ g.methods = v; }, 2), '예: - 정량평가: 참여율 확인  - 정성평가: 주요 의견 검토'));
+    box.appendChild(el('div', {class:'goal'}, kids));
+  });
+}
+function renderRoles(){
+  var box = document.getElementById('xRoles'); box.innerHTML = '';
+  if (!doc.roles){
+    box.appendChild(el('button', {class:'sm', on:{click:function(){ doc.roles = {preset:'roles2', rows: defaultRoles()}; markDirty(); renderRoles(); }}, text:'＋ 업무분장 넣기'}));
+    return;
+  }
+  doc.roles.preset = 'roles2';
+  box.appendChild(tableEditor(doc.roles, renderRoles));
+  box.appendChild(el('button', {class:'sm ghost del', style:'margin-top:6px', on:{click:function(){ if(confirm('업무분장을 뺄까요?')){ doc.roles = null; markDirty(); renderRoles(); } }}, text:'업무분장 빼기'}));
+}
+
+/* 추진일정표 편집 */
+function ganttKeys(b){
+  var out = [];
+  (b.months||[]).forEach(function(m, mi){ var k = Number(m.weeks)||0; if (k) for (var i=1;i<=k;i++) out.push(mi + '|' + i); else out.push(mi + '|0'); });
+  return out;
+}
+function ganttChange(b, fn){
+  var old = ganttKeys(b);
+  var before = (b.rows||[]).map(function(r){ var o = {}; old.forEach(function(k, i){ if ((r.marks||[])[i]) o[k] = true; }); return o; });
+  var shift = fn() || {};   // {removed: 지운 달 번호}
+  var now = ganttKeys(b);
+  b.rows.forEach(function(r, ri){
+    r.marks = now.map(function(k){
+      var p = k.split('|'), mi = +p[0];
+      if (shift.removed != null && mi >= shift.removed) mi++;
+      var o = before[ri];
+      return !!(o[mi + '|' + p[1]] || (p[1]==='0' ? Object.keys(o).some(function(x){ return x.indexOf(mi + '|')===0 && o[x]; }) : o[mi + '|0']));
+    });
+  });
+  markDirty(); renderBlocks();
+}
+function ganttEditor(b){
+  if (!b.months) b.months = []; if (!b.rows) b.rows = [];
+  var mon = el('div', {class:'mon'});
+  mon.appendChild(el('b', {style:'font-size:13px;color:var(--sub)', text:'칸:'}));
+  b.months.forEach(function(m, mi){
+    var n = el('input', {placeholder:'11월'}); n.value = m.name || '';
+    n.addEventListener('input', function(){ m.name = n.value; markDirty(); });
+    n.addEventListener('change', function(){ renderBlocks(); });
+    var s = el('select', {title:'주 단위로 나누기'});
+    [['0','달만'],['2','2주'],['3','3주'],['4','4주'],['5','5주']].forEach(function(o){ var op = el('option', {value:o[0], text:o[1]}); if (String(m.weeks||0)===o[0]) op.selected = true; s.appendChild(op); });
+    s.addEventListener('change', function(){ ganttChange(b, function(){ m.weeks = Number(s.value); }); });
+    mon.appendChild(el('span', {}, [n, s, el('button', {class:'sm ghost del', title:'이 달 빼기', on:{click:function(){ ganttChange(b, function(){ b.months.splice(mi,1); return {removed: mi}; }); }}, text:'✕'})]));
+  });
+  mon.appendChild(el('button', {class:'sm', on:{click:function(){
+    var last = b.months[b.months.length-1], nm = last && /(\d+)월/.test(last.name) ? (Number(last.name.match(/(\d+)월/)[1]) % 12 + 1) + '월' : '';
+    ganttChange(b, function(){ b.months.push({name:nm, weeks:0}); });
+  }}, text:'＋ 달'}));
+  // 표
+  var lv = SaupGen.leaves(b), tbl = el('table', {class:'gt'});
+  var two = b.months.some(function(m){ return Number(m.weeks) > 0; });
+  var r0 = el('tr', {}, [el('th', {rowspan: two ? 2 : 1, text:'할 일'})]), r1 = el('tr');
+  b.months.forEach(function(m){
+    var k = Number(m.weeks)||0;
+    if (k){ r0.appendChild(el('th', {colspan:k, text:m.name})); for (var i=1;i<=k;i++) r1.appendChild(el('th', {text:i+'주'})); }
+    else r0.appendChild(el('th', {rowspan: two ? 2 : 1, text:m.name}));
+  });
+  r0.appendChild(el('th', {rowspan: two ? 2 : 1}));
+  tbl.appendChild(r0); if (two) tbl.appendChild(r1);
+  b.rows.forEach(function(r, ri){
+    if (!r.marks) r.marks = [];
+    var tr = el('tr', {}, [el('td', {class:'tk'}, [ta(r.task, function(v){ r.task = v; })])]);
+    lv.forEach(function(_, ci){
+      var td = el('td', {class:'mk', title:'눌러서 ⇨ 표시/지우기', text: r.marks[ci] ? '⇨' : ''});
+      td.addEventListener('click', function(){ r.marks[ci] = !r.marks[ci]; td.textContent = r.marks[ci] ? '⇨' : ''; markDirty(); });
+      tr.appendChild(td);
+    });
+    tr.appendChild(el('td', {}, [el('button', {class:'sm ghost del', on:{click:function(){ b.rows.splice(ri,1); markDirty(); renderBlocks(); }}, text:'✕'})]));
+    tbl.appendChild(tr);
+  });
+  return el('div', {}, [mon, el('div', {class:'gwrap'}, [tbl]),
+    el('button', {class:'sm', style:'margin-top:6px', on:{click:function(){ b.rows.push({task:'', marks:[]}); markDirty(); renderBlocks(); }}, text:'＋ 할 일 추가'}),
+    el('span', {class:'hint', style:'display:inline-block;margin-left:8px;padding:3px 8px', text:'칸을 누르면 ⇨ 가 찍혀요'})]);
+}
+
+/* 예산 (실행계획서) / 예산집행내역 (사업결과보고서) */
+function renderXBudget(){
+  var box = document.getElementById('xBudget'); box.innerHTML = '';
+  if (doc.type==='execResult') return renderExe(box);
+  if (!doc.budget) doc.budget = {income:[], expense:[]};
+  var total = el('div', {class:'total'});
+  function upd(){
+    var B = SaupGen.budgetTotals(doc.budget);
+    total.textContent = '수입 ' + (B.inc.length ? HwpxGen.won(B.incTotal) : '해당사항 없음') + '  ·  지출 총계 ' + HwpxGen.won(B.expTotal);
+  }
+  [['income','수입', '예: 이용료'], ['expense','지출', '예: 모니터링단 활동비']].forEach(function(k){
+    var list = doc.budget[k[0]], tbl = el('table', {class:'bud'});
+    tbl.appendChild(el('tr', {}, ['내용','단가(원)','수량·횟수','금액','비고',''].map(function(t){ return el('th', {text:t}); })));
+    list.forEach(function(it, i){
+      var amt = el('td', {class:'amt'}), fm = el('div', {class:'preview', style:'font-size:12px;margin:0'});
+      function up(){ var a = SaupGen.itemAmount(it); amt.textContent = a ? HwpxGen.won(a) : (it.name ? '-' : ''); fm.textContent = SaupGen.itemFormula(it); upd(); }
+      function inp(key, ph, w){
+        var x = el('input', {placeholder:ph, style: w ? 'width:' + w : ''}); x.value = it[key] == null ? '' : it[key];
+        x.addEventListener('input', function(){ it[key] = x.value; up(); markDirty(); });
+        return x;
+      }
+      tbl.appendChild(el('tr', {}, [el('td', {}, [inp('name', k[2]), fm]), el('td', {}, [inp('price','22000','100px')]), el('td', {}, [inp('qty','2명×5그룹×5회','150px')]), amt,
+        el('td', {}, [inp('note','', '110px')]), el('td', {}, [el('button', {class:'sm ghost del', on:{click:function(){ list.splice(i,1); markDirty(); renderXBudget(); }}, text:'✕'})])]));
+      up();
+    });
+    box.appendChild(el('div', {class:'cat'}, [el('div', {class:'ch'}, [el('b', {text:k[1]}), k[0]==='income' && !list.length ? el('span', {class:'preview', style:'margin:0', text:'비어 있으면 「해당사항 없음」으로 들어가요'}) : null]), tbl,
+      el('button', {class:'sm', style:'margin-top:6px', on:{click:function(){ list.push({name:'', price:'', qty:'', note:''}); markDirty(); renderXBudget(); }}, text:'＋ ' + k[1] + ' 항목'})]));
+  });
+  box.appendChild(el('div', {class:'hint', text:'수량에 여러 개를 곱할 땐 「2명×5그룹×5회」처럼 써요. 단가를 비워두면 비예산(금액 -)으로 들어가요.'}));
+  box.appendChild(total); upd();
+}
+function renderExe(box){
+  if (!doc.exe) doc.exe = {income:[], expense:[]};
+  var total = el('div', {class:'total'});
+  function upd(){
+    var T = SaupGen.exeTotals(doc.exe.expense);
+    total.textContent = '세출 합계 — 예산 ' + HwpxGen.won(T.a) + ' · 집행 ' + HwpxGen.won(T.b) + ' · 집행률 ' + (SaupGen.pct(T.b, T.a) || '-');
+  }
+  [['income','세입'], ['expense','세출']].forEach(function(k){
+    var list = doc.exe[k[0]], tbl = el('table', {class:'bud'});
+    tbl.appendChild(el('tr', {}, ['내용','예산(A)','집행액(B)','집행률','비고',''].map(function(t){ return el('th', {text:t}); })));
+    list.forEach(function(it, i){
+      var rate = el('td', {class:'amt'});
+      function up(){ rate.textContent = SaupGen.pct(it.spent, it.budget) || '-'; upd(); }
+      function inp(key, ph, w){
+        var x = el('input', {placeholder:ph, style: w ? 'width:' + w : ''}); x.value = it[key] == null ? '' : it[key];
+        x.addEventListener('input', function(){ it[key] = x.value; up(); markDirty(); });
+        return el('td', {}, [x]);
+      }
+      tbl.appendChild(el('tr', {}, [inp('name',''), inp('budget','1540000','110px'), inp('spent','1276000','110px'), rate, inp('note','','120px'),
+        el('td', {}, [el('button', {class:'sm ghost del', on:{click:function(){ list.splice(i,1); markDirty(); renderXBudget(); }}, text:'✕'})])]));
+      up();
+    });
+    box.appendChild(el('div', {class:'cat'}, [el('div', {class:'ch'}, [el('b', {text:k[1]}), !list.length ? el('span', {class:'preview', style:'margin:0', text:'비어 있으면 「-」로 들어가요'}) : null]), tbl,
+      el('button', {class:'sm', style:'margin-top:6px', on:{click:function(){ list.push({name:'', budget:'', spent:'', note:''}); markDirty(); renderXBudget(); }}, text:'＋ ' + k[1] + ' 항목'})]));
+  });
+  box.appendChild(el('div', {class:'hint', text:'금액은 숫자만 써요. 집행률·합계는 자동으로 계산돼요.'}));
+  box.appendChild(total); upd();
+}
+
+/* 미리보기 (실행계획서 · 사업결과보고서) */
+function pvTable(cols, rows, widths){
+  var pre = {cols: cols};
+  return '<table class="in"><tr>' + cols.map(function(c, i){ return '<th' + (widths ? ' style="width:' + widths[i] + '%"' : '') + '>' + h(c) + '</th>'; }).join('') + '</tr>' + rows.join('') + '</table>';
+}
+function pvBlock(b){
+  if (b.kind==='heading') return '<p class="ln">' + rich(b.text) + '</p>';
+  if (b.kind==='text') return pvLines(b.text);
+  if (b.kind==='gantt'){
+    var two = (b.months||[]).some(function(m){ return Number(m.weeks) > 0; }), lv = SaupGen.leaves(b);
+    var o = '<table class="in"><tr><th rowspan="' + (two?2:1) + '" style="width:30%;background:linear-gradient(to top right,#DCDCDC calc(50% - 1px),#555 50%,#DCDCDC calc(50% + 1px))"></th>', o2 = '';
+    (b.months||[]).forEach(function(m){ var k = Number(m.weeks)||0; if (k){ o += '<th colspan="' + k + '">' + h(m.name) + '</th>'; for (var i=1;i<=k;i++) o2 += '<th>' + i + '주</th>'; } else o += '<th rowspan="' + (two?2:1) + '">' + h(m.name) + '</th>'; });
+    o += '</tr>' + (two ? '<tr>' + o2 + '</tr>' : '');
+    (b.rows||[]).filter(function(r){ return String(r.task||'').trim() || (r.marks||[]).some(Boolean); }).forEach(function(r){
+      o += '<tr><td class="c">' + h(r.task).replace(/\n/g,'<br>') + '</td>' + lv.map(function(_, i){ return '<td class="c">' + ((r.marks||[])[i] ? '⇨' : '') + '</td>'; }).join('') + '</tr>';
+    });
+    return o + '</table>';
+  }
+  return pvTable(b);
+}
+// 표 미리보기 (칸 합치기·정렬·행 사진 반영) — 활동계획서·실행계획서 공통
+function pvTable(b){
+  var L = HwpxGen.lib, pre = L.presetOf(b), n = pre.cols.length;
+  var hc = (b.cols && b.cols.length === n) ? b.cols : pre.cols, tw = pre.w.reduce(function(a, c){ return a + c; }, 0);
+  var dr = (b.rows||[]).map(function(r, i){ return {r: r||[], pics: ((b.rowPics||[])[i]||[]).filter(function(p){ return p && imgCache[p.fileId]; })}; })
+    .filter(function(x){ return x.pics.length || x.r.some(function(v){ return String(v||'').trim(); }); });
+  var rows = dr.map(function(x){ return x.r; }), al = L.alignOf(b, pre), sp = L.spansOf(b, rows, n), pc = L.picCol(al);
+  return '<table class="in"><tr>' + hc.map(function(c, i){ return '<th style="width:' + Math.round(pre.w[i]/tw*100) + '%">' + h(c) + '</th>'; }).join('') + '</tr>' +
+    rows.map(function(r, ri){ return '<tr>' + pre.cols.map(function(_, i){
+      if (sp.skip[ri][i]) return '';
+      var rs = sp.span[ri][i] ? ' rowspan="' + sp.span[ri][i] + '"' : '';
+      var pics = (i === pc ? dr[ri].pics : []).map(function(p){ return '<div style="text-align:' + (p.align==='r' ? 'right' : 'center') + '"><img src="data:image/jpeg;base64,' + imgCache[p.fileId].b64 + '" style="max-width:60%;max-height:150px;margin-top:4px"></div>'; }).join('');
+      return (al[i]==='l' ? '<td' + rs + '>' + pvLines(r[i]) : '<td class="c"' + rs + '>' + rich(r[i]).replace(/\n/g,'<br>')) + pics + '</td>'; }).join('') + '</tr>'; }).join('') + '</table>';
+}
+function pvAtts(d){
+  var o = '';
+  (d.attachments||[]).forEach(function(a){
+    if (!a.title && !a.text && !(a.images||[]).length) return;
+    o += '<div class="pg"><table class="main"><tr><td class="lb" style="width:auto">' + h(a.title || '첨부') + '</td></tr><tr><td>' +
+      (a.images||[]).map(function(im){ return imgTag(im.fileId, 'attimg'); }).join('') + pvLines(a.text) + '</td></tr></table></div>';
+  });
+  return o;
+}
+function previewExecHtml(d){
+  // 한글 파일과 같은 칸 배치: 위치(x)·너비를 100칸 격자로 바꿔서 그림
+  var isRes = d.type==='execResult', S = SaupGen;
+  var FULL = 50442, W = [3600, 5600, 6400, 14221, 6400, 14221], X = [0];
+  W.forEach(function(w, i){ X.push(X[i] + w); });
+  var X2 = X[2], CW = FULL - X2, HALF = X2 + (CW >> 1), rows = [], tops = [];
+  function R(r, t){ rows.push(r); tops.push(t || 1); }
+  function u(x){ return Math.round(x / FULL * 100); }
+  function br(t){ return h(t).replace(/\n/g, '<br>'); }
+  function lab(x, w, t, rs){ return {x:x, w:w, rs:rs, cls:'lb', html:br(t)}; }
+  function sub(x, w, t, rs){ return {x:x, w:w, rs:rs, cls:'c', html:br(t)}; }
+  function val(x, w, html, cls, rs){ return {x:x, w:w, rs:rs, cls:cls||'', html:html}; }
+  // 선 굵기: 3 = 항목 사이(0.4mm), 2 = 사업기본정보 안 항목 사이(0.2mm), 1 = 한 항목 안
+  function sec(title, list, lx, t){
+    lx = lx || 0;
+    list.forEach(function(x, k){ var r = []; if (k===0) r.push(lab(lx, X2 - lx, title, list.length)); r.push(val(X2, CW, x)); R(r, k===0 ? t : 1); });
+  }
+  function block(title, rl, lx, t){ lx = lx || 0; rl.forEach(function(r, k){ if (k===0) r.unshift(lab(lx, X2 - lx, title, rl.length)); R(r, k===0 ? t : 1); }); }
+  function widths(total, ws){ var t = ws.reduce(function(a, b){ return a + b; }, 0); return ws.map(function(x){ return total * x / t; }); }
+  function xsOf(w){ var x = [X2]; w.forEach(function(ww, i){ x.push(x[i] + ww); }); return x; }
+
+  sec(isRes ? '사 업 명' : '사업명', ['<div class="c">' + h(d.programName) + '</div>'], 0, 3);
+  if (!isRes){
+    sec('배경 및 필요성', [pvLines(d.background)], 0, 3);
+    var gr = [];
+    (d.goals||[]).filter(function(g){ return g.title || g.indicators || g.methods; }).forEach(function(g, i){
+      gr.push([val(X2, CW, '<p class="ln">∎성과목표 ' + (i+1) + ' ' + h(g.title) + '</p>')]);
+      gr.push([val(X2, HALF - X2, '<div style="font-size:12px"><p class="ln">↳평가지표</p>' + pvLines(g.indicators) + '</div>'),
+        val(HALF, FULL - HALF, '<div style="font-size:12px"><p class="ln">↳평가방법</p>' + pvLines(g.methods) + '</div>')]);
+    });
+    if (gr.length) block('성과목표\n(성과지표)', gr, 0, 3);
+  }
+  // 사업 기본 정보
+  var g0 = rows.length;
+  R([lab(X[1], W[1], isRes ? '재원구분' : '재원'), val(X2, CW, h(S.fundText(d)), 'c')], 3);
+  if (String(d.place||'').trim()) R([lab(X[1], W[1], '사업기간'), val(X2, W[2] + W[3], br(d.period), 'c'), lab(X[4], W[4], '장  소'), val(X[5], W[5], br(d.place), 'c')], 1);
+  else R([lab(X[1], W[1], '사업기간'), val(X2, CW, br(d.period), 'c')], 1);
+  if (!isRes){
+    var t = [['계획인원', S.planText(d)], ['대상자', d.target], [d.selectLabel || '선정방법', d.selectText]].filter(function(x, i){ return i===0 || String(x[1]||'').trim(); });
+    t.forEach(function(x, k){ var r = []; if (k===0) r.push(lab(X[1], W[1], '사업대상', t.length)); r.push(sub(X2, W[2], x[0]), val(X[3], FULL - X[3], pvLines(x[1]))); R(r, k===0 ? 2 : 1); });
+    if (String(d.fee||'').trim()) R([lab(X[1], W[1], '이용료'), val(X2, CW, h(d.fee), 'c')], 2);
+    sec('세부추진\n계획', [(d.blocks||[]).map(pvBlock).join('')], X[1], 2);
+    if (String(d.resources||'').trim()) sec('자원 활용', [pvLines(d.resources)], X[1], 2);
+    if (String(d.promo||'').trim()) sec('홍보\n(필요시)', [pvLines(d.promo)], X[1], 2);
+    // 업무분장
+    var rr = d.roles && (d.roles.rows||[]).filter(function(r){ return r.some(function(x){ return String(x||'').trim(); }); });
+    if (rr && rr.length){
+      var pre = HwpxGen.lib.presetOf({preset:'roles2'}), rw = widths(CW, pre.w), rx = xsOf(rw);
+      var cols = (d.roles.cols && d.roles.cols.length===4) ? d.roles.cols : pre.cols;
+      var rl = [cols.map(function(c, i){ return val(rx[i], rw[i], '<b>' + h(c) + '</b>', 'c'); })];
+      rr.forEach(function(r){ rl.push(r.map(function(v, i){ return pre.align[i]==='l' ? val(rx[i], rw[i], pvLines(v)) : val(rx[i], rw[i], br(v), 'c'); })); });
+      block('업무분장\n(필요시)', rl, X[1], 2);
+    }
+    // 예산 — 수입(내용·금액) | 지출(내용·금액) | 비고, 지출 내용은 위: 항목명 / 아래: 산출식
+    var B = S.budgetTotals(d.budget), bw = widths(CW, [0.15, 0.12, 0.38, 0.17, 0.18]), bx = xsOf(bw);
+    function hd(c, t, cs, rs){ var w = 0; for (var i = c; i < c + (cs||1); i++) w += bw[i]; return val(bx[c], w, '<b>' + t + '</b>', 'c hd', rs); }
+    var bl = [[hd(0, '수입', 2), hd(2, '지출', 2), hd(4, '비고', 1, 2)], [hd(0, '내용'), hd(1, '금액'), hd(2, '내용'), hd(3, '금액')]];
+    var n = Math.max(1, B.inc.length, B.exp.length), body = n * 2;
+    var notes = B.exp.concat(B.inc).some(function(it){ return S.num(it.price) && String(it.note||'').trim(); });
+    function bsub(it){ return !it ? '' : S.num(it.price) ? '<div style="text-align:right;font-size:12px">' + h(S.itemFormula(it)) + '</div>' : '<div class="c" style="font-size:12px">' + br(it.note||'') + '</div>'; }
+    for (var i = 0; i < n; i++){
+      var a = B.inc[i], e = B.exp[i], r1 = [], r2 = [];
+      if (!B.inc.length){ if (i===0) r1.push(val(bx[0], bw[0] + bw[1], '해당사항 없음', 'c', body + 1)); }
+      else { r1.push(val(bx[0], bw[0], a ? br(a.name) : '', 'nb')); r2.push(val(bx[0], bw[0], bsub(a), 'nt')); r1.push(val(bx[1], bw[1], a ? HwpxGen.won(S.itemAmount(a)) : '', 'c', 2)); }
+      r1.push(val(bx[2], bw[2], e ? br(e.name) : '', 'nb')); r2.push(val(bx[2], bw[2], bsub(e), 'nt'));
+      r1.push(val(bx[3], bw[3], e ? (S.itemAmount(e) ? HwpxGen.won(S.itemAmount(e)) : '-') : '', 'c', 2));
+      if (notes) r1.push(val(bx[4], bw[4], br([a, e].filter(function(it){ return it && S.num(it.price) && it.note; }).map(function(it){ return it.note; }).join('\n')), 'c', 2));
+      else if (i===0) r1.push(val(bx[4], bw[4], '-', 'c', body + 1));
+      bl.push(r1, r2);
+    }
+    var last = [];
+    if (B.inc.length) last.push(hd(0, '총계'), val(bx[1], bw[1], HwpxGen.won(B.incTotal), 'c'));
+    last.push(val(bx[2], bw[2], '<b>총계</b>', 'c'), val(bx[3], bw[3], '<b>' + HwpxGen.won(B.expTotal) + '</b>', 'c'));
+    if (notes) last.push(val(bx[4], bw[4], ''));
+    bl.push(last);
+    block('예  산', bl, X[1], 2);
+  } else {
+    R([lab(X[1], W[1], '사업대상'), sub(X2, W[2], '계획인원'), val(X[3], W[3], br(S.planTextShort(d)), 'c'), sub(X[4], W[4], '총 참여인원\n(목표대비%)'), val(X[5], W[5], br(S.actualText(d)), 'c')], 2);
+    if (String(d.participants||'').trim()) sec('참여자', [pvLines(d.participants)], X[1], 2);
+    sec('세부추진\n내용', [(d.blocks||[]).map(pvBlock).join('')], X[1], 2);
+  }
+  rows[g0].unshift(lab(0, X[1], '사업\n기본\n정보', rows.length - g0));
+  if (isRes){
+    if (String(d.processEval||'').trim()) sec('과정 평가', [pvLines(d.processEval)], 0, 3);
+    if (String(d.resources||'').trim()) sec('자원 활용\n현황', [pvLines(d.resources)], 0, 3);
+    var gs = (d.goals||[]).filter(function(x){ return x.title || x.indicators || x.result; });
+    if (gs.length) sec('사업성과\n평가', gs.map(function(x, i){
+      return '<p class="ln"><b>∎성과목표 ' + (i+1) + ' : ' + h(x.title) + '</b></p>' + (String(x.indicators||'').trim() ? '<p class="ln">• 평가지표</p>' + pvLines(x.indicators) : '') + '<p class="ln"><b>↳ 평가결과 :</b></p>' + pvLines(x.result);
+    }), 0, 3);
+    // 예산집행내역
+    var ew = widths(CW, [0.09, 0.29, 0.16, 0.16, 0.13, 0.17]), ex_ = xsOf(ew), ex = d.exe || {};
+    function eh(c, t, cs, rs){ var w = 0; for (var i = c; i < c + (cs||1); i++) w += ew[i]; return val(ex_[c], w, '<b>' + t + '</b>', 'c hd', rs); }
+    function ec(c, t, b){ return val(ex_[c], ew[c], b ? '<b>' + br(t) + '</b>' : br(t), 'c'); }
+    var el_ = [[eh(0, '구분', 1, 2), eh(1, '예산계획', 2), eh(3, '집행현황', 2), eh(5, '비고', 1, 2)], [eh(1, '내 용'), eh(2, '금 액(A)'), eh(3, '집행액(B)'), eh(4, '집행률(B/A)')]];
+    [['세입', ex.income], ['세출', ex.expense]].forEach(function(p){
+      var items = S.exeRows(p[1]), T = S.exeTotals(p[1]);
+      if (!items.length) items = [{name:'-', none:true}];
+      items.forEach(function(it, k){
+        var r = []; if (k===0) r.push(val(ex_[0], ew[0], p[0], 'c', items.length + 1));
+        r.push(ec(1, it.name), ec(2, it.none ? '-원' : HwpxGen.won(it.budget)), ec(3, it.none ? '-원' : HwpxGen.won(it.spent)), ec(4, it.none ? '-%' : (S.pct(it.spent, it.budget) || '-')), ec(5, it.note || ''));
+        el_.push(r);
+      });
+      el_.push([eh(1, '합계'), ec(2, HwpxGen.won(T.a), 1), ec(3, HwpxGen.won(T.b), 1), ec(4, S.pct(T.b, T.a) || '-%', 1), ec(5, '')]);
+    });
+    block('예산집행\n내역', el_, 0, 3);
+    if (String(d.improve||'').trim()) sec('향후개선\n사항', [pvLines(d.improve)], 0, 3);
+    var ps = d.photos || [], pl = [];
+    for (var j = 0; j < ps.length; j += 2) pl.push([ps[j], ps[j+1]].map(function(p, k){
+      return val(k ? HALF : X2, k ? FULL - HALF : HALF - X2, p ? imgTag(p.fileId) + (p.caption ? '<div style="margin-top:4px">' + h(p.caption) + '</div>' : '') : '', 'c ph');
+    }));
+    if (pl.length) block('사진자료', pl, 0, 3);
+  }
+  var o = '<div class="pg"><div class="ttl2">' + h(d.title || S.defaultTitle(d)) + '</div><table class="main x6" style="table-layout:fixed"><colgroup>';
+  for (var c = 0; c < 100; c++) o += '<col style="width:1%">';
+  var PX = {1:'1px', 2:'1.5px', 3:'2px'};
+  o += '</colgroup>' + rows.map(function(r, ri){
+    return '<tr>' + r.map(function(cell){
+      var cs = Math.max(1, u(cell.x + cell.w) - u(cell.x)), rs = cell.rs || 1, nb = tops[ri + rs] || 3;
+      var st = 'border-top:' + (cell.cls.indexOf('nt') >= 0 ? '0' : PX[tops[ri]] + ' solid #000') + ';border-bottom:' + (cell.cls.indexOf('nb') >= 0 ? '0' : PX[nb] + ' solid #000') +
+        (cell.x === 0 ? ';border-left:0' : '') + (cell.x + cell.w >= FULL - 1 ? ';border-right:0' : '');
+      return '<td class="' + cell.cls + '" style="' + st + '" colspan="' + cs + '"' + (rs > 1 ? ' rowspan="' + rs + '"' : '') + '>' + cell.html + '</td>';
+    }).join('') + '</tr>';
+  }).join('') + '</table></div>';
+  return o + pvAtts(d);
+}
+
 /* ── 제목 자동 ── */
 function baseName(p){ return String(p||'').replace(/\s*(활동계획|결과보고|활동계획서|결과보고서)\s*$/,''); }
 function autoTitle(){ return baseName(doc.programName) + (doc.type==='result' ? ' 결과보고서' : ' 활동계획서'); }
@@ -398,11 +1040,17 @@ function autoTitle(){ return baseName(doc.programName) + (doc.type==='result' ? 
 /* ── 화면 그리기 ── */
 var FIELDS = ['programName','title','date','dateEnd','timeStart','timeEnd','place','participants','manager','goal'];
 function renderAll(){
-  var isEdu = doc.type==='edu';
-  document.getElementById('planForm').style.display = isEdu ? 'none' : '';
+  var isEdu = doc.type==='edu', isX = isExec();
+  document.getElementById('planForm').style.display = (isEdu || isX) ? 'none' : '';
   document.getElementById('eduForm').style.display = isEdu ? '' : 'none';
+  document.getElementById('execForm').style.display = isX ? '' : 'none';
   if (!doc.photos) doc.photos = [];
   if (!doc.attachments) doc.attachments = [];
+  if (isX){
+    document.getElementById('photoCard').style.display = doc.type==='execResult' ? '' : 'none';
+    renderExec(); renderPhotos(); renderAtts(); renderStatus(); renderList();
+    return;
+  }
   if (isEdu){
     document.getElementById('photoCard').style.display = '';
     renderEdu(); renderPhotos(); renderAtts(); renderStatus(); renderList();
@@ -411,6 +1059,7 @@ function renderAll(){
   FIELDS.forEach(function(f){ document.getElementById(f).value = doc[f] || ''; });
   document.querySelectorAll('#typeSeg button').forEach(function(b){ b.classList.toggle('on', b.dataset.v===doc.type); });
   document.getElementById('budgetTitle').textContent = doc.type==='result' ? '결산' : '소요예산';
+  document.getElementById('wonMark').value = doc.wonMark ? '1' : '';
   document.getElementById('participants').classList.toggle('flag', !!doc.flagParticipants);
   if (!doc.photos) doc.photos = [];
   if (!doc.attachments) doc.attachments = [];
@@ -498,7 +1147,8 @@ function ta(val, onInput, rows){
 }
 function blockKey(b){ return b.kind==='table' ? b.preset : b.kind; }
 function renderBlocks(){
-  var box = document.getElementById('blocks'); box.innerHTML = '';
+  var box = document.getElementById(isExec() ? 'xblocks' : 'blocks'); box.innerHTML = '';
+  if (!doc.blocks.length) box.appendChild(el('div', {class:'empty', style:'text-align:left;padding:4px 0 8px', text:'아래 ＋ 버튼으로 필요한 것만 순서대로 넣어요. (지난 보고서와 구성이 같으면 왼쪽 목록에서 「복사해서 새로」가 편해요)'}));
   doc.blocks.forEach(function(b, i){
     var head = el('div', {class:'bh'}, [
       el('b', {text: BLOCK_NAMES[blockKey(b)] || '블록'}), el('span', {class:'sp'}),
@@ -512,41 +1162,94 @@ function renderBlocks(){
       body.addEventListener('input', function(){ b.text = body.value; markDirty(); });
     } else if (b.kind==='text') {
       body = ta(b.text, function(v){ b.text = v; }, 3);
+      if (b.ph) body.placeholder = b.ph;
+    } else if (b.kind==='gantt') {
+      body = ganttEditor(b);
     } else {
       body = tableEditor(b);
     }
     box.appendChild(el('div', {class:'blk' + (b.kind==='heading'?' head':'')}, [head, body]));
   });
 }
-function tableEditor(b){
-  var cols = PRESETS[b.preset].cols, w = PRESETS[b.preset].w;
+function tableEditor(b, rerender){
+  rerender = rerender || renderBlocks;
+  var pre = HwpxGen.lib.presetOf(b), cols = pre.cols, w = pre.w;
   var tbl = el('table', {class:'grid'});
   if (!b.cols || b.cols.length !== cols.length) b.cols = cols.slice();
+  if (!b.rowPics) b.rowPics = [];
+  var mc = HwpxGen.lib.mergeColsOf(b, cols.length), al = HwpxGen.lib.alignOf(b, pre), pc = HwpxGen.lib.picCol(al);
   var hr = el('tr'); b.cols.forEach(function(c, ci){
     var inp = el('input', {class:'hd', title:'제목 칸도 고칠 수 있어요'}); inp.value = c;
     inp.addEventListener('input', function(){ b.cols[ci] = inp.value; markDirty(); });
     hr.appendChild(el('th', {style:'width:'+Math.round(w[ci]/396)+'%'}, [inp]));
-  }); hr.appendChild(el('th',{class:'x', style:'width:34px'}));
+  }); hr.appendChild(el('th',{class:'x', style:'width:40px'}));
   tbl.appendChild(hr);
+  // 칸 설정 줄: 정렬 · 빈 칸 합치기
+  var sr = el('tr', {class:'colset'});
+  cols.forEach(function(_, ci){
+    var sel = el('select', {title:'이 칸 글자 정렬'});
+    [['c','가운데'],['l','왼쪽']].forEach(function(o){ var op = el('option', {value:o[0], text:o[1]}); if (al[ci]===o[0]) op.selected = true; sel.appendChild(op); });
+    sel.addEventListener('change', function(){ if (!b.align) b.align = []; b.align[ci] = sel.value; markDirty(); rerender(); });
+    var cb = el('input', {type:'checkbox'}); cb.checked = mc.indexOf(ci) >= 0;
+    cb.addEventListener('change', function(){ var m = HwpxGen.lib.mergeColsOf(b, cols.length).filter(function(x){ return x !== ci; }); if (cb.checked) m.push(ci); b.mergeCols = m.sort(); delete b.merge; markDirty(); });
+    sr.appendChild(el('td', {}, [sel, el('label', {title:'이 칸이 비어 있으면 위 칸과 하나로 합쳐요'}, [cb, document.createTextNode(' 빈 칸 합치기')])]));
+  });
+  sr.appendChild(el('td', {class:'x'}));
+  tbl.appendChild(sr);
   b.rows.forEach(function(r, ri){
     var tr = el('tr');
-    cols.forEach(function(c, ci){ tr.appendChild(el('td', {}, [ta(r[ci], function(v){ r[ci] = v; })])); });
-    tr.appendChild(el('td', {class:'x'}, [el('button', {class:'sm ghost del', title:'행 삭제', on:{click:function(){ b.rows.splice(ri,1); markDirty(); renderBlocks(); }}, text:'✕'})]));
+    cols.forEach(function(c, ci){
+      var kids = [ta(r[ci], function(v){ r[ci] = v; })];
+      var pics = b.rowPics[ri] || [];
+      if (ci === pc && pics.length){
+        var box = el('div', {class:'cellpics'});
+        pics.forEach(function(p, pi){
+          var t = el('div', {class:'thumb sm'});
+          if (imgCache[p.fileId]) t.appendChild(el('img', {src:'data:image/jpeg;base64,' + imgCache[p.fileId].b64}));
+          else { t.textContent = '…'; ensureImages([p.fileId], rerender); }
+          t.appendChild(el('button', {class:'rm', title:'빼기', on:{click:function(){ pics.splice(pi,1); markDirty(); rerender(); }}, text:'✕'}));
+          var a = el('select', {title:'사진 위치'});
+          [['c','가운데'],['r','오른쪽']].forEach(function(o){ var op = el('option', {value:o[0], text:o[1]}); if ((p.align||'c')===o[0]) op.selected = true; a.appendChild(op); });
+          a.addEventListener('change', function(){ p.align = a.value; markDirty(); });
+          box.appendChild(el('div', {}, [t, a]));
+        });
+        kids.push(box);
+      }
+      tr.appendChild(el('td', {}, kids));
+    });
+    var file = el('input', {type:'file', accept:'image/*', multiple:'multiple', style:'display:none'});
+    file.addEventListener('change', function(){ if (!b.rowPics[ri]) b.rowPics[ri] = []; uploadTo(file, b.rowPics[ri], rerender); });
+    tr.appendChild(el('td', {class:'x'}, [
+      el('label', {class:'sm ghost picbtn', title:'이 행에 사진 넣기 (글 아래에 들어가요)'}, [document.createTextNode('📷'), file]),
+      el('button', {class:'sm ghost del', title:'행 삭제', on:{click:function(){ b.rows.splice(ri,1); b.rowPics.splice(ri,1); markDirty(); rerender(); }}, text:'✕'})]));
     tbl.appendChild(tr);
   });
   var add = el('button', {class:'sm', style:'margin-top:6px', on:{click:function(){
     var nr = cols.map(function(){ return ''; });
-    if (b.preset==='roles' || b.preset==='lecturers') nr[0] = String(b.rows.length+1);
-    b.rows.push(nr); markDirty(); renderBlocks();
+    if (b.preset==='roles' || b.preset==='lecturers' || (b.preset==='custom' && /연번/.test(b.cols[0]))) nr[0] = String(b.rows.length+1);
+    b.rows.push(nr); markDirty(); rerender();
   }}, text:'＋ 행 추가'});
-  return el('div', {}, [tbl, add]);
+  var extra = [el('span', {class:'hint', style:'display:inline-block;margin-left:8px;padding:3px 8px', text:'「빈 칸 합치기」를 켠 칸은 비워두면 위 칸과 하나로 합쳐져요 · 📷 사진은 「' + (b.cols[pc]||'') + '」 칸 글 아래에 들어가요'})];
+  if (b.preset==='custom'){
+    extra.push(el('button', {class:'sm', style:'margin:6px 0 0 6px', on:{click:function(){
+      if (b.cols.length >= 7) return toast('칸은 7개까지 넣을 수 있어요.');
+      b.cols.push('제목'); b.rows.forEach(function(r){ r.push(''); }); markDirty(); rerender(); }}, text:'＋ 칸'}));
+    extra.push(el('button', {class:'sm', style:'margin:6px 0 0 6px', on:{click:function(){
+      if (b.cols.length <= 2) return;
+      if (!confirm('맨 오른쪽 칸을 지울까요?')) return;
+      b.cols.pop(); b.rows.forEach(function(r){ r.pop(); }); if (b.align) b.align.length = Math.min(b.align.length, b.cols.length); markDirty(); rerender(); }}, text:'－ 칸'}));
+  }
+  return el('div', {}, [tbl, add].concat(extra));
 }
 function addBlock(kind){
   if (kind==='heading') doc.blocks.push({kind:'heading', text:''});
   else if (kind==='text') doc.blocks.push({kind:'text', text:''});
+  else if (kind==='gantt') doc.blocks.push(blankGantt());
+  else if (kind==='custom') doc.blocks.push({kind:'table', preset:'custom', cols:['구분','내용'], rows:[['','']]});
   else {
     var n = PRESETS[kind].cols.length, row = []; for (var i=0;i<n;i++) row.push('');
     if (kind==='roles'||kind==='lecturers') row[0]='1';
+    if (kind==='roles2'){ doc.blocks.push({kind:'table', preset:'roles2', rows:defaultRoles()}); markDirty(); renderBlocks(); return; }
     doc.blocks.push({kind:'table', preset:kind, rows:[row]});
   }
   markDirty(); renderBlocks();
@@ -561,7 +1264,7 @@ function num(v){ return Number(String(v||'').replace(/[^\d.]/g,'')) || 0; }
 function renderBudget(){
   var box = document.getElementById('budget'); box.innerHTML = '';
   doc.budget.forEach(function(cat, ci){
-    var catIn = el('input', {placeholder:'구분 (예: 캠페인 진행비)'}); catIn.value = cat.category||'';
+    var catIn = el('input', {placeholder: ci ? '구분 (비워두면 위 구분과 합쳐요)' : '구분 (예: 캠페인 진행비)'}); catIn.value = cat.category||'';
     catIn.addEventListener('input', function(){ cat.category = catIn.value; markDirty(); });
     var sum = el('span', {class:'sum'});
     var tbl = el('table', {class:'bud'});
@@ -587,6 +1290,7 @@ function renderBudget(){
   });
   updTotals();
 }
+document.getElementById('wonMark').addEventListener('change', function(e){ doc.wonMark = !!e.target.value; markDirty(); });
 function cleanBudget(){
   return doc.budget.map(function(c){ return {category:c.category, items:c.items.map(function(it){ return {name:it.name, price:num(it.price), qty:num(it.qty), unit:it.unit}; })}; });
 }
@@ -606,17 +1310,18 @@ function renderList(){
   var box = document.getElementById('list'), q = document.getElementById('q').value.trim();
   var arr = saved.filter(function(s){ return (!filterType || s.type===filterType) && (!q || (s.title+s.programName).indexOf(q) >= 0); });
   box.innerHTML = '';
+  document.getElementById('listCount').textContent = arr.length ? arr.length + '개' : '';
   if (!arr.length){ box.appendChild(el('div',{class:'empty', text: saved.length ? '찾는 보고서가 없어요' : '아직 저장된 보고서가 없어요'})); return; }
   arr.forEach(function(s){
-    var isRes = s.type==='결과보고서', isEdu = s.type==='장애이해교육';
+    var isRes = s.type==='결과보고서', isEdu = s.type==='장애이해교육', isEx = s.type==='실행계획서', isExR = s.type==='사업결과보고서';
     var acts = el('div', {class:'acts'}, [
       el('button', {class:'sm', title:'날짜만 비우고 똑같이 복사해서 새로 써요', on:{click:function(e){ e.stopPropagation(); openReport(s.id, 'copy'); }}, text:'복사해서 새로'}),
-      (isRes || isEdu) ? null : el('button', {class:'sm', on:{click:function(e){ e.stopPropagation(); openReport(s.id, 'toResult'); }}, text:'→ 결과보고서 만들기'}),
+      (isRes || isEdu || isExR) ? null : el('button', {class:'sm', on:{click:function(e){ e.stopPropagation(); openReport(s.id, 'toResult'); }}, text: isEx ? '→ 사업결과보고서 만들기' : '→ 활동결과보고 만들기'}),
       el('button', {class:'sm ghost del', on:{click:function(e){ e.stopPropagation(); delReport(s); }}, text:'삭제'})
     ]);
     var item = el('div', {class:'item' + (doc && doc.id===s.id ? ' on':'' ), on:{click:function(){ openReport(s.id); }}}, [
-      el('div', {class:'t', text: s.title || s.programName || '(제목 없음)'}),
-      el('div', {class:'m'}, [el('span',{class:'tag'+(isRes?' res':isEdu?' edu':''), text: isRes?'결과':isEdu?'교육':'계획'}), document.createTextNode((s.date||'날짜 없음') + ' · 수정 ' + s.updated)]),
+      el('div', {class:'t', title: s.title || s.programName || '', text: s.title || s.programName || '(제목 없음)'}),
+      el('div', {class:'m'}, [el('span',{class:'tag'+(isRes?' res':isEdu?' edu':isEx?' ex':isExR?' exr':''), text: isRes?'활동결과':isEdu?'교육':isEx?'실행계획':isExR?'사업결과':'활동계획'}), document.createTextNode((s.date||'날짜 없음') + ' · 수정 ' + s.updated)]),
       acts
     ]);
     box.appendChild(item);
@@ -628,12 +1333,13 @@ function openReport(id, mode){
   toast('불러오는 중…');
   google.script.run.withSuccessHandler(function(d){
     if (mode==='copy'){ delete d.id; d.date=''; d.dateEnd=''; d.titleAuto = true; d.title = ''; d.photos = [];
-      if (d.type==='edu'){ d.dates = ['']; d.evaluation = ''; } }
-    if (mode==='toResult') d = toResult(d);
+      if (d.type==='edu'){ d.dates = ['']; d.evaluation = ''; }
+      if (isExec(d)){ d.period = ''; d.year = String(new Date().getFullYear() + (new Date().getMonth() >= 10 ? 1 : 0)); } }
+    if (mode==='toResult') d = d.type==='exec' ? toExecResult(d) : toResult(d);
     doc = d; if (doc.titleAuto==null) doc.titleAuto = false;
-    if (doc.type!=='edu' && (doc.titleAuto || !doc.title)){ doc.titleAuto = true; doc.title = autoTitle(); }
+    if (doc.type!=='edu' && (doc.titleAuto || !doc.title)){ doc.titleAuto = true; doc.title = isExec() ? SaupGen.defaultTitle(doc) : autoTitle(); }
     dirty = !!mode; renderAll();
-    toast(mode==='toResult' ? '결과보고서로 바꿨어요. 참여인원·진행평가·향후 계획·결산을 확인해주세요.' : mode==='copy' ? '복사했어요. 날짜와 바뀐 내용만 고쳐주세요.' : '불러왔어요.', 3500);
+    toast(mode==='toResult' ? (doc.type==='execResult' ? '사업결과보고서로 바꿨어요. 참여인원·과정평가·성과평가·집행액·향후 개선사항을 채워주세요.' : '결과보고서로 바꿨어요. 참여인원·진행평가·향후 계획·결산을 확인해주세요.') : mode==='copy' ? '복사했어요. 날짜와 바뀐 내용만 고쳐주세요.' : '불러왔어요.', 3500);
     window.scrollTo(0,0);
   }).withFailureHandler(fail).getReport(id);
 }
@@ -667,12 +1373,13 @@ function payload(){
     d.date = d.dates[0] || ''; d.title = eduTitle(d);
     return d;
   }
+  if (isExec(d)){ if (!d.title) d.title = SaupGen.defaultTitle(d); d.date = d.period || ''; return d; }
   d.budget = cleanBudget();
   if (!d.title) d.title = autoTitle();
   return d;
 }
 function save(cb){
-  if (!doc.programName){ toast('프로그램명을 먼저 써주세요.'); document.getElementById('programName').focus(); return; }
+  if (!doc.programName){ toast(isExec() ? '사업명을 먼저 써주세요.' : '프로그램명을 먼저 써주세요.'); document.getElementById(isExec() ? 'xProgramName' : doc.type==='edu' ? 'eduProgram' : 'programName').focus(); return; }
   if (saving){ setTimeout(function(){ save(cb); }, 400); return; }   // 자동 저장이 끝난 뒤에
   clearTimeout(autoT);
   var me = doc, ver = editVer, d = payload();
@@ -692,13 +1399,15 @@ function getTpl(cb, kind){
 }
 function neededImages(d){
   var ids = [];
-  ((d.type==='result' || d.type==='edu') ? (d.photos||[]) : []).forEach(function(p){ ids.push(p.fileId); });
+  ((d.type==='result' || d.type==='edu' || d.type==='execResult') ? (d.photos||[]) : []).forEach(function(p){ ids.push(p.fileId); });
   (d.attachments||[]).forEach(function(a){ (a.images||[]).forEach(function(im){ ids.push(im.fileId); }); });
+  (d.blocks||[]).forEach(function(b){ (b.rowPics||[]).forEach(function(ps){ (ps||[]).forEach(function(p){ ids.push(p.fileId); }); }); });
   return ids.filter(function(x, i){ return x && ids.indexOf(x)===i; });
 }
 function dimsOf(id){
   var all = (doc.photos||[]).slice();
   (doc.attachments||[]).forEach(function(a){ all = all.concat(a.images||[]); });
+  (doc.blocks||[]).forEach(function(b){ (b.rowPics||[]).forEach(function(ps){ all = all.concat(ps||[]); }); });
   for (var i=0;i<all.length;i++) if (all[i].fileId===id) return all[i];
   return {w:0, h:0};
 }
@@ -717,18 +1426,18 @@ function download(){
     toast('한글 파일 만드는 중…', 20000);
     var d = payload();
     ensureImages(neededImages(d), function(){
-      var isEdu = d.type==='edu';
+      var isEdu = d.type==='edu', isX = isExec(d);
       getTpl(function(b64){
         var imgs = {}; for (var k in imgCache) if (imgCache[k]) imgs[k] = imgCache[k];
         JSZip.loadAsync(b64, {base64:true}).then(function(z){
           var dd = TextStyle.prep(d);   // ***굵게+기울임***
-          return isEdu ? EduGen.buildZip(z, dd, imgs) : HwpxGen.buildZip(z, dd, imgs);
+          return isEdu ? EduGen.buildZip(z, dd, imgs) : isX ? SaupGen.buildZip(z, dd, imgs) : HwpxGen.buildZip(z, dd, imgs);
         }).then(function(z){
           return TextStyle.apply(z);   // *기울임*, __밑줄__
         }).then(function(z){
           return z.generateAsync({type:'blob', compression:'DEFLATE', mimeType:'application/hwp+zip'});
         }).then(function(blob){
-          var base = isEdu ? '장애이해교육 결과보고서_' + (d.date || '') + (((d.attendees||[])[0]||{}).names ? '_' + String(d.attendees[0].names).split('\n')[0].slice(0,20) : '') : (doc.title || autoTitle());
+          var base = isEdu ? '장애이해교육 결과보고서_' + (d.date || '') + (((d.attendees||[])[0]||{}).names ? '_' + String(d.attendees[0].names).split('\n')[0].slice(0,20) : '') : (d.title || autoTitle());
           var name = base.replace(/[\\/:*?"<>|]/g,'_') + '.hwpx';
           var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
           document.body.appendChild(a); a.click(); a.remove();
@@ -773,7 +1482,7 @@ function uploadTo(input, list, rerender){
     });
   });
 }
-function thumbs(box, list, rerender){
+function thumbs(box, list, rerender, withCaption){
   box.innerHTML = '';
   list.forEach(function(p, i){
     var t = el('div', {class:'thumb'});
@@ -783,10 +1492,14 @@ function thumbs(box, list, rerender){
     t.appendChild(el('div', {class:'mv'}, [
       el('button', {title:'앞으로', on:{click:function(){ if(i>0){ var x=list[i]; list[i]=list[i-1]; list[i-1]=x; markDirty(); rerender(); } }}, text:'◀'}),
       el('button', {title:'뒤로', on:{click:function(){ if(i<list.length-1){ var x=list[i]; list[i]=list[i+1]; list[i+1]=x; markDirty(); rerender(); } }}, text:'▶'})]));
-    box.appendChild(t);
+    if (withCaption){
+      var cap = el('input', {class:'cap', placeholder:'사진 설명 (예: 오리엔테이션)'}); cap.value = p.caption || '';
+      cap.addEventListener('input', function(){ p.caption = cap.value; markDirty(); });
+      box.appendChild(el('div', {}, [t, cap]));
+    } else box.appendChild(t);
   });
 }
-function renderPhotos(){ thumbs(document.getElementById('photos'), doc.photos, renderPhotos); }
+function renderPhotos(){ thumbs(document.getElementById('photos'), doc.photos, renderPhotos, doc.type==='execResult'); }
 
 /* ── 첨부 자료 ── */
 function addAtt(){ doc.attachments.push({title:'', text:'', images:[]}); markDirty(); renderAtts(); }
@@ -830,19 +1543,19 @@ function previewHtml(d){
   var body = (d.blocks||[]).map(function(b){
     if (b.kind==='heading') return '<p class="ln">▪' + h(b.text) + '</p>';
     if (b.kind==='text') return pvLines(b.text);
-    var pre = PRESETS[b.preset], rows = (b.rows||[]).filter(function(r){ return r.some(function(x){ return String(x||'').trim(); }); });
-    var hc = (b.cols && b.cols.length === pre.cols.length) ? b.cols : pre.cols;
-    return '<table class="in"><tr>' + hc.map(function(c, i){ return '<th style="width:' + Math.round(pre.w[i]/396) + '%">' + c + '</th>'; }).join('') + '</tr>' +
-      rows.map(function(r){ return '<tr>' + pre.cols.map(function(_, i){ return pre.align[i]==='l' ? '<td>' + pvLines(r[i]) + '</td>' : '<td class="c">' + rich(r[i]).replace(/\n/g,'<br>') + '</td>'; }).join('') + '</tr>'; }).join('') + '</table>';
+    return pvTable(b);
   }).join('');
   o += '<tr><td class="lb">내용</td><td colspan="3" style="vertical-align:top">' + body + '</td></tr>';
   var B = HwpxGen.budgetCalc(d.budget);
   if (B.cats.length){
     o += '<tr><td class="lb">' + (isRes?'결산':'소요예산') + '</td><td colspan="3" style="padding:0"><table><tr><th style="width:18%;background:#F2F2F2">구분</th><th style="background:#F2F2F2">산출내역</th><th style="width:18%;background:#F2F2F2">금액</th></tr>';
-    B.cats.forEach(function(c){
-      o += '<tr><td class="c">' + h(c.category) + '</td><td class="r">' + c.items.map(function(it){ return '<b>' + h(it.name) + '</b> ' + HwpxGen.won(it.price).replace('원','') + '원×' + it.qty + h(it.unit||'') + '=' + HwpxGen.won(HwpxGen.itemAmount(it)); }).join('<br>') + '</td><td class="c">' + HwpxGen.won(c.total) + '</td></tr>';
+    var amt = function(n){ return d.wonMark ? '₩' + HwpxGen.won(n).replace('원','') : HwpxGen.won(n); };
+    B.cats.forEach(function(c, k){
+      var rs = 0;
+      if (k === 0 || String(c.category||'').trim()){ rs = 1; while (k + rs < B.cats.length && !String(B.cats[k + rs].category||'').trim()) rs++; }
+      o += '<tr>' + (rs ? '<td class="c" rowspan="' + rs + '">' + h(c.category) + '</td>' : '') + '<td class="r">' + c.items.map(function(it){ return '<b>' + h(it.name) + '</b> ' + HwpxGen.won(it.price).replace('원','') + '원×' + it.qty + h(it.unit||'') + '=' + HwpxGen.won(HwpxGen.itemAmount(it)); }).join('<br>') + '</td><td class="c">' + amt(c.total) + '</td></tr>';
     });
-    o += '<tr><th colspan="2" style="background:#F2F2F2">계</th><th>' + HwpxGen.won(B.total) + '</th></tr></table></td></tr>';
+    o += '<tr><th colspan="2" style="background:#F2F2F2">계</th><th>' + amt(B.total) + '</th></tr></table></td></tr>';
   }
   if (isRes){
     var ps = d.photos || [], cells = '';
@@ -893,7 +1606,7 @@ function openPreview(){
   toast('미리보기 준비 중…', 20000);
   ensureImages(neededImages(d), function(){
     var pv = document.getElementById('pv');
-    pv.innerHTML = d.type==='edu' ? previewEduHtml(d) : previewHtml(d);
+    pv.innerHTML = d.type==='edu' ? previewEduHtml(d) : isExec(d) ? previewExecHtml(d) : previewHtml(d);
     // 인쇄할 때 바탕색이 빠지지 않도록 회색 칸에 그림(SVG)으로 색을 깔아줌
     pv.querySelectorAll('td, th').forEach(function(c){
       var bg = getComputedStyle(c).backgroundColor;
