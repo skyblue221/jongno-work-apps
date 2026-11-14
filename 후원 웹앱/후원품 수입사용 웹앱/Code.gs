@@ -30,7 +30,8 @@ const FIELDS = {
     donor: ['후원처', '후원자', '기부처', '후원기관'],
     value: ['환가액', '금액'],
     expiry: ['유통기한', '소비기한'],
-    photo: ['사진링크', '사진 링크', '사진']
+    photo: ['사진링크', '사진 링크', '사진'],
+    purpose: ['사용목적', '지정용도', '용도']
   },
   DIST: {
     recordId: ['앱기록ID'],
@@ -96,7 +97,7 @@ const FIELDS = {
   }
 };
 const LABELS = {
-  REG: { name: '품명', date: '입고일', given: '지원수량 (직접 입력분)', done: '사용완료', qty: '수량', unit: '단위', donor: '후원처', value: '환가액', expiry: '유통기한', photo: '사진 링크' },
+  REG: { name: '품명', date: '입고일', given: '지원수량 (직접 입력분)', done: '사용완료', qty: '수량', unit: '단위', donor: '후원처', value: '환가액', expiry: '유통기한', photo: '사진 링크', purpose: '사용목적 (지정 용도)' },
   DIST: { recordId:'앱기록ID (자동)', no: '배분번호', label: '배분품', date: '지출일', name: '품명', person: '수령인', team: '소속', addr: '주소(배분처)', qty: '수량', inDate: '입고일', note: '비고' },
   DISP: { recordId:'앱기록ID (자동)', date: '폐기일', name: '품명', inDate: '입고일', donor: '후원처', total: '총 수량', given: '지원수량', u1: '단위 (총 수량 옆)', u2: '단위 (지원수량 옆)', u3: '단위 (폐기 수량 옆)', qty: '폐기 수량', reason: '사유', photo: '사진' },
   STOCK: { name: '품명', inDate: '입고일', remain: '남은 수량', inQty: '입고 수량', out: '배분 수량', disp: '폐기 수량' },
@@ -187,7 +188,7 @@ function cacheStamp_() {
 }
 function cached_(key, fn) {
   if (MEMO[key]) return MEMO[key];
-  const c = CacheService.getScriptCache(), prefix = 'v2:' + key + ':' + cacheStamp_();
+  const c = CacheService.getScriptCache(), prefix = 'v3:' + key + ':' + cacheStamp_();
   try {
     const m = JSON.parse(c.get(prefix) || 'null');
     if (m && m.count > 0) {
@@ -426,9 +427,12 @@ function stock_(compare) {
     const d = ymd_(r.date), k = name + '|' + d;
     if (!lots[k]) {
       lots[k] = { key: k, name: name, inDate: d, inQty: 0, unit: str_(r.unit), donor: str_(r.donor),
-        expiry: ymd_(r.expiry), photo: str_(r.photo), out: 0, disp: 0, pending: 0 };
+        expiry: ymd_(r.expiry), photo: str_(r.photo), purpose: '', out: 0, disp: 0, pending: 0 };
       order.push(k);
     }
+    // 사용목적(지정 용도): 같은 묶음에 여러 줄이면 겹치지 않게 모아서 보여 줌
+    const pu = str_(r.purpose);
+    if (pu && lots[k].purpose.split(' / ').indexOf(pu) < 0) lots[k].purpose = lots[k].purpose ? lots[k].purpose + ' / ' + pu : pu;
     lots[k].inQty += num_(r.qty);
     lots[k].out += num_(r.given); // 수령증 없이 숫자만 넣은 배분(가정·사례)
     if (r.done === true || String(r.done).toUpperCase() === 'TRUE') lots[k].done = true;
@@ -513,7 +517,7 @@ function createTeamReceipt(p,requestId) {
     }));
     appendDist_(id, rows);
 
-    const items = lots.map(l => ({ key: l.key, name: l.name, inDate: l.inDate, donor: l.donor, unit: l.unit, inQty: l.inQty, give: need[l.key] || 0, remainAfter: l.remain - (need[l.key] || 0) }));
+    const items = lots.map(l => ({ key: l.key, name: l.name, inDate: l.inDate, donor: l.donor, unit: l.unit, purpose: l.purpose || '', inQty: l.inQty, give: need[l.key] || 0, remainAfter: l.remain - (need[l.key] || 0) }));
     const ppl = people.map((x, i) => { const o = { name: str_(x.name), team: str_(x.team), note: str_(x.note), qty: x.qty, sig: '', at: '' }; if (vs && vsFlat_(vs[i]).length) { o.vs = vs[i]; o.serials = vsFlat_(vs[i]); } return o; });
     appendOwn_('RCPT', [id, '팀', no, date, me_(), '서명 대기', JSON.stringify(items), JSON.stringify(ppl), '', str_(p.note), new Date()]);
     return { id: id, url: ScriptApp.getService().getUrl() + '?r=' + id };
@@ -599,14 +603,14 @@ function requestHome(p,requestId) {
       markVouch_(vp.reduce((a, x, i) => a.concat(vsFlat_(vs[i]).map(sr => ({ serial: sr, person: str_(x.name) }))), []),
         { date: ymd_(p.date) || today_(), purpose: '가정 배분 (담당 ' + str_(p.manager) + ')', outBy: str_(p.outBy) || str_(p.manager), note: '가정배분 ' + id });
     }
-    const items = lots.map(l => { const o = { key: l.key, name: l.name, inDate: wIn_(l), unit: l.unit, qty: need[l.key] || 0 }; if (vs && (p.vsel[l.key] || []).length) o.serials = p.vsel[l.key].slice(); return o; }).filter(i => i.qty > 0);
+    const items = lots.map(l => { const o = { key: l.key, name: l.name, inDate: wIn_(l), unit: l.unit, purpose: l.purpose || '', qty: need[l.key] || 0 }; if (vs && (p.vsel[l.key] || []).length) o.serials = p.vsel[l.key].slice(); return o; }).filter(i => i.qty > 0);
     const row = [id, ymd_(p.date) || today_(), str_(p.manager), me_(), num_(p.count), JSON.stringify(items), '확인 대기', '', '', '', '', ''];
     if (p.later) {
       // 나중에 서명받기: 명단은 min 드라이브의 잠긴 임시 파일에만 둠 (시트에는 안 씀)
       const people = (p.people || []).filter(x => str_(x.name));
       if (!people.length) throw new Error('받는 분 명단을 넣어 주세요.');
       const data = { id: id, date: row[1], manager: row[2], dateMode: p.dateMode === 'fill' ? 'fill' : 'blank',
-        items: lots.filter(l => need[l.key] > 0).map(l => { const o = { key: l.key, name: l.name, inDate: l.inDate, donor: l.donor, inQty: l.inQty, give: need[l.key], remainAfter: l.remain - need[l.key] }; if (vs && (p.vsel[l.key] || []).length) o.serials = p.vsel[l.key].slice(); return o; }),
+        items: lots.filter(l => need[l.key] > 0).map(l => { const o = { key: l.key, name: l.name, inDate: l.inDate, donor: l.donor, purpose: l.purpose || '', inQty: l.inQty, give: need[l.key], remainAfter: l.remain - need[l.key] }; if (vs && (p.vsel[l.key] || []).length) o.serials = p.vsel[l.key].slice(); return o; }),
         people: people.map((x, i) => ({ vs: vs ? vs[i] : undefined, name: str_(x.name), addr: str_(x.addr), idType:x.idType==='생년월일'?'생년월일':'주소', phone: digits_(x.phone), birth: birth6_(x.birth) || (x.idType === '생년월일' ? birth6_(x.addr) : ''), qty: x.qty || {}, sig: '', at: '' })) };
       const f = trackedFile_(folder_(['가정배분_임시명단']),id + '.json', JSON.stringify(data), 'application/json');
       row[9] = '서명 대기'; row[11] = f.getId();
@@ -801,7 +805,7 @@ function createOrgReceipt(p,requestId) {
     appendDist_(id, lots.filter(l => need[l.key] > 0).map(l => ({ no: no, date: date, name: l.name, label: l.name, person: org.name, team: '유관기관', addr: org.addr || org.name, qty: need[l.key], inDate: wIn_(l), note: str_(p.note) })));
 
     const units = {}; p.items.forEach(i => { units[i.key] = i.unit; });
-    const items = lots.filter(l => need[l.key] > 0).map(l => ({ key: l.key, name: l.name, inDate: l.inDate, unit: str_(units[l.key]) || l.unit || '개', give: need[l.key] }));
+    const items = lots.filter(l => need[l.key] > 0).map(l => ({ key: l.key, name: l.name, inDate: l.inDate, unit: str_(units[l.key]) || l.unit || '개', purpose: l.purpose || '', give: need[l.key] }));
     appendOwn_('RCPT', [id, '기관', no, date, me_(), '회수 대기', JSON.stringify(items), JSON.stringify(org), '', str_(p.note), new Date()]);
     return rcptObj_(findRcpt_(id), false);
   });

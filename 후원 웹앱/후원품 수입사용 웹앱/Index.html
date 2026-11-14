@@ -178,10 +178,12 @@ function picker(el, sel, onChange, single){
     const q=(el.querySelector('.pq')||{}).value||'';
     const list=S.stock.filter(l=>!q||l.name.includes(q)||(l.donor||'').includes(q));
     el.querySelector('.lots').innerHTML = list.length? list.map(l=>{ const d=daysTo(l.expiry);
-      return `\x3cdiv class="lot ${sel.includes(l.key)?'on':''}" data-k="${esc(l.key)}">\x3cspan>\x3cb>${esc(l.name)}\x3c/b>\x3cbr>\x3cspan class="muted">${esc(l.inDate)} 입고${l.donor?' · '+esc(l.donor):''}${l.expiry?` · \x3cspan class="${d!=null&&d<=30?'exp':''}">유통 ${esc(l.expiry)}\x3c/span>`:''}\x3c/span>\x3c/span>\x3cspan>남은 \x3cb>${l.remain}\x3c/b>${esc(l.unit||'')}\x3c/span>\x3c/div>`;}).join('')
+      return `\x3cdiv class="lot ${sel.includes(l.key)?'on':''}" data-k="${esc(l.key)}">\x3cspan>\x3cb>${esc(l.name)}\x3c/b>${purposeTag(l)}\x3cbr>\x3cspan class="muted">${esc(l.inDate)} 입고${l.donor?' · '+esc(l.donor):''}${l.expiry?` · \x3cspan class="${d!=null&&d<=30?'exp':''}">유통 ${esc(l.expiry)}\x3c/span>`:''}\x3c/span>\x3c/span>\x3cspan>남은 \x3cb>${l.remain}\x3c/b>${esc(l.unit||'')}\x3c/span>\x3c/div>`;}).join('')
       : '\x3cp class="muted">남은 물품이 없어요.\x3c/p>';
+    const P=sel.map(lotOf).filter(l=>l&&l.purpose);
+    el.querySelector('.pp').innerHTML=P.length?`\x3cdiv class="note warn" style="margin:8px 0 0">\x3cb>사용목적이 정해진 물품이에요.\x3c/b> 받는 곳이 목적에 맞는지 확인해 주세요.\x3cbr>${P.map(l=>`· ${esc(l.name)} → \x3cb>${esc(l.purpose)}\x3c/b>`).join('\x3cbr>')}\x3c/div>`:'';
   };
-  el.innerHTML = `\x3cinput class="pq" placeholder="품명이나 후원처로 찾기">\x3cdiv class="lots">\x3c/div>\x3cdiv class="btns">\x3ca class="btn line sm" href="https://docs.google.com/forms/d/e/1FAIpQLSdFv6PF9OE8ac1YFcNvo2Q-MVCW1wAA5lnunsR5EDa6tuQZww/viewform" target="_blank" rel="noopener noreferrer">목록에 없는 후원품 등록\x3c/a>\x3cbutton type="button" class="btn sub sm pickerRefresh">등록 후 새로고침\x3c/button>\x3c/div>\x3cp class="muted" style="margin-top:6px">등록을 마친 뒤 새로고침해주세요. 연결된 등록 시트에 반영되고 재고가 남은 물품이 목록에 표시돼요.\x3c/p>`;
+  el.innerHTML = `\x3cinput class="pq" placeholder="품명이나 후원처로 찾기">\x3cdiv class="lots">\x3c/div>\x3cdiv class="pp">\x3c/div>\x3cdiv class="btns">\x3ca class="btn line sm" href="https://docs.google.com/forms/d/e/1FAIpQLSdFv6PF9OE8ac1YFcNvo2Q-MVCW1wAA5lnunsR5EDa6tuQZww/viewform" target="_blank" rel="noopener noreferrer">목록에 없는 후원품 등록\x3c/a>\x3cbutton type="button" class="btn sub sm pickerRefresh">등록 후 새로고침\x3c/button>\x3c/div>\x3cp class="muted" style="margin-top:6px">등록을 마친 뒤 새로고침해주세요. 연결된 등록 시트에 반영되고 재고가 남은 물품이 목록에 표시돼요.\x3c/p>`;
   el.querySelector('.pickerRefresh').onclick=e=>act(e.target,async()=>{await refreshStock(true);for(let i=sel.length-1;i>=0;i--)if(!S.stock.some(l=>l.key===sel[i]))sel.splice(i,1);draw();if(onChange)onChange();toast('물품 목록을 새로 불러왔어요.');},'불러오는 중...');
   el.querySelector('.pq').oninput=draw;
   el.querySelector('.lots').onclick=e=>{ const d=e.target.closest('.lot'); if(!d) return; const k=d.dataset.k, i=sel.indexOf(k);
@@ -190,6 +192,14 @@ function picker(el, sel, onChange, single){
   draw();
 }
 const lotOf = k => S.stock.find(l=>l.key===k);
+/* 사용목적(지정 용도): 후원물품등록 「사용목적」 칸에 적은 내용 */
+const purposeTag = l => l&&l.purpose?` \x3cspan class="tag wait">사용목적: ${esc(l.purpose)}\x3c/span>`:'';
+/** 내보내기 전에 한 번 더 확인: 사용목적이 적힌 물품이 있으면 목적에 맞는지 물어봄 */
+function purposeOk(keys, where){
+  const L=keys.map(lotOf).filter(l=>l&&l.purpose);
+  if(!L.length) return true;
+  return confirm(`사용목적이 정해진 물품이 있어요.\n\n${L.map(l=>`· ${l.name} → ${l.purpose}`).join('\n')}\n\n지금 「${where}」(으)로 내보내는 것이 이 목적에 맞나요?\n맞으면 [확인], 아니면 [취소]를 눌러 주세요.`);
+}
 
 
 function receiptHtml(d){
@@ -200,7 +210,7 @@ function receiptHtml(d){
   \x3ch1 style="text-align:center;font-size:24pt;letter-spacing:12px;margin:0 0 14px">수령증\x3c/h1>
   \x3ctable style="width:100%;border-collapse:collapse;margin-bottom:14px">\x3ctr>
   ${(d.heads||['품번','품목','입고일','후원처','배분처','총 수량','지원수량','잔여수량']).map(t=>`\x3cth style="${th}">${t}\x3c/th>`).join('')}\x3c/tr>
-  ${items.map((it,i)=>`\x3ctr>\x3ctd style="${cell}">${i+1}\x3c/td>\x3ctd style="${cell}">${esc(it.name)}\x3c/td>\x3ctd style="${cell}">${esc(it.inDate)}\x3c/td>\x3ctd style="${cell}">${esc(it.donor||'')}\x3c/td>\x3ctd style="${cell}">${esc(d.dest||'')}\x3c/td>\x3ctd style="${cell}">${it.remainAfter!=null&&it.remainAfter!==''?num(it.remainAfter)+num(it.give):(it.inQty??'')}\x3c/td>\x3ctd style="${cell}">${it.give}\x3c/td>\x3ctd style="${cell}">${it.remainAfter??''}\x3c/td>\x3c/tr>`).join('')}
+  ${items.map((it,i)=>`\x3ctr>\x3ctd style="${cell}">${i+1}\x3c/td>\x3ctd style="${cell}">${esc(it.name)}${it.purpose?`\x3cbr>\x3cspan style="font-size:8.5pt">(사용목적: ${esc(it.purpose)})\x3c/span>`:''}\x3c/td>\x3ctd style="${cell}">${esc(it.inDate)}\x3c/td>\x3ctd style="${cell}">${esc(it.donor||'')}\x3c/td>\x3ctd style="${cell}">${esc(d.dest||'')}\x3c/td>\x3ctd style="${cell}">${it.remainAfter!=null&&it.remainAfter!==''?num(it.remainAfter)+num(it.give):(it.inQty??'')}\x3c/td>\x3ctd style="${cell}">${it.give}\x3c/td>\x3ctd style="${cell}">${it.remainAfter??''}\x3c/td>\x3c/tr>`).join('')}
   \x3c/table>
   \x3ctable style="width:100%;border-collapse:collapse">\x3ctr>
   ${['연번','성명',d.noTeam?null:'소속팀',d.noId?null:identityHeader,'수령일','서명','비고'].filter(Boolean).map(t=>`\x3cth rowspan="3" style="${th}${t==='서명'?'width:24%;min-width:160px;':t==='비고'?'width:8%;':''}">${t}\x3c/th>`).join('')}
@@ -221,7 +231,7 @@ function orgHtml(o){
   \x3ctr>\x3cth style="${th}">주소\x3c/th>\x3ctd style="${cell}" colspan="3">${esc(org.addr||'')}\x3c/td>\x3c/tr>
   \x3ctr>\x3cth style="${th}">연락처\x3c/th>\x3ctd style="${cell}" colspan="3">${esc(org.tel||'')}\x3c/td>\x3c/tr>\x3c/table>
   \x3ctable style="width:100%;border-collapse:collapse">\x3ctr>${['연번','품목','수량','단위','비고'].map(t=>`\x3cth style="${th}">${t}\x3c/th>`).join('')}\x3c/tr>
-  ${o.items.map((it,i)=>`\x3ctr>\x3ctd style="${cell}text-align:center">${i+1}\x3c/td>\x3ctd style="${cell}">${esc(it.name)}\x3c/td>\x3ctd style="${cell}text-align:center">${it.give}\x3c/td>\x3ctd style="${cell}text-align:center">${esc(it.unit||'')}\x3c/td>\x3ctd style="${cell}">\x3c/td>\x3c/tr>`).join('')}
+  ${o.items.map((it,i)=>`\x3ctr>\x3ctd style="${cell}text-align:center">${i+1}\x3c/td>\x3ctd style="${cell}">${esc(it.name)}\x3c/td>\x3ctd style="${cell}text-align:center">${it.give}\x3c/td>\x3ctd style="${cell}text-align:center">${esc(it.unit||'')}\x3c/td>\x3ctd style="${cell}font-size:10pt">${it.purpose?'사용목적: '+esc(it.purpose):''}\x3c/td>\x3c/tr>`).join('')}
   \x3ctr>\x3cth style="${th}" colspan="2">합계\x3c/th>\x3ctd style="${cell}text-align:center;font-weight:bold">${total}\x3c/td>\x3ctd style="${cell}" colspan="2">\x3c/td>\x3c/tr>\x3c/table>
   \x3cp style="text-align:center;font-size:13pt;margin:34px 0 10px">위 물품을 정히 인수합니다.\x3c/p>
   \x3cp style="text-align:center;font-size:13pt;margin:0 0 34px">${koDate(o.date)}\x3c/p>
@@ -375,6 +385,7 @@ function distView(){
   $('#dReset').onclick=()=>{ if(confirm('입력한 내용을 지울까요?')){ S.dist=null; distView(); } };
   $('#dGo').onclick=e=>act(e.target, async()=>{
     if(!D.sel.length) throw '물품을 골라 주세요.';
+    if(!purposeOk(D.sel,'팀 배분 (직원)')) return;
     const vc=await vCheck(vo);
     const r=await run('createTeamReceipt',{date:D.date,note:D.note,items:D.sel.map(k=>({key:k})),people:D.people,vsel:vc.vsel,vskip:vc.vskip,outBy:vc.outBy});
     S.dist=null; S.lv=null; await refreshStock(); bumpCount('sign',1);
@@ -616,13 +627,14 @@ function homeView(){
   const vo={sel:H.sel,vsel:H.vsel,vskip:H.vskip,get outBy(){return H.manager||'';},set outBy(v){},need:k=>total(k),people:()=>H.rows.filter(r=>r.name).map(r=>({name:r.name,q:k=>qOf(r,k)}))};
   const vNotes=()=>{ const keys=H.sel.filter(k=>(H.vsel[k]||[]).length); return keys.length?vSplit(keys,H.vsel,vo.people()).map(vsFlat):[]; };
   const html=()=>{ const L=lots(), vn=vNotes(); let ri=-1; return receiptHtml({ dest:S.boot.dept||'일상동행팀', noTeam:true,
-    items:L.map(l=>({name:l.name,inDate:l.inDate,donor:l.donor,inQty:l.inQty,give:total(l.key),remainAfter:(H.before&&H.before[l.key]!=null?H.before[l.key]:l.remain)-total(l.key)})),
+    items:L.map(l=>({name:l.name,inDate:l.inDate,donor:l.donor,purpose:l.purpose||'',inQty:l.inQty,give:total(l.key),remainAfter:(H.before&&H.before[l.key]!=null?H.before[l.key]:l.remain)-total(l.key)})),
     rows:H.rows.filter(r=>r.name).map(r=>{ ri++; const n=(vn[ri]||[]).join(', '); return {name:r.name,team:'',addr:r.addr,idType:H.idType,date:H.dateMode==='fill'?H.date:(r.sig?S.boot.today:''),sigUrl:r.sig,note:n,noteSmall:!!n,qty:L.map(l=>qOf(r,l.key))}; }) }); };
   $('#hXls').onclick=e=>{if(!checkHome())return; if(!H.sel.length||!H.rows.some(r=>r.name)) return toast('물품과 명단을 넣어 주세요.'); toExcel(e.target,html(),'가정배분수령증_'+H.date,true); };
   $('#hPrint').onclick=()=>{if(!checkHome())return; if(!H.sel.length||!H.rows.some(r=>r.name)) return toast('물품과 명단을 넣어 주세요.'); printHtml(html(),true); };
   $('#hLater').onclick=e=>act(e.target, async()=>{
     checkInputQuantities(H.rows);if(H.sent) throw '이미 요청했어요.'; if(!H.manager) throw '사례 담당자 이름을 골라 주세요.';
     const people=H.rows.filter(r=>r.name); if(!H.sel.length||!people.length) throw '물품과 명단을 넣어 주세요.';
+    if(!purposeOk(H.sel,'가정 배분 (당사자)')) return;
     const vc=await vCheck(vo);
     if(!confirm('명단(이름·선택한 주소 또는 생년월일)을 서명이 끝날 때까지만 잠긴 임시 파일에 저장해요. 서명을 마치면 수령증 PDF만 남고 임시 명단 파일은 휴지통으로 보내요. 계속할까요?')) return;
     await run('requestHome',{later:true,vsel:vc.vsel,vskip:vc.vskip,outBy:vc.outBy,dateMode:H.dateMode,manager:H.manager,date:H.date,count:people.length,items:H.sel.map(k=>({key:k,qty:total(k)})),
@@ -633,6 +645,7 @@ function homeView(){
   $('#hSend').onclick=e=>act(e.target, async()=>{
     checkInputQuantities(H.rows);if(H.sent) throw '이미 요청했어요.'; if(!H.manager) throw '사례 담당자 이름을 골라 주세요.';
     const people=H.rows.filter(r=>r.name); if(!H.sel.length||!people.length) throw '물품과 명단을 넣어 주세요.';
+    if(!purposeOk(H.sel,'가정 배분 (당사자)')) return;
     const vc=await vCheck(vo), hasV=Object.keys(vc.vsel).length, before=Object.fromEntries(H.sel.map(k=>[k,(lotOf(k)||{}).remain]));
     const hid=await run('requestHome',{manager:H.manager,date:H.date,count:people.length,items:H.sel.map(k=>({key:k,qty:total(k)})),vsel:vc.vsel,vskip:vc.vskip,outBy:vc.outBy,
       people:hasV?people.map(r=>({name:r.name,qty:Object.fromEntries(Object.keys(vc.vsel).map(k=>[k,qOf(r,k)]))})):[]});
@@ -900,6 +913,7 @@ async function orgView(){
   picker($('#oPick2'), O.sel, drawQty); drawQty();
   $('#oGo').onclick=e=>act(e.target, async()=>{
     if(!O.sel.length) throw '물품을 골라 주세요.';
+    if(!purposeOk(O.sel,'유관기관 ('+(O.org.name||'기관')+')')) return;
     const r=await run('createOrgReceipt',{org:O.org,date:O.date,note:O.note,items:O.sel.map(k=>({key:k,qty:O.qty[k],unit:O.unit[k]}))});
     S.org=null; await refreshStock(); bumpCount('org',1);
     showOrg(r);
@@ -995,7 +1009,7 @@ async function stockView(){
   const draw=()=>{ const q=($('#kq')||{}).value||'';
     const L=list.filter(l=>!q||l.name.includes(q)||(l.donor||'').includes(q));
     $('#kList').innerHTML=L.length?L.map(l=>{ const d=daysTo(l.expiry);
-      return `\x3cdiv class="lot" style="cursor:default">\x3cspan>\x3cb>${esc(l.name)}\x3c/b>\x3cbr>\x3cspan class="muted">${esc(l.inDate)} 입고${l.donor?' · '+esc(l.donor):''}${l.expiry?` · \x3cspan class="${d!=null&&d<=30?'exp':''}">유통 ${esc(l.expiry)}${d!=null&&d<0?' (지남)':d!=null&&d<=30?` (${d}일 남음)`:''}\x3c/span>`:''}\x3c/span>
+      return `\x3cdiv class="lot" style="cursor:default">\x3cspan>\x3cb>${esc(l.name)}\x3c/b>${purposeTag(l)}\x3cbr>\x3cspan class="muted">${esc(l.inDate)} 입고${l.donor?' · '+esc(l.donor):''}${l.expiry?` · \x3cspan class="${d!=null&&d<=30?'exp':''}">유통 ${esc(l.expiry)}${d!=null&&d<0?' (지남)':d!=null&&d<=30?` (${d}일 남음)`:''}\x3c/span>`:''}\x3c/span>
       ${(S.boot.admin||S.boot.viewer)?`\x3cbr>\x3cspan class="muted">입고 ${l.inQty} · 나감 ${l.out} · 폐기 ${l.disp}${l.pending?` · 확인 대기 ${l.pending}`:''}\x3c/span>`:''}${l.photo&&/^https?:/.test(l.photo)?` \x3ca href="${esc(l.photo)}" target="_blank" class="muted">사진\x3c/a>`:''}\x3c/span>
       \x3cspan style="white-space:nowrap">남은 \x3cb>${l.remain}\x3c/b>${esc(l.unit||'')}\x3c/span>\x3c/div>`;}).join(''):'\x3cp class="muted">없어요.\x3c/p>'; };
   let check='';
