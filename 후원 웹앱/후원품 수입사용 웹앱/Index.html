@@ -77,6 +77,8 @@ label{color:var(--sub)}
 input,select,textarea{border:1px solid #c9cfd6;border-radius:2px;min-height:42px}
 textarea{min-height:90px}
 input:focus,select:focus,textarea:focus{outline:2px solid var(--pri);outline-offset:-1px}
+/* 체크박스·라디오는 입력칸 높이(42px)를 따르지 않게: 글자와 같은 줄에 */
+input[type=checkbox],input[type=radio]{width:auto;min-height:0;margin:0 6px 0 0;vertical-align:middle}
 /* 버튼: 남색 하나만 진하게 */
 .btn{border-radius:2px;font-weight:700}
 .btn:hover{filter:brightness(.92)}
