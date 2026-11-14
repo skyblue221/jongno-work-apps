@@ -194,6 +194,24 @@ function picker(el, sel, onChange, single){
   draw();
 }
 const lotOf = k => S.stock.find(l=>l.key===k);
+/* 수량 한 번에 채우기: 품목마다 숫자 칸 하나 + 「한 분당 채우기」·「전체를 나누기」 (팀 배분·가정 배분·빈 수령증) */
+function qtyBar(list){
+  return list.length?`\x3cdiv class="row" style="margin-top:10px">${list.map(o=>`\x3cdiv>\x3clabel>${esc(o.name)}\x3c/label>\x3cdiv class="row" style="flex-wrap:nowrap;gap:6px">\x3cinput class="q" inputmode="numeric" data-qb="${esc(o.key)}" placeholder="개수" style="flex:0 0 76px;min-width:0">\x3cbutton type="button" class="btn sub sm" data-qe="${esc(o.key)}" style="flex:0 0 auto;min-width:0">한 분당 채우기\x3c/button>\x3cbutton type="button" class="btn line sm" data-qs="${esc(o.key)}" style="flex:0 0 auto;min-width:0">전체를 나누기\x3c/button>\x3c/div>\x3c/div>`).join('')}\x3c/div>\x3cp class="muted" style="margin:4px 0 0">숫자를 넣고 \x3cb>한 분당 채우기\x3c/b>는 모두에게 그 수만큼, \x3cb>전체를 나누기\x3c/b>는 인원수로 똑같이 나눠 채워요. 채운 뒤에도 칸에서 직접 고칠 수 있어요.\x3c/p>`:'';
+}
+/** 버튼을 누르면 채울 수를 계산해서 돌려줌 (못 채우면 안내만 하고 null) */
+function qtyBarRead(box,t,people){
+  const key=t.dataset.qe||t.dataset.qs; if(key===undefined) return null;
+  const raw=String((box.querySelector(`[data-qb="${CSS.escape(key)}"]`)||{}).value||'').trim();
+  if(!/^\d+$/.test(raw)||+raw<1){ toast('1 이상의 숫자를 넣어 주세요.'); return null; }
+  if(!people){ toast('받는 분을 먼저 넣어 주세요.'); return null; }
+  const n=+raw; if(t.dataset.qe) return {key,per:n,n,rest:0,split:false};
+  const per=Math.floor(n/people), rest=n-per*people;
+  if(!per){ toast(`${n}개로는 ${people}명에게 1개씩도 안 돼요. 받을 분 칸에 직접 넣어 주세요.`,4500); return null; }
+  return {key,per,n,rest,split:true};
+}
+function qtyBarDone(r,people){
+  toast(!r.split?`모두에게 ${r.per}개씩 채웠어요.`:r.rest?`${people}명에게 ${r.per}개씩 채웠어요. ${r.rest}개가 남아요 — 더 드릴 분 칸에서 직접 늘려 주세요.`:`${r.n}개를 ${people}명에게 ${r.per}개씩 나눴어요.`, r.rest?6500:3000);
+}
 /* 사용목적(지정 용도): 후원물품등록 「사용목적」 칸에 적은 내용 */
 const purposeTag = l => l&&l.purpose?` \x3cspan class="tag wait">사용목적: ${esc(l.purpose)}\x3c/span>`:'';
 /** 내보내기 전에 한 번 더 확인: 사용목적이 적힌 물품이 있으면 목적에 맞는지 물어봄 */
@@ -407,11 +425,11 @@ function distView(){
     $('#dPeople').innerHTML=`\x3cdiv class="scroll">\x3ctable class="tbl">\x3ctr>\x3cth>이름\x3c/th>\x3cth>소속\x3c/th>${lots.map(l=>`\x3cth>${esc(l.name)}\x3cbr>\x3cspan class="muted">남은 ${l.remain}\x3c/span>\x3c/th>`).join('')}\x3cth>비고 \x3cspan class="muted">(세부 품목 등)\x3c/span>\x3c/th>\x3cth>\x3c/th>\x3c/tr>
       ${D.people.map((p,i)=>`\x3ctr>\x3ctd>${esc(p.name)}\x3c/td>\x3ctd>\x3cinput value="${esc(p.team)}" data-t="${i}" style="width:110px">\x3c/td>${lots.map(l=>`\x3ctd>\x3cinput class="q" inputmode="numeric" data-i="${i}" data-k="${esc(l.key)}" value="${p.qty[l.key]||''}">\x3c/td>`).join('')}\x3ctd>\x3cinput data-n="${i}" value="${esc(p.note||'')}" placeholder="비워 둬도 돼요" style="min-width:160px">\x3c/td>\x3ctd>\x3cbutton class="btn line sm" data-x="${i}">빼기\x3c/button>\x3c/td>\x3c/tr>`).join('')}
       \x3ctr>\x3cth colspan="2">합계\x3c/th>${lots.map(l=>{const t=tot(l.key);return `\x3cth class="${t>l.remain?'exp':''}">${t}\x3c/th>`;}).join('')}\x3cth>\x3c/th>\x3cth>\x3c/th>\x3c/tr>\x3c/table>\x3c/div>
-      ${lots.length?`\x3cdiv class="row" style="margin-top:8px">${lots.map(l=>`\x3cdiv>\x3clabel>${esc(l.name)} 한 사람당\x3c/label>\x3cdiv class="row">\x3cinput class="q" inputmode="numeric" data-all="${esc(l.key)}">\x3cbutton class="btn sub sm" data-fill="${esc(l.key)}" style="flex:0 0 auto">모두에게\x3c/button>\x3c/div>\x3c/div>`).join('')}\x3c/div>`:''}`;
+      ${qtyBar(lots)}`;
     const box=$('#dPeople');
     box.oninput=e=>{ const t=e.target; if(t.dataset.k){ D.people[t.dataset.i].qty[t.dataset.k]=t.value; const th=box.querySelectorAll('tr:last-child th')[1+D.sel.indexOf(t.dataset.k)]; if(th){const v=tot(t.dataset.k); th.textContent=v; th.className=v>lotOf(t.dataset.k).remain?'exp':'';} if(S.lv&&S.lv[t.dataset.k]) vBox($('#dV'),vo); } if(t.dataset.t) D.people[t.dataset.t].team=t.value; if(t.dataset.n) D.people[t.dataset.n].note=t.value; };
     box.onclick=e=>{ const t=e.target; if(t.dataset.x){ D.people.splice(+t.dataset.x,1); drawPeople(); }
-      if(t.dataset.fill){ const v=box.querySelector(`[data-all="${CSS.escape(t.dataset.fill)}"]`).value; D.people.forEach(p=>p.qty[t.dataset.fill]=v); drawPeople(); } };
+      const qb=qtyBarRead(box,t,D.people.length); if(qb){ D.people.forEach(p=>p.qty[qb.key]=String(qb.per)); drawPeople(); qtyBarDone(qb,D.people.length); } };
   }
 }
 function bumpCount(k,d){ const c=S.boot.counts||(S.boot.counts={}); c[k]=Math.max(0,(c[k]||0)+d); buildNav(); document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.k===S.tab)); }
@@ -566,8 +584,7 @@ function freeView(){
     if(!F.rows.length){ $('#fRows').innerHTML='\x3cp class="muted">받는 분을 넣어 주세요.\x3c/p>'; return; }
     $('#fRows').innerHTML=`\x3cdiv style="overflow-x:auto">\x3ctable class="tbl">\x3ctr>\x3cth>성명\x3c/th>\x3cth>${F.mode==='team'?'소속팀':F.idType}\x3c/th>${its.map(o=>`\x3cth>${esc(o.it.name)}\x3cbr>\x3cspan class="muted" data-tot="${o.i}">합계 ${total(o.i)}\x3c/span>\x3c/th>`).join('')}\x3cth>비고\x3c/th>\x3cth>\x3c/th>\x3c/tr>
       ${F.rows.map((r,ri)=>`\x3ctr>\x3ctd>\x3cinput data-ri="${ri}" data-f="name" value="${esc(r.name)}">\x3c/td>\x3ctd>\x3cinput data-ri="${ri}" data-f="${F.mode==='team'?'team':'addr'}" value="${esc(F.mode==='team'?r.team:r.addr)}">\x3c/td>${its.map(o=>`\x3ctd>\x3cinput class="q" inputmode="numeric" data-ri="${ri}" data-qi="${o.i}" value="${r.qty[o.i]??''}">\x3c/td>`).join('')}\x3ctd>\x3cinput data-ri="${ri}" data-f="note" value="${esc(r.note||'')}">\x3c/td>\x3ctd>\x3cbutton class="btn line sm" data-xr="${ri}">빼기\x3c/button>\x3c/td>\x3c/tr>`).join('')}\x3c/table>\x3c/div>
-      ${its.length?`\x3cdiv class="btns">\x3cbutton class="btn line sm" id="fAll">모든 분 1개씩 채우기\x3c/button>\x3c/div>`:'\x3cp class="muted">위에 물품 이름을 넣으면 수량 칸이 생겨요.\x3c/p>'}`;
-    const a=$('#fAll'); if(a) a.onclick=()=>{ F.rows.forEach(r=>its.forEach(o=>{ if(r.qty[o.i]===undefined||r.qty[o.i]==='') r.qty[o.i]=1; })); drawRows(); }; };
+      ${its.length?qtyBar(its.map(o=>({key:String(o.i),name:o.it.name.trim()}))):'\x3cp class="muted">위에 물품 이름을 넣으면 수량 칸이 생겨요.\x3c/p>'}`; };
   drawItems(); drawRows();
   $('#fKind').onchange=e=>{ F.kind=e.target.value; drawItems(); };
   $('#fDest').oninput=e=>{ F.dest=e.target.value; };
@@ -580,7 +597,10 @@ function freeView(){
   $('#fItems').onclick=e=>{ const i=e.target.dataset.xi; if(i===undefined) return; F.items.splice(+i,1); F.rows.forEach(r=>{ const q={}; Object.keys(r.qty).forEach(k=>{ if(+k<+i) q[k]=r.qty[k]; else if(+k>+i) q[+k-1]=r.qty[k]; }); r.qty=q; }); drawItems(); drawRows(); };
   $('#fRows').oninput=e=>{ const t=e.target, ri=t.dataset.ri; if(ri===undefined) return; const r=F.rows[+ri];
     if(t.dataset.qi!==undefined){ r.qty[t.dataset.qi]=t.value; const tt=document.querySelector(`[data-tot="${t.dataset.qi}"]`); if(tt) tt.textContent='합계 '+total(+t.dataset.qi); } else r[t.dataset.f]=t.value; };
-  $('#fRows').onclick=e=>{ const i=e.target.dataset.xr; if(i===undefined) return; F.rows.splice(+i,1); drawRows(); };
+  $('#fRows').onclick=e=>{
+    const named=F.rows.filter(r=>r.name), qb=qtyBarRead($('#fRows'),e.target,named.length);
+    if(qb){ named.forEach(r=>{ r.qty[qb.key]=String(qb.per); }); const it=F.items[+qb.key]; if(qb.split&&it&&it.inQty===''){ it.inQty=String(qb.n); drawItems(); } drawRows(); qtyBarDone(qb,named.length); return; }
+    const i=e.target.dataset.xr; if(i===undefined) return; F.rows.splice(+i,1); drawRows(); };
   $('#fParse').onclick=()=>{ $('#fPaste').value.split(/\r?\n/).map(x=>x.trim()).filter(Boolean).forEach(line=>{ const p=line.split(/\t|,/).map(x=>x.trim()), rest=p.slice(1).filter(Boolean).join(' ');
     F.rows.push(F.mode==='team'?{name:p[0],team:rest||((S.staff.find(x=>x.name===p[0])||{}).team||''),qty:{}}:{name:p[0],addr:rest,qty:{}}); }); $('#fPaste').value=''; drawRows(); };
   if($('#fWhoAdd')){ const add=()=>{ const n=$('#fWho').value.trim(); if(!n) return; const st=S.staff.find(x=>x.name===n); F.rows.push({name:n,team:st?st.team:'',qty:{}}); $('#fWho').value=''; drawRows(); };
@@ -663,11 +683,13 @@ function homeView(){
     ${H.rows.map((r,i)=>`\x3ctr>\x3ctd>\x3cinput data-i="${i}" data-f="name" value="${esc(r.name)}" style="width:90px">\x3c/td>\x3ctd>\x3cinput data-i="${i}" data-f="addr" value="${esc(r.addr)}" placeholder="${H.idType==='생년월일'?'예: 1980.01.01':'주소'}" style="min-width:150px">\x3c/td>
       ${L.map(l=>`\x3ctd>\x3cinput class="q" inputmode="numeric" data-i="${i}" data-k="${esc(l.key)}" value="${qOf(r,l.key)}">\x3c/td>`).join('')}
       ${H.phoneSign?`\x3ctd>${r.sig?`\x3cimg src="${r.sig}" style="height:30px">`:`\x3cbutton class="btn sm" data-s="${i}">서명\x3c/button>`}\x3c/td>`:''}\x3ctd>\x3cbutton class="btn line sm" data-x="${i}">빼기\x3c/button>\x3c/td>\x3c/tr>`).join('')}
-    \x3ctr>\x3cth colspan="2">합계 (${H.rows.filter(r=>r.name).length}명)\x3c/th>${L.map(l=>{const t=total(l.key);return `\x3cth class="${t>l.remain&&!H.sent?'exp':''}">${t} / 남은 ${l.remain}\x3c/th>`;}).join('')}\x3cth colspan="2">\x3c/th>\x3c/tr>\x3c/table>\x3c/div>`;
+    \x3ctr>\x3cth colspan="2">합계 (${H.rows.filter(r=>r.name).length}명)\x3c/th>${L.map(l=>{const t=total(l.key);return `\x3cth class="${t>l.remain&&!H.sent?'exp':''}">${t} / 남은 ${l.remain}\x3c/th>`;}).join('')}\x3cth colspan="2">\x3c/th>\x3c/tr>\x3c/table>\x3c/div>${H.sent?'':qtyBar(L)}`;
     const box=$('#hRows');
     box.oninput=e=>{ const t=e.target,r=H.rows[t.dataset.i]; if(!r) return; if(t.dataset.f){if(r[t.dataset.f]!==t.value){r.sig='';if(t.dataset.f==='idType')r.addr='';}r[t.dataset.f]=t.value;}if(t.dataset.k){if(String(r.qty[t.dataset.k]??1)!==t.value)r.sig='';r.qty[t.dataset.k]=t.value;} };
     box.onchange=e=>{ if(e.target.dataset.k||e.target.dataset.f)drawRows(); };
     box.onclick=async e=>{ const t=e.target; if(t.dataset.x){ H.rows.splice(+t.dataset.x,1); drawRows(); }
+      const named=H.rows.filter(r=>r.name), qb=qtyBarRead(box,t,named.length);
+      if(qb){ named.forEach(r=>{ if(String(qOf(r,qb.key))!==String(qb.per)) r.sig=''; r.qty[qb.key]=String(qb.per); }); drawRows(); qtyBarDone(qb,named.length); }
       if(t.dataset.s){ const r=H.rows[+t.dataset.s]; const sig=await signPad(`${r.name||'받는 분'} 서명`); if(sig){ r.sig=sig; drawRows(); } } };
   }
 }
