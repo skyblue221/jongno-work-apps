@@ -613,9 +613,10 @@ $('assignPeopleIds').onclick=async()=>{
 };
 const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function api(method,data){return new Promise((resolve,reject)=>{const runner=google.script.run.withSuccessHandler(resolve).withFailureHandler(e=>reject(Error(e.message||String(e))));if(data===undefined)runner[method]();else runner[method](data);});}
-function notice(msg,error=false){$('message').textContent=msg;$('message').style.color=error?'#a33131':'#08606a';}
+let noticeTimer;
+function notice(msg,error=false){clearTimeout(noticeTimer);$('message').textContent=msg;$('message').style.color=error?'#a33131':'#08606a';if(msg&&!error&&!/중입니다\.?$/.test(msg))noticeTimer=setTimeout(()=>{$('message').textContent='';},5000);}
 function show(id){document.querySelectorAll('main section').forEach(s=>s.hidden=s.id!==id);document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('selected',b.dataset.tab===id));}
-document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{returnToAwardAfterPerson=false;show(b.dataset.tab);if(b.dataset.tab==='access')loadAccess();});
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{returnToAwardAfterPerson=false;clearTimeout(noticeTimer);$('message').textContent='';show(b.dataset.tab);if(b.dataset.tab==='access')loadAccess();});
 async function loadAccess(){$('accessRows').textContent='불러오는 중입니다.';
   try{const list=await api('listAccess');
     $('accessRows').innerHTML=list.length?`<table><thead><tr><th>이메일</th><th>이름·역할</th><th>부여일</th><th>만료일</th><th></th></tr></thead><tbody>${list.map(r=>`<tr${r.expired?' style="opacity:.5"':''}><td>${esc(r.email)}</td><td>${esc(r.name)}</td><td>${esc(r.date)}</td><td>${esc(r.until||'계속')}${r.expired?' <span class="pill">만료</span>':''}</td><td><button class="small accDel" data-email="${esc(r.email)}">권한 빼기</button></td></tr>`).join('')}</tbody></table>`:'<p class="muted">아직 권한을 준 분이 없어요.</p>';

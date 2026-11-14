@@ -434,10 +434,11 @@ const $=id=>document.getElementById(id);
 const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const won=n=>Number(n||0).toLocaleString('ko-KR');
 function api(method,data){return new Promise((res,rej)=>{const r=google.script.run.withSuccessHandler(res).withFailureHandler(e=>rej(Error(e.message||String(e))));data===undefined?r[method]():r[method](data);});}
-function notice(t,err){$('message').textContent=t;$('message').style.color=err?'#a8322a':'#9a3b26';}
+let noticeTimer;
+function notice(t,err){clearTimeout(noticeTimer);$('message').textContent=t;$('message').style.color=err?'#a8322a':'#9a3b26';if(t&&!err&&!/중입니다\.?$/.test(t))noticeTimer=setTimeout(()=>{$('message').textContent='';},5000);}
 function show(id){document.querySelectorAll('main section').forEach(s=>s.hidden=s.id!==id);document.querySelectorAll('nav button[data-tab]').forEach(b=>b.classList.toggle('selected',b.dataset.tab===id));
   if(id==='donors')loadDonors();if(id==='bank')loadBank();if(id==='monthly')loadMonthlyRecords();if(id==='newdonor')loadNew();if(id==='access')loadAccess();if(id==='cert')initCert();if(id==='dash')loadDash();if(id==='annual')loadAnnualCtx();}
-document.querySelectorAll('nav button[data-tab]').forEach(b=>b.onclick=()=>show(b.dataset.tab));
+document.querySelectorAll('nav button[data-tab]').forEach(b=>b.onclick=()=>{clearTimeout(noticeTimer);$('message').textContent='';show(b.dataset.tab);});
 async function copyText(text){try{await navigator.clipboard.writeText(text);return true;}catch(e){}const t=document.createElement('textarea');t.value=text;t.style.position='fixed';t.style.opacity='0';document.body.appendChild(t);t.select();let ok=false;try{ok=document.execCommand('copy');}catch(e){}t.remove();return ok;}
 function copyBtn(value,label){return `<button class="small copyBtn" data-copy="${esc(value)}">${esc(label||'복사')}</button>`;}
 function bindCopy(root){root.querySelectorAll('.copyBtn').forEach(b=>b.onclick=async()=>{const ok=await copyText(b.dataset.copy);notice(ok?`「${b.dataset.copy}」 복사했어요.`:'복사가 막혔어요. 다른 브라우저로 열어 주세요.',!ok);});}
