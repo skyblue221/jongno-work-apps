@@ -3,6 +3,7 @@
 <head>
 <base target="_top">
 <meta charset="utf-8">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap">
 <style>
 :root{--bg:#f6f7f4;--card:#fff;--ink:#1f2a24;--sub:#5f6b64;--line:#dfe5df;--pri:#2f6b4f;--pri2:#e5f0ea;--warn:#b5532b;--warnbg:#fbeee6;--yel:#fff3b0}
 *{box-sizing:border-box}
@@ -53,6 +54,55 @@ textarea{min-height:90px}
 #printArea{display:none}
 body.viewer .frm,
 body.viewer :is(#dGo,#oGo,#xGo,#vGo,#vAddOpen,#sEdit,#sLink,#sPdf,#oEdit,#oPdf,#dEdit,#hsEdit,#hsDone,#oScan,[data-s],[data-ln],[data-ok],[data-no],[data-ed],[data-r],[data-x],[data-l]){display:none!important}
+/* ===== 화면 다듬기 (2026-11) · 관리 화면형 · 남색 · 수령증·인수증 출력 양식은 그대로 · 이 블록만 지우면 예전 모양 ===== */
+:root{--bg:#fff;--card:#fff;--ink:#1d2329;--sub:#5d6670;--line:#dde1e6;--pri:#1f3a5f;--pri2:#edf2f7;--warn:#a8322a;--warnbg:#fbefed}
+body{background:#fff;font-family:"Noto Sans KR","Apple SD Gothic Neo","Malgun Gothic",sans-serif;word-break:keep-all}
+/* 맨 위: 기관명 줄 */
+header{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;background:#fff;color:var(--ink);max-width:1140px;margin:0 auto;padding:20px 20px 4px}
+header h1{font-size:15px;font-weight:400;color:var(--sub)}
+header h1::before{content:"종로장애인복지관";font-size:19px;font-weight:700;color:var(--ink);margin-right:12px}
+header small{margin-left:auto;opacity:1;color:var(--sub);font-size:13px}
+/* 메뉴: 밑줄 탭, 줄은 화면 끝까지 */
+nav{gap:28px;padding:0 max(20px,calc((100% - 1100px)/2));background:#fff;border-bottom:1px solid var(--line)}
+nav button{border:0;border-bottom:3px solid transparent;border-radius:0;background:none;padding:15px 0 12px;font-size:15px;color:var(--ink)}
+nav button:hover{color:var(--pri)}
+nav button.on{background:none;border-color:transparent;border-bottom-color:var(--pri);color:var(--pri);font-weight:700}
+nav .dot{background:var(--warn);border-radius:2px}
+main{max-width:1140px;padding:30px 20px 80px}
+/* 칸: 그림자·둥근 모서리 없이 */
+.card{border:1px solid var(--line);border-radius:0;padding:20px 22px;margin-bottom:20px}
+.card h2{font-size:18px;margin:0 0 14px;letter-spacing:-.01em}
+.card h3{color:var(--ink)}
+label{color:var(--sub)}
+input,select,textarea{border:1px solid #c9cfd6;border-radius:2px;min-height:42px}
+textarea{min-height:90px}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--pri);outline-offset:-1px}
+/* 버튼: 남색 하나만 진하게 */
+.btn{border-radius:2px;font-weight:700}
+.btn:hover{filter:brightness(.92)}
+.btn.sub{background:var(--pri2);color:var(--pri)}
+.btn.line{border:1px solid #c9cfd6;background:#fff;color:var(--ink)}
+.btn.line:hover{border-color:var(--pri);filter:none}
+/* 안내 상자: 왼쪽 줄 */
+.note{background:#f4f6f8;color:var(--ink);border-left:3px solid var(--pri);border-radius:0}
+.note.warn{background:var(--warnbg);color:var(--warn);border-left-color:var(--warn)}
+/* 물품 고르기 목록 */
+.lot{border-radius:2px;border-color:var(--line)}
+.lot:hover{border-color:#b9c1ca}
+.lot.on{border-color:var(--pri);background:var(--pri2)}
+.chip{border-radius:2px}
+/* 표: 위에 남색 굵은 선 + 회색 머리줄 */
+.tbl{border-top:2px solid var(--pri)}
+.tbl th{background:#f4f6f8;color:var(--ink);font-weight:700;font-size:13.5px;padding:10px 8px}
+.tbl td{padding:9px 8px;border-bottom-color:var(--line)}
+.tag{border-radius:2px}
+.tag.ok{background:var(--pri2);color:var(--pri)}
+.exp{color:var(--warn)}
+#modal .box{border-radius:2px;border-top:3px solid var(--pri)}
+#toast{border-radius:2px;background:var(--ink)}
+#pad{border:1px solid var(--ink);border-radius:2px}
+.preview{border-radius:0}
+@media(max-width:640px){header h1::before{display:block;margin:0 0 2px}nav{gap:20px}.card{padding:16px}}
 @media print{
   @page{margin:10mm}
   body{background:#fff}
@@ -566,7 +616,7 @@ function homeView(){
   const vo={sel:H.sel,vsel:H.vsel,vskip:H.vskip,get outBy(){return H.manager||'';},set outBy(v){},need:k=>total(k),people:()=>H.rows.filter(r=>r.name).map(r=>({name:r.name,q:k=>qOf(r,k)}))};
   const vNotes=()=>{ const keys=H.sel.filter(k=>(H.vsel[k]||[]).length); return keys.length?vSplit(keys,H.vsel,vo.people()).map(vsFlat):[]; };
   const html=()=>{ const L=lots(), vn=vNotes(); let ri=-1; return receiptHtml({ dest:S.boot.dept||'일상동행팀', noTeam:true,
-    items:L.map(l=>({name:l.name,inDate:l.inDate,donor:l.donor,inQty:l.inQty,give:total(l.key),remainAfter:H.sent?l.remain:l.remain-total(l.key)})),
+    items:L.map(l=>({name:l.name,inDate:l.inDate,donor:l.donor,inQty:l.inQty,give:total(l.key),remainAfter:(H.before&&H.before[l.key]!=null?H.before[l.key]:l.remain)-total(l.key)})),
     rows:H.rows.filter(r=>r.name).map(r=>{ ri++; const n=(vn[ri]||[]).join(', '); return {name:r.name,team:'',addr:r.addr,idType:H.idType,date:H.dateMode==='fill'?H.date:(r.sig?S.boot.today:''),sigUrl:r.sig,note:n,noteSmall:!!n,qty:L.map(l=>qOf(r,l.key))}; }) }); };
   $('#hXls').onclick=e=>{if(!checkHome())return; if(!H.sel.length||!H.rows.some(r=>r.name)) return toast('물품과 명단을 넣어 주세요.'); toExcel(e.target,html(),'가정배분수령증_'+H.date,true); };
   $('#hPrint').onclick=()=>{if(!checkHome())return; if(!H.sel.length||!H.rows.some(r=>r.name)) return toast('물품과 명단을 넣어 주세요.'); printHtml(html(),true); };
@@ -583,11 +633,11 @@ function homeView(){
   $('#hSend').onclick=e=>act(e.target, async()=>{
     checkInputQuantities(H.rows);if(H.sent) throw '이미 요청했어요.'; if(!H.manager) throw '사례 담당자 이름을 골라 주세요.';
     const people=H.rows.filter(r=>r.name); if(!H.sel.length||!people.length) throw '물품과 명단을 넣어 주세요.';
-    const vc=await vCheck(vo), hasV=Object.keys(vc.vsel).length;
-    await run('requestHome',{manager:H.manager,date:H.date,count:people.length,items:H.sel.map(k=>({key:k,qty:total(k)})),vsel:vc.vsel,vskip:vc.vskip,outBy:vc.outBy,
+    const vc=await vCheck(vo), hasV=Object.keys(vc.vsel).length, before=Object.fromEntries(H.sel.map(k=>[k,(lotOf(k)||{}).remain]));
+    const hid=await run('requestHome',{manager:H.manager,date:H.date,count:people.length,items:H.sel.map(k=>({key:k,qty:total(k)})),vsel:vc.vsel,vskip:vc.vskip,outBy:vc.outBy,
       people:hasV?people.map(r=>({name:r.name,qty:Object.fromEntries(Object.keys(vc.vsel).map(k=>[k,qOf(r,k)]))})):[]});
-    H.sent=true; S.lv=null; refreshStockLater(); if(S.boot.admin) bumpCount('home',1);
-    $('#hMsg').innerHTML=`\x3cp class="note">min에게 확인 요청을 보냈어요. 기록에는 \x3cb>${people.length}명 · 수량\x3c/b>만 남았어요. 수령증을 다 뽑았으면 \x3cb>명단 지우기\x3c/b>를 눌러 주세요.\x3c/p>`;
+    H.before=before; H.sent=true; const keep=html(); run('saveHomePaper',hid,keep).catch(()=>run('saveHomePaper',hid,keep)).catch(()=>toast('확인용 수령증 PDF 저장이 안 됐어요. 인쇄는 그대로 하시면 돼요.')); S.lv=null; refreshStockLater(); if(S.boot.admin) bumpCount('home',1);
+    $('#hMsg').innerHTML=`\x3cp class="note">min에게 확인 요청을 보냈어요. 기록에는 \x3cb>${people.length}명 · 수량\x3c/b>만 남고, 확인용으로 \x3cb>서명 전 수령증 PDF\x3c/b>가 관리자만 여는 폴더에 저장돼요. 수령증을 다 뽑았으면 \x3cb>명단 지우기\x3c/b>를 눌러 주세요.\x3c/p>`;
   }, '보내는 중...');
   drawRows(); loadLV(()=>{ if(!H.sent) vBox($('#hV'),vo); });
   function drawRows(){
@@ -815,8 +865,8 @@ async function homeOkView(){
   const list=await run('listHome'), wait=list.filter(x=>x.status==='확인 대기'), done=list.filter(x=>x.status!=='확인 대기').slice(0,15);
   const line=x=>x.items.map(i=>`${esc(i.name)} ${i.qty}`).join(', ');
   $('#main').innerHTML=`\x3cdiv class="card">\x3ch2>확인 기다리는 가정 배분\x3c/h2>\x3cp class="muted">확인을 누르면 배분 기록에 담당자 이름으로 들어가요. 그 전까지도 재고에서는 미리 빼 두고 있어요.\x3c/p>
-  ${wait.length?`\x3ctable class="tbl">${wait.map(x=>`\x3ctr>\x3ctd>\x3cb>${esc(x.manager)}\x3c/b> · ${esc(x.date)} · ${x.count}명\x3cbr>\x3cspan class="muted">${line(x)}\x3c/span>\x3c/td>\x3ctd style="text-align:right;white-space:nowrap">${x.sign?'':`\x3cbutton class="btn sm line" data-ed="${x.id}">수정\x3c/button> `}\x3cbutton class="btn sm" data-ok="${x.id}">확인\x3c/button> \x3cbutton class="btn sm line" data-no="${x.id}">취소\x3c/button>\x3c/td>\x3c/tr>`).join('')}\x3c/table>`:'\x3cp class="muted">기다리는 요청이 없어요.\x3c/p>'}\x3c/div>
-  \x3cdiv class="card">\x3ch2>최근 처리\x3c/h2>${done.length?`\x3ctable class="tbl">${done.map(x=>`\x3ctr>\x3ctd>${esc(x.manager)} · ${esc(x.date)} · ${x.count}명\x3cbr>\x3cspan class="muted">${line(x)}\x3c/span>\x3c/td>\x3ctd style="white-space:nowrap">\x3cspan class="tag ${x.status==='확인'?'ok':''}">${esc(x.status)}\x3c/span>${x.status==='확인'&&!x.sign?` \x3cbutton class="btn sm line" data-ed="${x.id}">수정\x3c/button>`:''}\x3c/td>\x3c/tr>`).join('')}\x3c/table>`:'\x3cp class="muted">없어요.\x3c/p>'}\x3c/div>`;
+  ${wait.length?`\x3ctable class="tbl">${wait.map(x=>`\x3ctr>\x3ctd>\x3cb>${esc(x.manager)}\x3c/b> · ${esc(x.date)} · ${x.count}명\x3cbr>\x3cspan class="muted">${line(x)}\x3c/span>\x3c/td>\x3ctd style="text-align:right;white-space:nowrap">${x.file?`\x3ca class="btn sm line" href="${esc(x.file)}" target="_blank">📄 수령증\x3c/a> `:''}${x.sign?'':`\x3cbutton class="btn sm line" data-ed="${x.id}">수정\x3c/button> `}\x3cbutton class="btn sm" data-ok="${x.id}">확인\x3c/button> \x3cbutton class="btn sm line" data-no="${x.id}">취소\x3c/button>\x3c/td>\x3c/tr>`).join('')}\x3c/table>`:'\x3cp class="muted">기다리는 요청이 없어요.\x3c/p>'}\x3c/div>
+  \x3cdiv class="card">\x3ch2>최근 처리\x3c/h2>${done.length?`\x3ctable class="tbl">${done.map(x=>`\x3ctr>\x3ctd>${esc(x.manager)} · ${esc(x.date)} · ${x.count}명\x3cbr>\x3cspan class="muted">${line(x)}\x3c/span>\x3c/td>\x3ctd style="white-space:nowrap">${x.file?`\x3ca class="btn sm line" href="${esc(x.file)}" target="_blank">📄 수령증\x3c/a> `:''}\x3cspan class="tag ${x.status==='확인'?'ok':''}">${esc(x.status)}\x3c/span>${x.status==='확인'&&!x.sign?` \x3cbutton class="btn sm line" data-ed="${x.id}">수정\x3c/button>`:''}\x3c/td>\x3c/tr>`).join('')}\x3c/table>`:'\x3cp class="muted">없어요.\x3c/p>'}\x3c/div>`;
   $('#main').onclick=e=>{ const t=e.target; if(t.dataset.ed) return editHomeTotals(list.find(x=>x.id===t.dataset.ed)); const id=t.dataset.ok||t.dataset.no; if(!id) return;
     if(t.dataset.no && !confirm('이 요청을 취소할까요? 미리 빼 둔 재고가 돌아와요.'+((list.find(x=>x.id===id)||{items:[]}).items.some(i=>(i.serials||[]).length)?' 상품권 번호도 관리대장에서 「보유」로 돌아가요.':''))) return;
     act(t, async()=>{ await run('confirmHome',id,!!t.dataset.ok); if(t.dataset.no) S.lv=null; bumpCount('home',-1); refreshStockLater(); toast(t.dataset.ok?'배분 기록에 넣었어요.':'취소했어요.'); homeOkView(); }); };
