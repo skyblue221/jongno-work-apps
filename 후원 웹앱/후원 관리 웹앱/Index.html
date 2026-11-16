@@ -686,7 +686,9 @@ function parseMonthlyGoodsList(aoa,period,expected){
   if(iNo<0)return {error:'건수를 셀 번호 칸을 찾지 못했어요.'};
   const isOut=h.row.some(c=>c.startsWith('사용')),isIn=h.row.some(c=>c.startsWith('후원자')||c.startsWith('수입'));
   if((expected==='수입'&&isOut)||(expected==='사용'&&!isOut&&isIn))return {error:expected+' 명세서 칸에 다른 종류의 파일을 선택했어요.'};
-  const iDate=_idx(h.row,['수입일자','사용일자','입금일자','기부일자','연월일','년월일','수입일','사용일','일자','날짜']);
+  // 사용명세서에는 사용일자·수입일자가 둘 다 있어요 → 종류에 맞는 날짜 칸을 먼저 찾아요
+  const dateNames=expected==='사용'?['사용일자','사용일','수입일자','입금일자','기부일자','연월일','년월일','수입일','일자','날짜']:['수입일자','입금일자','기부일자','연월일','년월일','수입일','사용일자','사용일','일자','날짜'];
+  const iDate=_idx(h.row,dateNames);
   let count=0,qty=0,amount=0,badDate=0,allCount=0;const months=new Set();
   for(const row of aoa.slice(h.r+1)){if(!/^\d+$/.test(_t(row[iNo])))continue;++allCount;
     if(iDate>=0){const date=excelDate(row[iDate]);if(!date){++badDate;continue;}months.add(date.slice(0,7));if(date.slice(0,7)!==period)continue;}
@@ -733,7 +735,10 @@ async function renderMonthly(){
   let cumTable='';
   try{
     const py=m===1?y-1:y,pm=m===1?12:m-1,prev=m===1?null:(await api('getMonthly',py)).find(o=>o.month===pm);
-    const has=prev&&prev.dCumInc!=null;
+    // 지난달 누적값이 그 달 차인과 맞을 때만 수입·지출을 따로 비교해요 (안 맞으면 차인만 비교)
+    const hasCum=prev&&[prev.dCumInc,prev.dCumExp,prev.nCumInc,prev.nCumExp].every(v=>v!=null);
+    const cumOk=hasCum&&prev.dCumInc-prev.dCumExp===prev.dBalance&&prev.nCumInc-prev.nCumExp===prev.nBalance;
+    const has=cumOk;
     const cell=(now,before)=>{
       if(before==null)return `<td class="num">${won(now)}</td><td class="num muted">-</td><td></td>`;
       const d=now-before;
@@ -754,7 +759,9 @@ async function renderMonthly(){
       checks.push(diffs.length
         ? `<li><span class="warn">⚠ 지난달 저장 이후 지난 자료가 바뀌었어요: ${diffs.join(', ')}</span><br><span class="small">희망이음에서 ${pm}월 이전 날짜로 수정·추가·삭제된 내역이 있는지 확인해 주세요.</span></li>`
         : `<li><span class="ok">✓</span> 지난달(${pm}월) 저장값과 이번 달 전월 누적이 ${has?'수입·지출 모두':'차인 기준으로'} 같아요.</li>`);
-      if(!has)checks.push('<li class="muted">지난달 기록에는 누적수입·지출이 없어서 차인만 비교했어요. 이번 달부터 누적값도 저장돼서 다음 달부터는 수입·지출을 따로 비교해요.</li>');
+      if(!has)checks.push(hasCum
+        ? `<li class="muted">지난달(${pm}월) 저장된 누적수입·지출이 그 달 차인과 맞지 않아서 차인만 비교했어요. 「월별기록」 탭 ${pm}월 줄의 누적 칸에는 그 달 말 누적(누적수입 − 누적지출 = 그 달 차인)이 들어가야 해요.</li>`
+        : '<li class="muted">지난달 기록에는 누적수입·지출이 없어서 차인만 비교했어요. 이번 달부터 누적값도 저장돼서 다음 달부터는 수입·지출을 따로 비교해요.</li>');
     }
   }catch(e){}
   $('moChecks').innerHTML=`<h3>3. 계산 확인</h3><ul class="small">${checks.join('')}</ul>${cumTable}`;
