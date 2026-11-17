@@ -741,6 +741,24 @@ function recordThankAwards_impl_(o){return withLock_(()=>{
  return {added:rows.length,skipped};
 },['AWARDS']);}
 function recordThankAwards(o){requireOwner_();return recordThankAwards_impl_(o);}
+/* 감사패키지 명단 출력용: 고른 분의 연락처, 최초·마지막 봉사일, 누적 봉사횟수 (교육·모집연계 제외, 모든 연도) */
+function getThankPrintData_impl_(o){
+ const ids=new Set((o&&o.personIds||[]).map(x=>String(x).trim()).filter(Boolean));
+ if(!ids.size)throw Error('출력할 분을 선택해 주세요.');
+ if(ids.size>300)throw Error('한 번에 300명까지 출력할 수 있어요.');
+ const year=Number(o.year)||Number(today_().slice(0,4)),all=allData_(),events=dashboardStats_(all,year,true).events;
+ const byId=new Map((all.people||[]).map(p=>[String(p.id),p])),info={},valid=d=>/^\d{4}-\d{2}-\d{2}$/.test(d);
+ events.forEach(e=>{
+  if(!e.key||!e.key.startsWith('id:')||!isServiceEvent_(e)||!valid(e.date))return;
+  const id=e.key.slice(3);if(!ids.has(id))return;
+  const r=info[id]||(info[id]={first:e.date,last:e.date,total:0});
+  if(e.date<r.first)r.first=e.date;if(e.date>r.last)r.last=e.date;r.total++;
+ });
+ const out={};
+ ids.forEach(id=>{const p=byId.get(id)||{},r=info[id]||{};out[id]={phone:p.phone||'',firstDate:r.first||'',lastDate:r.last||'',totalCount:r.total||0};});
+ return {today:today_(),people:out};
+}
+function getThankPrintData(o){requireRead_();return getThankPrintData_impl_(o);}
 
 /* ── 대시보드 홈: ① 실적 반영 현황 ② 문자 대상 ③ 보고용 숫자·그래프 ── */
 const SMS_PIN_SHEET='문자고정', SMS_RECENT_MONTHS=3;
@@ -827,8 +845,10 @@ function getDashboardHome_impl_(year){
 
 /* ── 접근 권한 ──
    - 이 스크립트를 배포한 계정(min) = 모든 기능 + 연락처·생년월일
-   - 앱의 「권한 관리」 탭(또는 아래 VIEWER_EMAILS)에 넣은 관리자 = 숫자만 보기 (대시보드 숫자·그래프, 연간 현황 표)
-     명단·이름이 나오는 화면(봉사자 명단, 상세 이력, 감사명단, 배지, 집계 근거)과 수정 기능은 min만
+   - 앱의 「권한 관리」 탭에서 보기 범위를 골라 넣은 분
+     · 숫자만 보기(또는 아래 VIEWER_EMAILS): 대시보드 숫자·그래프, 연간 현황 표만 (이름·연락처 없음)
+     · 전체 보기(수정 불가): 모든 메뉴와 연락처·생년월일까지 보기만 (팀장·관장·국장 등). 저장·수정·삭제는 안 됨
+     수정 기능과 권한 관리는 min만
    - 그 밖의 사람 = "접근 권한이 없습니다" 화면
    배포 설정: 실행 사용자 "나" / 액세스 권한 "도메인 내 모든 사용자" (기관 계정으로 배포해야 이메일 확인이 됩니다) */
 const VIEWER_EMAILS=[
@@ -839,7 +859,8 @@ const PRIVATE_KEYS=['phone','birthDate'];
 function currentEmail_(){try{return String(Session.getActiveUser().getEmail()||'').trim().toLowerCase();}catch(e){return '';}}
 function ownerEmail_(){try{return String(Session.getEffectiveUser().getEmail()||'').trim().toLowerCase();}catch(e){return '';}}
 /* 앱의 「권한 관리」 탭에서 넣고 빼는 '권한' 시트 (코드를 고치지 않아도 됨) */
-const ACCESS_SHEET='권한',ACCESS_HEAD=['이메일','이름·역할','부여일','만료일'];
+const ACCESS_SHEET='권한',ACCESS_HEAD=['이메일','이름·역할','부여일','만료일','보기 범위'];
+const SCOPE_NUMBERS='숫자만 보기',SCOPE_ALL='전체 보기(수정 불가)';
 let _ROLE=null;
 function accessSheet_(){
  const ss=ss_();let sh=ss.getSheetByName(ACCESS_SHEET);
@@ -849,7 +870,7 @@ function accessSheet_(){
 function fmtDay_(v){if(v instanceof Date)return Utilities.formatDate(v,Session.getScriptTimeZone(),'yyyy-MM-dd');const m=String(v||'').trim().replace(/[.\/]/g,'-').match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);return m?m[1]+'-'+m[2].padStart(2,'0')+'-'+m[3].padStart(2,'0'):'';}
 function accessRows_(){
  const sh=ss_().getSheetByName(ACCESS_SHEET);if(!sh||sh.getLastRow()<2)return [];
- return sh.getRange(2,1,sh.getLastRow()-1,4).getValues().map(r=>({email:String(r[0]).trim().toLowerCase(),name:String(r[1]||''),date:fmtDay_(r[2]),until:fmtDay_(r[3])})).filter(r=>r.email);
+ return sh.getRange(2,1,sh.getLastRow()-1,5).getValues().map(r=>({email:String(r[0]).trim().toLowerCase(),name:String(r[1]||''),date:fmtDay_(r[2]),until:fmtDay_(r[3]),scope:String(r[4]||'').trim()===SCOPE_ALL?SCOPE_ALL:SCOPE_NUMBERS})).filter(r=>r.email);   // 보기 범위가 비어 있으면(예전에 넣은 분) 숫자만 보기
 }
 function role_(){
  if(_ROLE!==null)return _ROLE;
@@ -857,7 +878,7 @@ function role_(){
  if(me&&owner&&me===owner)return (_ROLE='owner');
  if(me&&VIEWER_EMAILS.map(x=>String(x).trim().toLowerCase()).includes(me))return (_ROLE='viewer');
  const a=me?accessRows_().find(r=>r.email===me):null;
- if(a&&!(a.until&&today_()>a.until))return (_ROLE='viewer');   // 만료일이 지나면 자동으로 권한 없음
+ if(a&&!(a.until&&today_()>a.until))return (_ROLE=a.scope===SCOPE_ALL?'viewerAll':'viewer');   // 만료일이 지나면 자동으로 권한 없음
  return (_ROLE='');
 }
 function listAccess(){requireOwner_();const t=today_();return accessRows_().map(r=>Object.assign(r,{expired:!!r.until&&t>r.until}));}
@@ -866,8 +887,10 @@ function addAccess(o){requireOwner_();return withLock_(()=>{
  if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email))throw Error('이메일 주소를 확인해 주세요.');
  if(email===ownerEmail_())throw Error('담당자 본인은 이미 모든 권한이 있어요.');
  const sh=accessSheet_(),list=accessRows_(),i=list.findIndex(r=>r.email===email);
- const row=[email,String(o.name||'').trim().slice(0,60),today_(),fmtDay_(o.until)];
- if(i>=0)sh.getRange(i+2,1,1,4).setValues([row]);else sh.appendRow(row);   // 같은 이메일이면 기한을 새로 바꿈
+ const scope=o.scope===SCOPE_ALL?SCOPE_ALL:SCOPE_NUMBERS;
+ if(sh.getRange(1,5).getValue()!=='보기 범위')sh.getRange(1,5).setValue('보기 범위').setFontWeight('bold');
+ const row=[email,String(o.name||'').trim().slice(0,60),today_(),fmtDay_(o.until),scope];
+ if(i>=0)sh.getRange(i+2,1,1,5).setValues([row]);else sh.appendRow(row);   // 같은 이메일이면 범위·기한을 새로 바꿈
  return {replaced:i>=0};
 },['EXTRA']);}
 function removeAccess(email){requireOwner_();return withLock_(()=>{
@@ -876,12 +899,14 @@ function removeAccess(email){requireOwner_();return withLock_(()=>{
 },['EXTRA']);}
 function requireOwner_(){if(role_()!=='owner')throw Error('이 기능은 담당자만 사용할 수 있습니다.');}
 function requireRole_(){const r=role_();if(!r)throw Error('접근 권한이 없습니다.');return r;}
+/** 명단·이름이 나오는 조회: min과 '전체 보기' 권한 */
+function requireRead_(){const r=role_();if(r!=='owner'&&r!=='viewerAll')throw Error('이 화면은 볼 수 있는 권한이 없습니다.');return r;}
 function scrub_(v){
  if(Array.isArray(v))return v.map(scrub_);
  if(v&&typeof v==='object'){const o={};Object.keys(v).forEach(k=>{o[k]=PRIVATE_KEYS.includes(k)?(v[k]?'비공개':''):scrub_(v[k]);});return o;}
  return v;
 }
-function forViewer_(result){return role_()==='owner'?result:scrub_(result);}
+function forViewer_(result){return role_()==='viewer'?scrub_(result):result;}   // 숫자만 보기: 연락처·생년월일 숨김
 function getMyRole(){return requireRole_();}
 // 수정·가져오기: min만
 function movePeopleStatusToB(){requireOwner_();return movePeopleStatusToB_impl_();}
@@ -906,16 +931,16 @@ function updateAwardStatus(a){requireOwner_();return updateAwardStatus_impl_(a);
 function setSmsPin(o){requireOwner_();return setSmsPin_impl_(o);}
 function statsForYear(y,all){requireOwner_();return statsForYear_impl_(y,all);}
 function getAll(){requireOwner_();return allData_();}
-// 조회: min과 관리자 (관리자에게는 연락처·생년월일 숨김)
-function getAppData(y){const r=requireRole_(),d=forViewer_(getAppData_impl_(y));if(r!=='owner'){d.people=[];d.awards=[];}d.role=r;return d;}
+// 조회: min과 권한 받은 분 (숫자만 보기 → 이름·연락처 숨김 / 전체 보기 → 모두 보기)
+function getAppData(y){const r=requireRole_(),d=forViewer_(getAppData_impl_(y));if(r==='viewer'){d.people=[];d.awards=[];}d.role=r;return d;}
 function getJinwooYearStats(y){requireRole_();return getJinwooYearStats_impl_(y);}
 function getJinwooSummary(){requireRole_();return getJinwooSummary_impl_();}
 function getDashboardStats(y){requireRole_();return forViewer_(getDashboardStats_impl_(y));}
-function getPersonDetail(id){requireOwner_();return getPersonDetail_impl_(id);}
-function getDashboardEvidence(o){requireOwner_();return getDashboardEvidence_impl_(o);}
-function getLookupData(y){requireOwner_();return getLookupData_impl_(y);}
-function getThankList(y){requireOwner_();return getThankList_impl_(y);}
-function getDashboardHome(y){const r=requireRole_(),d=getDashboardHome_impl_(y);if(r!=='owner'){d.sms=null;delete d.registrationIssues;return scrub_(d);}return d;}
+function getPersonDetail(id){requireRead_();return getPersonDetail_impl_(id);}
+function getDashboardEvidence(o){requireRead_();return getDashboardEvidence_impl_(o);}
+function getLookupData(y){requireRead_();return getLookupData_impl_(y);}
+function getThankList(y){requireRead_();return getThankList_impl_(y);}
+function getDashboardHome(y){const r=requireRole_(),d=getDashboardHome_impl_(y);if(r==='viewer'){d.sms=null;delete d.registrationIssues;return scrub_(d);}return d;}
 
 
 /* ── 배지 신청 대상 ── 누적 활동시간(교육·모집연계 제외), 받은 배지는 AWARDS의 종류 '배지' 기록 기준 */
@@ -1006,10 +1031,10 @@ function getAnnualReport_impl_(year){
   return {year,summary:{all:sum(list),individual:sum(individuals),group:sum(members),orgCount:groups.length},groups,individuals,unidentified:unidentified.map(r=>r.name),rule:{minPeople:GROUP_MIN_PEOPLE,exclude:GROUP_EXCLUDE},notGroup:Array.from(notGroup.entries()).map(([org,reason])=>({org,reason})).sort((a,b)=>a.org.localeCompare(b.org,'ko'))};
  });
 }
-function getBadgeList(o){requireOwner_();return getBadgeList_impl_(o);}
+function getBadgeList(o){requireRead_();return getBadgeList_impl_(o);}
 function recordBadge(o){requireOwner_();return recordBadge_impl_(o);}
 function getAnnualReport(y){
- const r=requireRole_(),d=getAnnualReport_impl_(y);if(r==='owner')return d;
+ const r=requireRole_(),d=getAnnualReport_impl_(y);if(r!=='viewer')return d;
  // 관리자: 숫자만 (이름 없음)
  return {year:d.year,summary:d.summary,rule:d.rule,groups:d.groups.map(g=>({org:g.org,real:g.real,newCount:g.newCount,count:g.count,hours:g.hours})),individuals:[],unidentified:[],unidentifiedCount:d.unidentified.length,notGroup:[],viewer:true};
 }

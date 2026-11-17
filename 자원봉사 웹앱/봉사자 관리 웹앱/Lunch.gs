@@ -137,8 +137,8 @@ function getLunchXlsx_impl_(o){
  }finally{DriveApp.getFileById(tmp.getId()).setTrashed(true);}
 }
 
-function getLunchMonth(o){requireOwner_();return getLunchMonth_impl_(o);}
+function getLunchMonth(o){requireRead_();return getLunchMonth_impl_(o);}
 function addLunch(o){requireOwner_();return addLunch_impl_(o);}
 function deleteLunch(id){requireOwner_();return deleteLunch_impl_(id);}
 function importLunchSheet(link){requireOwner_();return importLunchSheet_impl_(link);}
-function getLunchXlsx(o){requireOwner_();return getLunchXlsx_impl_(o);}
+function getLunchXlsx(o){requireRead_();return getLunchXlsx_impl_(o);}

@@ -2,7 +2,7 @@
    선택한 봉사자의 활동기간(기관 기록상 첫 활동일 ~ 최근 활동일)과 활동 내용(많이 한 순 최대 3개)을 돌려줍니다.
    교육·모집연계와 연도별 명단(날짜 없음)은 활동기간·내용에서 제외합니다.
    기존 Code.gs의 함수(allData_, volunteerIdentity_, jinwooType_, bucketJinwoo_, normDate_, requireOwner_)를 사용합니다. */
-function getSmsPrintData(ids){requireOwner_();return smsPrintData_(allData_(),ids);}
+function getSmsPrintData(ids){requireRead_();return smsPrintData_(allData_(),ids);}
 function smsPrintData_(all,ids){
  const want=new Set((ids||[]).map(x=>String(x).trim()).filter(Boolean));
  if(!want.size)throw Error('명단에 넣을 분을 선택해 주세요.');
