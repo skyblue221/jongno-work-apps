@@ -96,6 +96,7 @@
     button.small{padding:3px 8px;font-size:12px;border-radius:3px}
     .orgBlock{border-top:1px solid var(--line2);padding:10px 0}.orgBlock p{margin:4px 0}
     body.viewer .ownerOnly{display:none!important}
+    body.readonly .editOnly{display:none!important}   /* 보기 전용(숫자만·전체 보기): 저장·수정 버튼 숨김 */
     [hidden]{display:none!important}
     #roleBadge{background:#fbf6ea;color:#6b4a00;border:1px solid #e3d3a8;font-weight:700}
     @media(max-width:520px){header{padding:20px 16px 12px}th,td{padding:8px}button{padding:9px}h1{font-size:21px}nav button{padding:10px 8px 8px}}
@@ -160,13 +161,13 @@ dialog,.prevBox{border-radius:2px;border-color:var(--line);border-top:3px solid 
   <nav>
     <button data-tab="dashboard" class="selected">대시보드</button>
     <button data-tab="people" class="ownerOnly">봉사자 명단</button>
-    <button data-tab="personForm" class="ownerOnly">봉사자 등록</button>
-    <button data-tab="import" class="ownerOnly">명단 가져오기</button>
-    <button data-tab="records" class="ownerOnly">참여·관계 기록</button>
+    <button data-tab="personForm" class="editOnly">봉사자 등록</button>
+    <button data-tab="import" class="editOnly">명단 가져오기</button>
+    <button data-tab="records" class="editOnly">참여·관계 기록</button>
     <button data-tab="awards" class="ownerOnly">인정·포상</button>
     <button data-tab="lunch" class="ownerOnly">중식비</button>
     <button data-tab="reports">연간보고·배지</button>
-    <button data-tab="access" class="ownerOnly">권한 관리</button>
+    <button data-tab="access" class="editOnly">권한 관리</button>
   </nav>
   <div id="message" role="status" aria-live="polite"></div>
 
@@ -237,8 +238,8 @@ dialog,.prevBox{border-radius:2px;border-color:var(--line);border-top:3px solid 
         <option value="">상태 전체</option><option>활동 중</option><option>일시중단</option><option>종결</option><option>확인 필요</option>
       </select>
       <button onclick="exportPeople()" class="ownerOnly">명단 CSV 내려받기</button>
-      <button id="assignPeopleIds" class="ownerOnly">빈 ID 채우기</button>
-      <button id="refreshPeopleAges" class="ownerOnly">연령 다시 계산</button>
+      <button id="assignPeopleIds" class="editOnly">빈 ID 채우기</button>
+      <button id="refreshPeopleAges" class="editOnly">연령 다시 계산</button>
     </div>
     <div class="panel overflow">
       <table><thead><tr><th>이름</th><th>상태</th><th>소속</th><th>재능/관심</th><th>상세</th></tr></thead><tbody id="peopleRows"></tbody></table>
@@ -335,7 +336,7 @@ dialog,.prevBox{border-radius:2px;border-color:var(--line);border-top:3px solid 
   </section>
 
   <section id="lunch" hidden>
-    <div class="panel">
+    <div class="panel editOnly">
       <h2>중식비 입력</h2>
       <p class="muted">같은 날, 같은 프로그램, 같은 시간이면 여러 명을 한 번에 넣을 수 있어요. 이름은 줄바꿈이나 쉼표로 나눠 주세요. 비고(장애인·비장애인)가 다른 분은 따로 입력해 주세요.</p>
       <form id="lunchForm" class="form">
@@ -364,7 +365,7 @@ dialog,.prevBox{border-radius:2px;border-color:var(--line);border-top:3px solid 
       <p id="lunchNote" class="small" role="status"></p>
       <div id="lunchRows" class="overflow"></div>
     </div>
-    <details class="panel">
+    <details class="panel editOnly">
       <summary><b>기존 중식비 시트 가져오기</b> <span class="muted">— 처음 한 번만</span></summary>
       <p class="muted small" style="margin-top:12px">지금까지 쓰던 중식비 구글시트 주소를 붙여넣으면 「중식비 내역」 탭과 월별 탭(예: 25.12월)의 기록을 이 앱으로 가져와요. 원본 시트는 바꾸지 않고, 이미 있는 기록(같은 일자·이름·시작시간)은 건너뛰어요. 금액이 없는 「중식비 내역」 기록은 4,000원으로 넣어요.</p>
       <div class="tools"><input id="lunchImportUrl" placeholder="https://docs.google.com/spreadsheets/d/..." style="max-width:520px"><button id="runLunchImport" class="primary">가져오기</button></div>
@@ -409,12 +410,12 @@ dialog,.prevBox{border-radius:2px;border-color:var(--line);border-top:3px solid 
       <div id="thanksWorkspace" hidden>
         <details id="thanksCandidates" class="recordDisclosure"><summary id="thanksCandidatesTitle">감사명단 후보 선택</summary>
           <div id="thanksRows" class="historyScroll"></div>
-          <div class="tools actionBar"><button id="finishThanksSelection" class="primary">선택 완료 · 선정 명단 보기</button></div>
+          <div class="tools actionBar"><button id="finishThanksSelection" class="primary">선택 완료 · 선정 명단 보기</button><button id="pickRecordedThanks" title="아래 포상 이름으로 이미 기록된 분만 체크해요">기록된 분만 고르기</button></div>
         </details>
         <details id="thanksSelected" class="recordDisclosure" hidden><summary id="thanksSelectedTitle">선정 명단</summary>
           <div id="thanksSelectedRows" class="historyScroll"></div>
-          <div class="tools"><button id="editThanksSelection">선정 명단 수정</button></div>
-      <div id="thanksRecord" class="tools" hidden style="margin-top:12px">
+          <div class="tools"><button id="printThanks" class="primary">감사패키지 명단 출력 (PDF)</button><button id="editThanksSelection">선정 명단 수정</button></div>
+      <div id="thanksRecord" class="tools editOnly" hidden style="margin-top:12px">
         <span id="thanksCount" class="pill"></span>
         <input id="thanksAwardName" aria-label="포상 이름" style="max-width:260px">
         <select id="thanksAwardStatus" aria-label="진행상태" style="max-width:130px"><option>선정</option><option>지급 완료</option></select>
@@ -425,7 +426,7 @@ dialog,.prevBox{border-radius:2px;border-color:var(--line);border-top:3px solid 
         </details>
       </div>
     </div>
-    <div class="panel ownerOnly">
+    <div class="panel editOnly">
       <h2>인정·포상 이력 추가</h2>
       <details class="pastAwardLookup"><summary><b>검색에 없는 과거 봉사자 찾기</b></summary>
         <p class="muted small">과거 명단에서 배지를 받은 사람을 찾아 등록할 수 있어요. 기존 명단에 같은 이름이 있으면 생년월일을 확인해 먼저 선택해주세요. 새 등록은 내용 확인 후 저장해야 하며, 배지 이력은 따로 저장합니다.</p>
@@ -454,10 +455,11 @@ dialog,.prevBox{border-radius:2px;border-color:var(--line);border-top:3px solid 
   <section id="access" hidden>
     <div class="panel">
       <h2>권한 관리</h2>
-      <p class="muted">여기에 넣은 분은 <b>숫자만 보기</b>로 들어올 수 있어요 (대시보드 숫자·그래프, 연간 현황 표). 이름·연락처가 나오는 화면과 수정 기능은 담당자만 써요. <b>만료일</b>을 정해 두면 그날이 지나면 자동으로 권한이 빠져요. 같은 이메일로 다시 넣으면 기한이 새로 바뀌어요.</p>
+      <p class="muted">권한을 줄 때 <b>보기 범위</b>를 골라 주세요.<br>· <b>숫자만 보기</b>: 대시보드 숫자·그래프, 연간 현황 표만 봐요. 이름·연락처는 안 보여요.<br>· <b>전체 보기(수정 불가)</b>: 팀장님·관장님·국장님처럼 모든 메뉴를 봐야 하는 분께. 명단·연락처·생년월일·중식비까지 다 보이지만 저장·수정·삭제는 못 해요.<br><b>만료일</b>을 정해 두면 그날이 지나면 자동으로 권한이 빠져요. 같은 이메일로 다시 넣으면 범위·기한이 새로 바뀌어요.</p>
       <form id="accessForm" class="tools">
         <input name="email" type="email" placeholder="기관 이메일" required style="min-width:220px">
         <input name="name" placeholder="이름·역할 (예: 김○○ 팀장)">
+        <select name="scope" aria-label="보기 범위" style="max-width:190px"><option>숫자만 보기</option><option>전체 보기(수정 불가)</option></select>
         <label class="small">만료일 <input name="until" type="date"></label>
         <button class="primary" type="submit">권한 주기</button>
       </form>
@@ -491,8 +493,14 @@ dialog,.prevBox{border-radius:2px;border-color:var(--line);border-top:3px solid 
 <script>
 let returnToAwardAfterPerson=false;
 let db={people:[],activity:[],awards:[],contacts:[],jinwoo:[],history:[]};
-const isViewer=()=>db.role==='viewer';
-function applyRole(){const v=isViewer();document.body.classList.toggle('viewer',v);$('roleBadge').hidden=!v;if(v&&['people','personForm','import','records','awards','lunch'].includes((document.querySelector('nav button.selected')||{}).dataset?.tab))show('dashboard');}
+const isViewer=()=>db.role==='viewer';                         // 숫자만 보기
+const isReadOnly=()=>!!db.role&&db.role!=='owner';              // 숫자만 보기 + 전체 보기(수정 불가)
+function applyRole(){
+ const v=isViewer(),ro=isReadOnly(),tab=(document.querySelector('nav button.selected')||{}).dataset?.tab;
+ document.body.classList.toggle('viewer',v);document.body.classList.toggle('readonly',ro);
+ $('roleBadge').hidden=!ro;$('roleBadge').textContent=v?'보기 전용 · 숫자만':'보기 전용 · 전체';
+ if((v&&['people','awards','lunch'].includes(tab))||(ro&&['personForm','import','records','access'].includes(tab)))show('dashboard');
+}
 const $=id=>document.getElementById(id);
 $('organizeSheets').onclick=async()=>{
  const button=$('organizeSheets');button.disabled=true;
@@ -536,7 +544,7 @@ function renderPersonDetail(data){
  const p=data.person;$('personDialogTitle').textContent=p.name+' · '+(p.status||'상태 미입력');
  const cached=db.people.findIndex(r=>String(r.id)===String(p.id));if(cached>=0)db.people[cached]=p;
  const items=(rows,fn)=>rows.length?rows.map(fn).join(''):'<li>기록 없음</li>';
- $('personDetail').innerHTML=`<div class="tools ownerOnly"><button id="editSelected" class="primary">정보 수정</button></div>
+ $('personDetail').innerHTML=`<div class="tools editOnly"><button id="editSelected" class="primary">정보 수정</button></div>
  <div class="detailFacts"><p>생년월일: ${esc(p.birthDate||'미입력')}</p><p>연령: ${p.age==null||p.age===''?'미입력':esc(p.age)+'세'}</p><p>연락처: ${esc(p.phone||'미입력')}</p><p>소속: ${esc(p.affiliation||'미입력')}</p><p>등록일: ${esc(p.registrationDate||'미입력')}</p><p>VMS: ${esc(p.vmsId||'-')} / 1365: ${esc(p.vol1365Id||'-')}</p><p>등록된 최초 활동일: ${esc(p.firstActivityDate||'-')}</p><p>등록된 최근 활동일: ${esc(p.lastActivityDate||'-')}</p></div>
  <p>재능: ${esc(p.talents||'미입력')} / 관심: ${esc(p.interests||'미입력')} / 가능 시간: ${esc(p.availability||'미입력')}</p><p>참고사항: ${esc(p.notes||'없음')}</p>
  <div class="detail"><h3>참여 요약</h3><p>확인된 참여 연도: ${esc(data.participationYears.join(', ')||'없음')}</p><p>이력상 첫 기록일: ${esc(data.firstDate||'-')} / 최근 기록일: ${esc(data.lastDate||'-')}</p><p>집계 시간: ${esc(data.hours.toLocaleString(undefined,{maximumFractionDigits:2}))}시간</p><p>과거 실인원 명단: ${esc(data.rosterYears.join(', ')||'없음')} (참여 연도만 확인)</p></div>
@@ -619,11 +627,11 @@ function show(id){document.querySelectorAll('main section').forEach(s=>s.hidden=
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{returnToAwardAfterPerson=false;clearTimeout(noticeTimer);$('message').textContent='';show(b.dataset.tab);if(b.dataset.tab==='access')loadAccess();});
 async function loadAccess(){$('accessRows').textContent='불러오는 중입니다.';
   try{const list=await api('listAccess');
-    $('accessRows').innerHTML=list.length?`<table><thead><tr><th>이메일</th><th>이름·역할</th><th>부여일</th><th>만료일</th><th></th></tr></thead><tbody>${list.map(r=>`<tr${r.expired?' style="opacity:.5"':''}><td>${esc(r.email)}</td><td>${esc(r.name)}</td><td>${esc(r.date)}</td><td>${esc(r.until||'계속')}${r.expired?' <span class="pill">만료</span>':''}</td><td><button class="small accDel" data-email="${esc(r.email)}">권한 빼기</button></td></tr>`).join('')}</tbody></table>`:'<p class="muted">아직 권한을 준 분이 없어요.</p>';
+    $('accessRows').innerHTML=list.length?`<table><thead><tr><th>이메일</th><th>이름·역할</th><th>보기 범위</th><th>부여일</th><th>만료일</th><th></th></tr></thead><tbody>${list.map(r=>`<tr${r.expired?' style="opacity:.5"':''}><td>${esc(r.email)}</td><td>${esc(r.name)}</td><td><span class="pill">${esc(r.scope||'숫자만 보기')}</span></td><td>${esc(r.date)}</td><td>${esc(r.until||'계속')}${r.expired?' <span class="pill">만료</span>':''}</td><td><button class="small accDel" data-email="${esc(r.email)}">권한 빼기</button></td></tr>`).join('')}</tbody></table>`:'<p class="muted">아직 권한을 준 분이 없어요.</p>';
     $('accessRows').querySelectorAll('.accDel').forEach(b=>b.onclick=async()=>{if(!confirm(b.dataset.email+' 님의 권한을 뺄까요?'))return;
       try{await api('removeAccess',b.dataset.email);notice('권한을 뺐어요.');loadAccess();}catch(e){notice(e.message,true);}});
   }catch(e){$('accessRows').textContent=e.message;}}
-$('accessForm').addEventListener('submit',async e=>{e.preventDefault();const f=e.target,o={email:f.elements['email'].value,name:f.elements['name'].value,until:f.elements['until'].value};
+$('accessForm').addEventListener('submit',async e=>{e.preventDefault();const f=e.target,o={email:f.elements['email'].value,name:f.elements['name'].value,scope:f.elements['scope'].value,until:f.elements['until'].value};
   try{const r=await api('addAccess',o);notice(r.replaced?'기존 권한을 새로 바꿨어요.':'권한을 줬어요. 그분은 같은 앱 주소로 들어오면 돼요.');f.reset();loadAccess();}catch(err){notice(err.message,true);}});
 function formData(form){return Object.fromEntries(new FormData(form).entries());}
 function filterPersonSelect(sel){
@@ -683,7 +691,7 @@ function renderAwards(){
  $('awardHistoryTitle').textContent=`인정·포상 기록 보기 (${db.awards.length}건)`;
  $('awardRows').innerHTML=rows.slice().reverse().map(a=>{
   const statuses=a.type==='배지'?BADGE_STATUS:AWARD_STATUS;const options=statuses.includes(a.status)?statuses:[a.status,...statuses];
-  return `<tr><td>${esc(a.date)}</td><td>${esc(names[a.personId]||'미확인')}</td><td>${esc(a.type)}</td><td>${esc(a.name)}</td><td><select class="awardStatus" ${isViewer()?'disabled':''} data-id="${esc(a.id)}" aria-label="${esc(names[a.personId]||'')} ${esc(a.name)} 진행상태">${options.map(s=>`<option ${s===a.status?'selected':''}>${esc(s)}</option>`).join('')}</select></td></tr>`;
+  return `<tr><td>${esc(a.date)}</td><td>${esc(names[a.personId]||'미확인')}</td><td>${esc(a.type)}</td><td>${esc(a.name)}</td><td><select class="awardStatus" ${isReadOnly()?'disabled':''} data-id="${esc(a.id)}" aria-label="${esc(names[a.personId]||'')} ${esc(a.name)} 진행상태">${options.map(s=>`<option ${s===a.status?'selected':''}>${esc(s)}</option>`).join('')}</select></td></tr>`;
  }).join('')||'<tr><td colspan="5">해당하는 기록이 없습니다.</td></tr>';
  $('awardRows').querySelectorAll('.awardStatus').forEach(sel=>sel.onchange=async()=>{
   sel.disabled=true;
@@ -720,7 +728,7 @@ function renderSync(s,today){
 }
 function renderRegistrationIssues(rows){
  $('registrationNote').textContent=rows.length?'선택 연도 진우 자료 중 명단 등록·이름 연결 확인이 필요한 '+rows.length+'명입니다. 통계 식별 불가 인원과는 다른 기준이에요.':'선택 연도 진우 자료에서 명단 등록·이름 연결 확인이 필요한 사람이 없습니다.';
- $('registrationRows').innerHTML=rows.length?`<table><thead><tr><th>이름</th><th>확인사항</th><th>첫 참여 기록</th><th>최근 참여 기록</th><th>주요 활동</th><th>등록·찾기</th></tr></thead><tbody>${rows.map((r,i)=>`<tr><td>${esc(r.name)}</td><td>${esc(r.reason)}</td><td>${esc(r.firstDate)}</td><td>${esc(r.lastDate)}</td><td>${esc(r.activities.join(' / '))}</td><td><button data-issue="${i}">${r.reason==='명단 등록 필요'?'등록하기':'명단 찾기'}</button></td></tr>`).join('')}</tbody></table>`:'';
+ $('registrationRows').innerHTML=rows.length?`<table><thead><tr><th>이름</th><th>확인사항</th><th>첫 참여 기록</th><th>최근 참여 기록</th><th>주요 활동</th><th>등록·찾기</th></tr></thead><tbody>${rows.map((r,i)=>`<tr><td>${esc(r.name)}</td><td>${esc(r.reason)}</td><td>${esc(r.firstDate)}</td><td>${esc(r.lastDate)}</td><td>${esc(r.activities.join(' / '))}</td><td>${r.reason==='명단 등록 필요'&&isReadOnly()?'-':`<button data-issue="${i}">${r.reason==='명단 등록 필요'?'등록하기':'명단 찾기'}</button>`}</td></tr>`).join('')}</tbody></table>`:'';
  $('registrationRows').querySelectorAll('[data-issue]').forEach(b=>b.onclick=()=>{const r=rows[Number(b.dataset.issue)];if(r.reason==='명단 등록 필요'){resetPerson();$('peopleForm').elements.namedItem('name').value=r.name;show('personForm');}else{$('search').value=r.name;$('statusFilter').value='';renderPeople();show('people');}});
 }
 
@@ -749,7 +757,7 @@ function renderSms(){
   <td>${String(p.phone||'').replace(/\D/g,'')?esc(p.phone):'<span class="noPhone">연락처 없음</span>'}</td>
   <td><span class="pill">${esc(p.status||'-')}</span></td><td>${esc(p.lastDate||'-')}</td><td>${esc(p.yearCount||0)}회 / ${esc(p.totalCount||0)}회</td>
   <td>${[...p.reasons,p.pinned?'📌 고정':''].filter(Boolean).map(x=>`<span class="pill">${esc(x)}</span>`).join(' ')||'<span class="muted small">직접 선택</span>'}</td>
-  <td><button class="smsPin" data-id="${esc(p.id)}">${p.pinned?'고정 해제':'📌 고정'}</button></td></tr>`).join('')}</tbody></table>`
+  <td>${isReadOnly()?(p.pinned?'📌':'-'):`<button class="smsPin" data-id="${esc(p.id)}">${p.pinned?'고정 해제':'📌 고정'}</button>`}</td></tr>`).join('')}</tbody></table>`
   :`<p class="placeholder">${view==='checked'?'체크된 분이 없습니다. 「전체 명단에서 추가」로 골라 주세요.':'검색 결과가 없습니다.'}</p>`;
  $('smsRows').querySelectorAll('.smsDetail').forEach(b=>b.onclick=()=>detail(b.dataset.id));
  $('smsRows').querySelectorAll('.smsCheck').forEach(c=>c.onchange=()=>{c.checked?smsChecked.add(c.dataset.id):smsChecked.delete(c.dataset.id);renderSms();});
@@ -815,7 +823,7 @@ async function loadBadges(){
  try{
   const d=await api('getBadgeList',{year:Number($('badgeYear').value)});badgeData=d;const due=d.rows.filter(r=>r.status==='신청 대상'),soon=d.rows.filter(r=>r.status==='곧 도달'),pending=d.rows.filter(r=>r.status==='신청 중');
   $('badgeNote').textContent=`${d.year}년 활동자 · ${d.year}년까지 누적시간 기준 · 신청 후보 ${due.length}명 · 신청 중 ${pending.length}명 · ${d.soonHours}시간 안에 다음 배지 ${soon.length}명`;
-  $('badgeRows').innerHTML=d.rows.length?`<table><thead><tr><th>상태</th><th>이름</th><th>소속</th><th>누적시간</th><th>달성</th><th>받은 배지</th><th>신청 중 배지</th><th>다음 배지</th><th class="ownerOnly">기록</th></tr></thead><tbody>${d.rows.map(r=>`<tr><td><span class="pill">${esc(r.status)}</span></td><td>${esc(r.name)}${r.personId?` <button class="small badgeDetail" data-id="${esc(r.personId)}">활동 보기</button>`:''}</td><td>${esc(r.affiliation)}</td><td>${hrs(r.hours)}시간</td><td>${esc(r.reachedBadge||'-')}</td><td>${esc(r.receivedBadge||'-')}</td><td>${esc(r.pendingBadge||'-')}</td><td>${r.nextBadge?`${esc(r.nextBadge)} (${hrs(r.remain)}시간 남음)`:'-'}</td><td class="ownerOnly">${r.status==='신청 중'&&r.pendingAwardId?`<button class="small completeBadge" data-award="${esc(r.pendingAwardId)}">수령 완료</button>`:r.status==='신청 대상'&&r.personId?`<button class="small recordBadge" data-id="${esc(r.personId)}" data-badge="${esc(r.reachedBadge)}">${esc(r.reachedBadge)} 신청 기록</button>`:''}</td></tr>`).join('')}</tbody></table>`:'<p class="placeholder">선택한 조건에 맞는 신청 후보·신청 중·곧 도달 대상이 없어요. 이전 수령 기록은 아래에서 확인할 수 있어요.</p>';
+  $('badgeRows').innerHTML=d.rows.length?`<table><thead><tr><th>상태</th><th>이름</th><th>소속</th><th>누적시간</th><th>달성</th><th>받은 배지</th><th>신청 중 배지</th><th>다음 배지</th><th class="editOnly">기록</th></tr></thead><tbody>${d.rows.map(r=>`<tr><td><span class="pill">${esc(r.status)}</span></td><td>${esc(r.name)}${r.personId?` <button class="small badgeDetail" data-id="${esc(r.personId)}">활동 보기</button>`:''}</td><td>${esc(r.affiliation)}</td><td>${hrs(r.hours)}시간</td><td>${esc(r.reachedBadge||'-')}</td><td>${esc(r.receivedBadge||'-')}</td><td>${esc(r.pendingBadge||'-')}</td><td>${r.nextBadge?`${esc(r.nextBadge)} (${hrs(r.remain)}시간 남음)`:'-'}</td><td class="editOnly">${r.status==='신청 중'&&r.pendingAwardId?`<button class="small completeBadge" data-award="${esc(r.pendingAwardId)}">수령 완료</button>`:r.status==='신청 대상'&&r.personId?`<button class="small recordBadge" data-id="${esc(r.personId)}" data-badge="${esc(r.reachedBadge)}">${esc(r.reachedBadge)} 신청 기록</button>`:''}</td></tr>`).join('')}</tbody></table>`:'<p class="placeholder">선택한 조건에 맞는 신청 후보·신청 중·곧 도달 대상이 없어요. 이전 수령 기록은 아래에서 확인할 수 있어요.</p>';
   $('badgeRows').querySelectorAll('.badgeDetail').forEach(b=>b.onclick=()=>detail(b.dataset.id));
   $('badgeRows').querySelectorAll('.completeBadge').forEach(b=>b.onclick=async()=>{if(!confirm('봉사자에게 배지를 전달했나요? 수령 완료로 기록합니다.'))return;b.disabled=true;try{await api('updateAwardStatus',{id:b.dataset.award,status:'수령 완료'});const a=db.awards.find(x=>String(x.id)===b.dataset.award);if(a)a.status='수령 완료';renderAwards();await loadBadges();}catch(e){$('badgeNote').textContent=e.message;b.disabled=false;}});
  $('badgeRows').querySelectorAll('.recordBadge').forEach(b=>b.onclick=async()=>{if(!confirm('VMS 누적시간을 확인하고 실제 배지를 신청했나요? 신청 중으로 기록합니다.'))return;b.disabled=true;try{await api('recordBadge',{personId:b.dataset.id,badge:b.dataset.badge});$('badgeNote').textContent=`${b.dataset.badge} 배지 신청을 인정·포상에 기록했어요.`;db=await api('getAppData',Number($('year').value));applyRole();renderAwards();await loadBadges();}catch(e){$('badgeNote').textContent=e.message;b.disabled=false;}});
@@ -860,7 +868,12 @@ $('loadThanks').onclick=async()=>{
   if(!$('thanksAwardName').value||/^\d{4} 자원봉사자 감사패키지$/.test($('thanksAwardName').value))$('thanksAwardName').value=r.defaultName;
   const rec=r.list.filter(p=>p.rank<=r.limit&&p.recommended).length;
   $('thanksNote').textContent=`${r.year}년 ${r.minCount}회 이상 ${r.eligible}명`+(rec?` · 상위 ${r.limit}명 중 💌 추천 카드 ${rec}명`:'')+(r.eligible>r.limit?' · 주황 선 아래는 31위부터예요':'');
-  renderThanks();showThanksCandidates();
+  // 이미 이 포상 이름으로 기록한 분이 있으면, 그 명단을 그대로 선택해서 선정 명단으로 바로 보여줌
+  const name=$('thanksAwardName').value.trim(),recorded=r.list.filter(p=>name&&p.packages.includes(name));
+  if(recorded.length){
+   thanksSel=new Set(recorded.map(p=>p.rank));renderThanks();finishThanksSelection();
+   $('thanksRecordNote').textContent=`「${name}」(으)로 기록한 ${recorded.length}명이 선택되어 있어요. 바꾸려면 [선정 명단 수정]을 눌러 주세요.`;
+  }else{renderThanks();showThanksCandidates();}
  }catch(e){$('thanksNote').textContent=e.message;}finally{btn.disabled=false;}
 };
 $('thanksAwardName').addEventListener('input',renderThanks);
@@ -876,6 +889,58 @@ $('recordThanks').onclick=async()=>{
   picked.forEach(p=>{if(!p.packages.includes(name))p.packages.push(name);});renderThanks();
   $('thanksRecordNote').textContent=`${res.added}명을 기록했어요.`+(res.skipped.length?` 건너뛴 ${res.skipped.length}명: 이미 기록됐거나 명단에 없는 분이에요.`:'')+' 아래 인정·포상 기록은 새로고침하면 보여요.';
  }catch(e){$('thanksRecordNote').textContent=e.message;}finally{btn.disabled=false;}
+};
+/* ── 감사패키지 명단 출력 (선정 명단 = 체크한 분) ── */
+$('pickRecordedThanks').onclick=()=>{
+ if(!thanksData)return;const name=$('thanksAwardName').value.trim();
+ const hit=thanksData.list.filter(p=>name&&p.packages.includes(name));
+ if(!hit.length){$('thanksRecordNote').textContent=name?`「${name}」(으)로 기록된 분이 없어요. 포상 이름을 확인해 주세요.`:'포상 이름을 먼저 적어 주세요.';return;}
+ thanksSel=new Set(hit.map(p=>p.rank));renderThanks();finishThanksSelection();
+ $('thanksRecordNote').textContent=`「${name}」(으)로 기록된 ${hit.length}명을 골랐어요.`;
+};
+const thanksDot=d=>d?String(d).replace(/-/g,'.'):'-';
+function thanksPeriod(a,b){
+ if(!a||!b)return '-';const [y1,m1,d1]=a.split('-').map(Number),[y2,m2,d2]=b.split('-').map(Number);
+ const m=(y2-y1)*12+(m2-m1)-(d2<d1?1:0);if(m<1)return '1개월 미만';
+ const y=Math.floor(m/12),r=m%12;return (y?y+'년 ':'')+(r?r+'개월':'').trim()||y+'년';
+}
+function thanksPrintHtml(year,list,info,today){
+ const rows=list.map(p=>{const r=info[p.personId]||{};return `<tr><td>${esc(p.name)}</td><td>${esc(phoneText(r.phone)||'-')}</td><td>${thanksDot(r.firstDate)}</td><td class="hl">${esc(Number(p.hours).toLocaleString(undefined,{maximumFractionDigits:1}))}</td><td>${thanksDot(r.lastDate)}</td><td>${p.count}</td><td>${r.totalCount||0}</td><td>${esc(thanksPeriod(r.firstDate,r.lastDate))}</td></tr>`;}).join('');
+ return `<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>${year} 자원봉사자 감사패키지 명단</title><style>
+ @page{size:A4 landscape;margin:14mm 12mm}
+ body{font-family:'Malgun Gothic','맑은 고딕','Apple SD Gothic Neo',sans-serif;color:#111;margin:0}
+ h1{font-size:24pt;font-weight:400;text-align:center;text-decoration:underline;text-underline-offset:6px;margin:4mm 0 5mm}
+ .base{text-align:right;font-size:10.5pt;margin:0 0 2mm}
+ table{width:100%;border-collapse:collapse;font-size:10.5pt}
+ th,td{border:1px solid #555;padding:6px 6px;text-align:center;vertical-align:middle;word-break:keep-all}
+ th{background:#c8c8c8;font-weight:400}th.b{font-weight:700}
+ thead{display:table-header-group}tr{page-break-inside:avoid}
+ .note{font-size:8.5pt;color:#444;margin-top:3mm;line-height:1.6}
+ .tip{font:14px sans-serif;background:#fff6dc;border:1px solid #e6cf8c;padding:10px 14px;margin:0 0 16px}
+ @media print{.tip{display:none}}
+ </style></head><body>
+ <p class="tip">인쇄 창의 <b>대상</b>에서 <b>PDF로 저장</b>을 고르면 PDF 파일로 저장돼요. (이 안내는 PDF에 나오지 않아요)</p>
+ <h1>${year} 자원봉사자 감사패키지 명단</h1>
+ <p class="base">${thanksDot(today)} 기준 · 총 ${list.length}명</p>
+ <table><colgroup><col style="width:11%"><col style="width:14%"><col style="width:12%"><col style="width:12%"><col style="width:12%"><col style="width:12%"><col style="width:11%"><col></colgroup>
+ <thead><tr><th>봉사자</th><th>핸드폰번호</th><th>최초봉사일</th><th class="b">${year}년 봉사 시간</th><th>마지막봉사일</th><th>${year}년 봉사횟수</th><th>봉사횟수</th><th class="b">총 봉사 기간</th></tr></thead><tbody>${rows}</tbody></table>
+ <p class="note">※ 기관 기록 기준 활동 실적이에요 (교육·모집연계 제외). 봉사횟수는 지금까지 누적, 총 봉사 기간은 최초봉사일 ~ 마지막봉사일이에요.<br>※ 개인정보가 포함된 문서이므로 업무 목적 외 사용·외부 유출을 금합니다.</p>
+ </body></html>`;
+}
+$('printThanks').onclick=async()=>{
+ if(!thanksData)return;
+ const list=thanksPicked().filter(p=>p.personId).sort((a,b)=>String(a.name).localeCompare(String(b.name),'ko'));
+ if(!list.length){$('thanksRecordNote').textContent='출력할 분이 없어요. 명단에 등록된 분을 골라 주세요.';return;}
+ const win=window.open('','_blank');if(win)try{win.document.write('<p style="font-family:sans-serif;padding:24px">명단을 만드는 중입니다…</p>');}catch(e){}
+ const btn=$('printThanks');btn.disabled=true;$('thanksRecordNote').textContent='명단을 만드는 중입니다.';
+ try{
+  const d=await api('getThankPrintData',{year:thanksData.year,personIds:list.map(p=>p.personId)}),html=thanksPrintHtml(thanksData.year,list,d.people,d.today);
+  let opened=false;
+  if(win&&!win.closed)try{win.document.open();win.document.write(html);win.document.close();win.focus();setTimeout(()=>win.print(),400);opened=true;}catch(e){}
+  if(!opened){const f=document.createElement('iframe');f.style.cssText='position:fixed;width:0;height:0;border:0';document.body.appendChild(f);f.contentDocument.open();f.contentDocument.write(html);f.contentDocument.close();setTimeout(()=>{f.contentWindow.focus();f.contentWindow.print();setTimeout(()=>f.remove(),60000);},400);}
+  const skipped=thanksPicked().length-list.length;
+  $('thanksRecordNote').textContent=`${list.length}명 명단을 만들었어요. 인쇄 창에서 「PDF로 저장」을 고르세요.`+(skipped?` (명단 미등록 ${skipped}명 제외)`:'');
+ }catch(e){if(win&&!win.closed)win.close();$('thanksRecordNote').textContent=e.message;}finally{btn.disabled=false;}
 };
 $('exportThanks').onclick=()=>{
  if(!thanksData)return;const picked=thanksPicked();
@@ -961,7 +1026,7 @@ async function loadLunch(){
   const d=await api('getLunchMonth',{year:Number($('lunchYear').value),month:Number($('lunchMonth').value)});lunchData=d;
   $('lunchTitle').textContent=`${d.year}년 ${d.month}월 자원봉사자 중식비 명단`;
   $('lunchNote').innerHTML=d.rows.length?`<b>${d.rows.length}건 · 중식비 합계 ${won(d.total)}원</b>`:'이 달에 입력된 중식비 기록이 없어요.'+(d.months.length?` 기록이 있는 달: ${d.months.slice(0,6).map(esc).join(', ')}`:'');
-  $('lunchRows').innerHTML=d.rows.length?`<table><thead><tr><th>구분</th><th>일자</th><th>성명</th><th>비고</th><th>프로그램명</th><th>시작</th><th>종료</th><th>총 시간</th><th>금액</th><th></th></tr></thead><tbody>${d.rows.map((r,i)=>`<tr><td>${i+1}</td><td class="nw">${esc(lunchDay(r.date))}</td><td>${esc(r.name)}</td><td>${esc(r.note)}</td><td>${esc(r.program)}</td><td>${esc(r.start)}</td><td>${esc(r.end)}</td><td>${Number(r.hours).toFixed(1)}</td><td>${won(r.amount)}</td><td><button class="small lunchDel" data-id="${esc(r.id)}">삭제</button></td></tr>`).join('')}</tbody></table>`:'';
+  $('lunchRows').innerHTML=d.rows.length?`<table><thead><tr><th>구분</th><th>일자</th><th>성명</th><th>비고</th><th>프로그램명</th><th>시작</th><th>종료</th><th>총 시간</th><th>금액</th><th></th></tr></thead><tbody>${d.rows.map((r,i)=>`<tr><td>${i+1}</td><td class="nw">${esc(lunchDay(r.date))}</td><td>${esc(r.name)}</td><td>${esc(r.note)}</td><td>${esc(r.program)}</td><td>${esc(r.start)}</td><td>${esc(r.end)}</td><td>${Number(r.hours).toFixed(1)}</td><td>${won(r.amount)}</td><td>${isReadOnly()?'':`<button class="small lunchDel" data-id="${esc(r.id)}">삭제</button>`}</td></tr>`).join('')}</tbody></table>`:'';
   $('lunchRows').querySelectorAll('.lunchDel').forEach(b=>b.onclick=async()=>{const r=d.rows.find(x=>x.id===b.dataset.id);if(!confirm(`${r.name} 님 ${lunchDay(r.date)} 기록을 지울까요?`))return;b.disabled=true;try{await api('deleteLunch',r.id);await loadLunch();}catch(e){$('lunchNote').textContent=e.message;b.disabled=false;}});
   $('lunchPrograms').innerHTML=Array.from(new Set(d.rows.map(r=>r.program))).map(p=>`<option value="${esc(p)}">`).join('');
   $('printLunch').disabled=$('xlsxLunch').disabled=!d.rows.length;
