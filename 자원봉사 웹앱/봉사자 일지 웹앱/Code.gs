@@ -7,7 +7,7 @@
  *       서명이 모두 끝난 일지는 매달 봉사자별 PDF로 드라이브에 자동 보관
  ****************************************************************/
 
-const ACTIVITY_LOG_BUILD = '활동일지 v2.2';
+const ACTIVITY_LOG_BUILD = '활동일지 v2.3 · 담당자 출력';
 const CONTENT_SHEET_NAME = '활동내용 문구';
 const CONTENT_HEADERS = ['프로그램', '활동내용', '사용(Y/N)'];
 
@@ -795,7 +795,8 @@ function getDashboard(from, to) {
   const staff = readStaff_();
   const range = normalizeRange_(from, to);
 
-  const rows = readActivity_().filter(function (r) {
+  const allRows = readActivity_(); // 시트를 한 번만 읽어요
+  const rows = allRows.filter(function (r) {
     return r.staffStatus !== '반려' && inRange_(r.dateText, range);
   });
 
@@ -836,7 +837,7 @@ function getDashboard(from, to) {
     }
   });
 
-  const rejected = readActivity_().filter(function (r) {
+  const rejected = allRows.filter(function (r) {
     return r.staffStatus === '반려' && inRange_(r.dateText, range);
   }).length;
 
@@ -887,11 +888,13 @@ function leaderNames_(staff, team) {
 
 function getInputList(from, to, onlyTodo) {
   requireAdmin_();
-  linkRegisteredVolunteers_();
   const range = normalizeRange_(from, to);
   const staff = readStaff_();
 
-  return readActivity_()
+  let all = readActivity_();
+  if (linkRegisteredVolunteers_(all)) all = readActivity_(); // 새로 연결된 사람이 있을 때만 다시 읽음
+
+  return all
     .filter(function (r) {
       if (r.staffStatus === '반려' || !inRange_(r.dateText, range)) return false;
       return onlyTodo ? !r.inputDone : true;
@@ -1084,14 +1087,34 @@ function saveSubstitute(data) {
  * PDF — 기간 지정 출력 · 월별 자동 보관
  * ============================================================ */
 
-/** 관리자: 봉사자 검색 (출력용) */
+/**
+ * 일지 출력 범위
+ *  - 관리자: 모든 일지
+ *  - 담당자: 내가 기본 담당자인 일지 + 내가 확인(서명)한 일지 + 지금 대직 중인 담당자의 일지
+ *  - 팀장: 위에 더해 우리 팀 일지
+ */
+function printableFilter_(me) {
+  if (me.isAdmin) return function () { return true; };
+  const staff = readStaff_();
+  const today = todayText_();
+  return function (r) {
+    const assignedEff = r.assigned || ((findAssignedStaff_(staff, r.program) || {}).name || '');
+    if (assignedEff === me.name || (r.staffName && r.staffName === me.name)) return true;
+    if (canHandle_(me, assignedEff, staff, today)) return true;
+    return me.isLeader && leaderCanSee_(me, r, staff);
+  };
+}
+
+
+/** 봉사자 검색 (출력용) — 담당자는 자기 범위의 봉사자만 */
 function searchVolunteersForPrint(keyword) {
-  requireAdmin_();
+  const me = currentUser_();
+  const canPrint = printableFilter_(me);
   const k = normalizeName_(keyword);
   const seen = {};
 
   readActivity_().forEach(function (r) {
-    if (r.staffStatus === '반려') return;
+    if (r.staffStatus === '반려' || !canPrint(r)) return;
     if (k && normalizeName_(r.name).indexOf(k) < 0 && r.phone.indexOf(k) < 0) return;
     const key = r.name + '|' + r.phone;
     if (!seen[key]) seen[key] = { key: key, name: r.name, phoneLast4: r.phone, count: 0, last: r.dateText };
@@ -1105,14 +1128,17 @@ function searchVolunteersForPrint(keyword) {
 }
 
 
-/** 기간 지정 PDF. key = '이름|뒤4자리' 또는 '' (기간 내 전체) */
-function makeLogPdf(key, from, to) {
-  requireAdmin_();
-  linkRegisteredVolunteers_();
+/** 출력할 일지 모으기 (미리보기·PDF 저장 공용) */
+function prepareLogPrint_(key, from, to) {
+  const me = currentUser_();
+  const canPrint = printableFilter_(me);
   const range = normalizeRange_(from, to);
 
-  const rows = readActivity_().filter(function (r) {
-    if (r.staffStatus === '반려' || !inRange_(r.dateText, range)) return false;
+  const all = readActivity_();
+  if (me.isAdmin) linkRegisteredVolunteers_(all); // 출력에 쓰는 실적 ID는 명단에서 바로 찾으므로 다시 읽지 않아요
+
+  const rows = all.filter(function (r) {
+    if (r.staffStatus === '반려' || !inRange_(r.dateText, range) || !canPrint(r)) return false;
     return !key || (r.name + '|' + r.phone) === key;
   });
 
@@ -1121,17 +1147,30 @@ function makeLogPdf(key, from, to) {
   const groups = groupByVolunteer_(rows);
   if (groups.length > 60) throw new Error('한 번에 너무 많아요 (' + groups.length + '명). 기간을 줄이거나 봉사자를 골라 주세요.');
 
-  const html = buildLogPdfHtml_(groups, range);
-  const name = (key ? key.split('|')[0] + '_' : '전체_') + range.from + '~' + range.to + '.pdf';
-  const pdf = Utilities.newBlob(html, 'text/html', 'log.html').getAs('application/pdf').setName(cleanFileName(name));
-
   return {
-    fileName: pdf.getName(),
-    base64: Utilities.base64Encode(pdf.getBytes()),
-    html: html,
+    html: buildLogPdfHtml_(groups, range),
+    fileName: cleanFileName((key ? key.split('|')[0] + '_' : (me.isAdmin ? '전체_' : (me.name || '내담당') + '_담당_')) + range.from + '~' + range.to + '.pdf'),
     volunteers: groups.length,
     entries: rows.length
   };
+}
+
+
+/**
+ * 미리보기용: 화면(HTML)만 만들어요.
+ * 예전에는 미리보기 때마다 PDF 변환까지 해서 오래 걸렸어요. PDF는 [PDF 저장]을 누를 때만 만들어요.
+ */
+function makeLogPdf(key, from, to) {
+  const p = prepareLogPrint_(key, from, to);
+  return { html: p.html, fileName: p.fileName, volunteers: p.volunteers, entries: p.entries };
+}
+
+
+/** [PDF 저장]을 누를 때만 PDF로 변환 */
+function makeLogPdfFile(key, from, to) {
+  const p = prepareLogPrint_(key, from, to);
+  const pdf = Utilities.newBlob(p.html, 'text/html', 'log.html').getAs('application/pdf').setName(p.fileName);
+  return { fileName: pdf.getName(), base64: Utilities.base64Encode(pdf.getBytes()) };
 }
 
 
@@ -1140,7 +1179,7 @@ function makeLogPdf(key, from, to) {
  * (이름 + 연락처 뒤 4자리가 같고, 생년월일이 다르지 않을 때)
  * 실적 입력 화면을 열 때, 일지 출력 때, 매일 밤 자동으로 실행돼요.
  */
-function linkRegisteredVolunteers_() {
+function linkRegisteredVolunteers_(rows) {
   const vSheet = ss_().getSheetByName(VOLUNTEER_SHEET_NAME);
   if (!vSheet || vSheet.getLastRow() < 2) return 0;
 
@@ -1160,7 +1199,7 @@ function linkRegisteredVolunteers_() {
   const C = ACTIVITY_COLUMNS;
   let linked = 0;
 
-  readActivity_().forEach(function (r) {
+  (rows || readActivity_()).forEach(function (r) {
     if (r.regType !== '미등록봉사자') return;
 
     const v = registry[normalizeName_(r.name) + '|' + r.phone];

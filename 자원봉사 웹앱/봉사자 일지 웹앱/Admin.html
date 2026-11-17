@@ -349,6 +349,7 @@
         <div class="card">
           <h2>일지 출력 (PDF)</h2>
           <p class="hint">봉사자와 기간을 고르면 종이 일지와 같은 모양으로 PDF를 만들어요. 한 봉사자가 여러 프로그램에서 활동했다면 날짜순으로 한 파일에 모여요.</p>
+          <p class="hint" id="printScopeHint" hidden>내가 담당하거나 확인한 일지만 나와요.</p>
 
           <label class="f">봉사자</label>
           <div class="row">
@@ -371,7 +372,7 @@
           <div style="margin-top:16px">
             <button class="b" id="printBtn" onclick="makePdf()">일지 만들기</button>
           </div>
-          <p class="hint" style="margin-top:12px">서명이 모두 끝난 일지는 매달 자동으로 드라이브 <b>자원봉사 활동일지 보관 › 연도 › 월</b> 폴더에도 저장돼요.</p>
+          <p class="hint" id="printArchiveHint" style="margin-top:12px">서명이 모두 끝난 일지는 매달 자동으로 드라이브 <b>자원봉사 활동일지 보관 › 연도 › 월</b> 폴더에도 저장돼요.</p>
         </div>
       </section>
 
@@ -597,7 +598,7 @@
           document.getElementById(p + 'From').value = init.period.from;
           document.getElementById(p + 'To').value = init.period.to;
         });
-        if (ME.isAdmin) quickRange('print', 'month');
+        quickRange('print', 'month');
       }).catch(function (e) {
         document.getElementById('gate').innerHTML =
           '<h2>들어갈 수 없어요</h2><p>' + esc(e && e.message ? e.message : e) + '</p>';
@@ -608,13 +609,21 @@
       const tabs = [];
       if (ME.registered || ME.isAdmin) tabs.push(['staff', '담당자 확인']);
       if (ME.isLeader || ME.isAdmin) tabs.push(['leader', '팀장 확인']);
-      if (ME.isAdmin) tabs.push(['dash', '현황판'], ['input', '실적 입력'], ['print', '일지 출력'], ['staffadmin', '담당자 관리']);
+      if (ME.isAdmin) tabs.push(['dash', '현황판'], ['input', '실적 입력']);
+      if (ME.registered || ME.isAdmin) tabs.push(['print', '일지 출력']);
+      if (ME.isAdmin) tabs.push(['staffadmin', '담당자 관리']);
       tabs.push(['me', '내 정보']);
 
       const nav = document.getElementById('tabs');
       nav.innerHTML = tabs.map(function (t) {
         return '<button data-tab="' + t[0] + '" onclick="showTab(\'' + t[0] + '\')">' + t[1] + '<span class="badge" id="badge-' + t[0] + '" hidden></span></button>';
       }).join('');
+
+      if (!ME.isAdmin) {
+        document.getElementById('printScopeHint').hidden = false;
+        document.getElementById('printArchiveHint').hidden = true;
+        pickPrint('', '');
+      }
 
       if (ME.isAdmin) {
         document.getElementById('staffScope').hidden = false;
@@ -1029,17 +1038,19 @@
     function pickPrint(key, label) {
       printKey = key;
       document.getElementById('printPicked').innerHTML = '선택: <b>' + label + '</b> <button class="b gray sm" onclick="pickPrint(\'\',\'\')">선택 해제</button>';
-      if (!key) document.getElementById('printPicked').innerHTML = '선택 안 함 → 기간 안의 <b>모든 봉사자</b>를 한 파일로 만들어요.';
+      if (!key) document.getElementById('printPicked').innerHTML = '선택 안 함 → 기간 안의 ' + (ME && !ME.isAdmin ? '<b>내 담당 봉사자 모두</b>' : '<b>모든 봉사자</b>') + '를 한 파일로 만들어요.';
       document.getElementById('printResults').innerHTML = '';
     }
 
     let lastPdf = null;
+    let lastPrintArgs = null;
 
     function makePdf() {
       const btn = document.getElementById('printBtn');
       btn.disabled = true;
-      btn.textContent = '일지 만드는 중... (조금 걸려요)';
-      run('makeLogPdf', printKey, document.getElementById('printFrom').value, document.getElementById('printTo').value)
+      btn.textContent = '일지 만드는 중...';
+      lastPrintArgs = [printKey, document.getElementById('printFrom').value, document.getElementById('printTo').value];
+      run.apply(null, ['makeLogPdf'].concat(lastPrintArgs))
         .then(function (r) {
           lastPdf = r;
           document.getElementById('previewTitle').textContent =
@@ -1061,8 +1072,17 @@
       }
     }
 
+    /* PDF 파일은 [PDF 저장]을 누를 때만 만들어요 (미리보기는 바로 뜨게) */
     function savePdf() {
-      if (!lastPdf) return;
+      if (!lastPdf || !lastPrintArgs) return;
+      if (lastPdf.base64) { downloadPdf(); return; }
+      toast('PDF 파일을 만드는 중이에요... (10초쯤 걸릴 수 있어요)', 'info');
+      run.apply(null, ['makeLogPdfFile'].concat(lastPrintArgs))
+        .then(function (r) { lastPdf.base64 = r.base64; lastPdf.fileName = r.fileName; downloadPdf(); })
+        .catch(fail);
+    }
+
+    function downloadPdf() {
       const bytes = atob(lastPdf.base64);
       const arr = new Uint8Array(bytes.length);
       for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
