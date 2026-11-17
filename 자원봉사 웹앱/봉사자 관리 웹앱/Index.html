@@ -843,7 +843,7 @@ function showThanksCandidates(){
 }
 function finishThanksSelection(){
  if(!thanksData||!thanksPicked().length)return;
- renderThanks();$('thanksCandidates').open=false;$('thanksSelected').hidden=false;$('thanksSelected').open=true;
+ renderThanks();$('thanksWorkspace').hidden=false;$('thanksCandidates').open=false;$('thanksSelected').hidden=false;$('thanksSelected').open=true;
  $('thanksRecord').hidden=false;$('exportThanks').disabled=false;$('thanksSelected').scrollIntoView({block:'nearest'});
 }
 $('finishThanksSelection').onclick=finishThanksSelection;
