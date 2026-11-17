@@ -913,7 +913,7 @@ function thanksPrintHtml(year,list,info,today){
  .base{text-align:right;font-size:10.5pt;margin:0 0 2mm}
  table{width:100%;border-collapse:collapse;font-size:10.5pt}
  th,td{border:1px solid #555;padding:6px 6px;text-align:center;vertical-align:middle;word-break:keep-all}
- th{background:#c8c8c8;font-weight:400}th.b{font-weight:700}
+ th{background:#d9d9d9;font-weight:700;-webkit-print-color-adjust:exact;print-color-adjust:exact}   /* 인쇄해도 머리줄 회색이 빠지지 않게 */
  thead{display:table-header-group}tr{page-break-inside:avoid}
  .note{font-size:8.5pt;color:#444;margin-top:3mm;line-height:1.6}
  .tip{font:14px sans-serif;background:#fff6dc;border:1px solid #e6cf8c;padding:10px 14px;margin:0 0 16px}
