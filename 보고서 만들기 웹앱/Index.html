@@ -4,8 +4,8 @@
 <base target="_top">
 <meta charset="utf-8">
 <title>보고서 만들기</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" media="print" onload="this.media='all'">
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
   :root{--bg:#F6F5F2;--card:#fff;--ink:#222;--sub:#666;--line:#E2DFD8;--main:#2F6B5E;--main2:#E7F0EE;--warn:#B54A2A;--warn2:#FBEDE8}
   *{box-sizing:border-box}
@@ -1205,8 +1205,7 @@ function tableEditor(b, rerender){
         var box = el('div', {class:'cellpics'});
         pics.forEach(function(p, pi){
           var t = el('div', {class:'thumb sm'});
-          if (imgCache[p.fileId]) t.appendChild(el('img', {src:'data:image/jpeg;base64,' + imgCache[p.fileId].b64}));
-          else { t.textContent = '…'; ensureImages([p.fileId], rerender); }
+          t.appendChild(picImg(p.fileId));
           t.appendChild(el('button', {class:'rm', title:'빼기', on:{click:function(){ pics.splice(pi,1); markDirty(); rerender(); }}, text:'✕'}));
           var a = el('select', {title:'사진 위치'});
           [['c','가운데'],['r','오른쪽']].forEach(function(o){ var op = el('option', {value:o[0], text:o[1]}); if ((p.align||'c')===o[0]) op.selected = true; a.appendChild(op); });
@@ -1411,15 +1410,48 @@ function dimsOf(id){
   for (var i=0;i<all.length;i++) if (all[i].fileId===id) return all[i];
   return {w:0, h:0};
 }
+// 원본 사진 (한글 내려받기·미리보기용). 이미 받으러 간 사진은 다시 요청하지 않고 기다려요.
+var imgWait = {};
 function ensureImages(ids, cb){
-  var miss = ids.filter(function(id){ return !imgCache[id]; });
+  var miss = ids.filter(function(id){ return id && !(id in imgCache); });
   if (!miss.length) return cb();
   var left = miss.length;
+  function one(){ if (--left === 0) cb(); }
   miss.forEach(function(id){
-    google.script.run.withSuccessHandler(function(b64){
-      var dm = dimsOf(id); imgCache[id] = b64 ? {b64: b64, w: dm.w, h: dm.h} : null; if (--left===0) cb();
-    }).withFailureHandler(function(e){ imgCache[id] = null; if (--left===0) cb(); }).getImage(id);
+    if (imgWait[id]) return imgWait[id].push(one);
+    imgWait[id] = [one];
+    function done(b64){
+      var dm = dimsOf(id); imgCache[id] = b64 ? {b64: b64, w: dm.w, h: dm.h} : null;
+      var w = imgWait[id]; delete imgWait[id]; w.forEach(function(f){ f(); });
+    }
+    google.script.run.withSuccessHandler(done).withFailureHandler(function(){ done(null); }).getImage(id);
   });
+}
+// 입력 화면의 작은 사진: 원본 대신 드라이브 썸네일(작은 그림)을 받아서, 도착하면 그 자리에 바로 채워요 (화면 전체를 다시 그리지 않음)
+var thumbCache = {}, thumbWait = {};
+function thumbSrc(id){
+  if (imgCache[id]) return 'data:image/jpeg;base64,' + imgCache[id].b64;
+  if (thumbCache[id]) return 'data:' + thumbCache[id].mime + ';base64,' + thumbCache[id].b64;
+  return '';
+}
+function picImg(id){
+  var im = el('img', {'data-img': id, alt:'불러오는 중…'}), src = thumbSrc(id);
+  if (src) im.src = src;
+  else if (imgCache[id] === null) im.alt = '사진을 불러오지 못했어요';
+  else loadThumb(id);
+  return im;
+}
+function fillPic(id){
+  var src = thumbSrc(id);
+  document.querySelectorAll('img[data-img="' + id + '"]').forEach(function(im){ if (src) im.src = src; else im.alt = '사진을 불러오지 못했어요'; });
+}
+function loadThumb(id){
+  if (thumbWait[id]) return; thumbWait[id] = true;
+  function full(){ delete thumbWait[id]; ensureImages([id], function(){ fillPic(id); }); }   // 썸네일이 없으면 원본으로
+  google.script.run.withSuccessHandler(function(r){
+    if (!r) return full();
+    delete thumbWait[id]; thumbCache[id] = r; fillPic(id);
+  }).withFailureHandler(full).getThumb(id);
 }
 function download(){
   save(function(){
@@ -1486,8 +1518,7 @@ function thumbs(box, list, rerender, withCaption){
   box.innerHTML = '';
   list.forEach(function(p, i){
     var t = el('div', {class:'thumb'});
-    if (imgCache[p.fileId]) t.appendChild(el('img', {src:'data:image/jpeg;base64,' + imgCache[p.fileId].b64}));
-    else { t.textContent = '불러오는 중…'; ensureImages([p.fileId], rerender); }
+    t.appendChild(picImg(p.fileId));
     t.appendChild(el('button', {class:'rm', title:'빼기', on:{click:function(){ list.splice(i,1); markDirty(); rerender(); }}, text:'✕'}));
     t.appendChild(el('div', {class:'mv'}, [
       el('button', {title:'앞으로', on:{click:function(){ if(i>0){ var x=list[i]; list[i]=list[i-1]; list[i-1]=x; markDirty(); rerender(); } }}, text:'◀'}),

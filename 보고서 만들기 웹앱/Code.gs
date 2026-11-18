@@ -30,11 +30,14 @@ function getSheet_() {
     sh.setFrozenRows(1);
     sh.setColumnWidth(5, 360);
     sh.hideColumns(7);
-  } else if (sh.getRange(1, 9).getValue() !== '작성완료') {
-    // 예전에 만든 시트: 「계획ID」「작성완료」 칸 제목만 붙여요
-    sh.getRange(1, 8, 1, 2).setValues([['계획ID', '작성완료']]).setFontWeight('bold').setBackground('#F2F2F2');
   }
   return sh;
+}
+
+/** 예전에 만든 시트: 「계획ID」「작성완료」 칸 제목만 붙여요 (목록 불러올 때만 확인) */
+function ensureHeaders_(sh) {
+  if (sh.getRange(1, 9).getValue() !== '작성완료')
+    sh.getRange(1, 8, 1, 2).setValues([['계획ID', '작성완료']]).setFontWeight('bold').setBackground('#F2F2F2');
 }
 
 /** 틀 파일 내려주기 */
@@ -45,6 +48,7 @@ function getTemplate(kind) {
 /** 저장된 보고서 목록 (최근 수정 순) */
 function listReports() {
   var sh = getSheet_();
+  ensureHeaders_(sh);
   var n = sh.getLastRow() - 1;
   if (n < 1) return [];
   var rows = sh.getRange(2, 1, n, 9).getDisplayValues();
@@ -89,11 +93,13 @@ function saveReport(data) {
     var values = [data.id, TYPE_LABEL[data.type] || '활동계획서', data.programName || '',
       data.date || '', data.title || '', now, json, data.sourcePlanId || '', data.done ? '완료' : ''];
     var row = findRow_(sh, data.id);
-    if (row) sh.getRange(row, 1, 1, values.length).setValues([values]);
-    else sh.appendRow(values);
-    var last = Math.max(sh.getLastRow() - 1, 1);
-    sh.getRange(2, 1, last, 1).setNumberFormat('@');
-    sh.getRange(2, 8, last, 1).setNumberFormat('@');
+    if (!row) {
+      // 새 줄: ID·계획ID 칸은 글자로 (숫자처럼 생긴 ID가 바뀌지 않게) — 저장할 때마다 열 전체를 바꾸지 않고 이 줄만
+      row = sh.getLastRow() + 1;
+      sh.getRange(row, 1).setNumberFormat('@');
+      sh.getRange(row, 8).setNumberFormat('@');
+    }
+    sh.getRange(row, 1, 1, values.length).setValues([values]);
     return { id: data.id, updated: now };
   } finally {
     lock.releaseLock();
@@ -127,6 +133,13 @@ function imgFolder_() {
 function saveImage(b64, name) {
   var blob = Utilities.newBlob(Utilities.base64Decode(b64), 'image/jpeg', (name || 'photo').replace(/\.[^.]+$/, '') + '.jpg');
   return imgFolder_().createFile(blob).getId();
+}
+/** 입력 화면용 작은 그림 (드라이브 썸네일). 없으면 null → 화면에서 원본을 받아요 */
+function getThumb(id) {
+  try {
+    var t = DriveApp.getFileById(id).getThumbnail();
+    return t ? { mime: t.getContentType() || 'image/png', b64: Utilities.base64Encode(t.getBytes()) } : null;
+  } catch (e) { return null; }
 }
 function getImage(id) {
   try { return Utilities.base64Encode(DriveApp.getFileById(id).getBlob().getBytes()); }
