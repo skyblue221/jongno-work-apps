@@ -2,9 +2,11 @@
   계획서 ↔ 결과보고 연결 (2026-11)
   - 결과보고 화면: 연결된 계획서를 왼쪽에 펼쳐 보기 (결과보고 입력칸은 오른쪽) / 연결 끊기 / 예전 결과보고는 계획서를 골라 연결
   - 계획서 화면: 이 계획서로 만든 결과보고 바로 열기, 없으면 「결과보고 만들기」
-  - 왼쪽 목록: 계획서마다 「결과보고 있음 / 아직 없음」, 결과보고마다 「계획서 연결됨」
+  - 왼쪽 목록: 결과보고를 계획서 밑에 묶어 보여줌. 결과보고에 「작성 완료」를 체크하면 계획서 안으로 접혀요
+    (작성 중인 결과보고는 펼쳐진 채로, 결과보고가 없는 계획서는 「결과보고 아직 없음」)
   Code.gs의 doGet()에서 Index 뒤에 붙여요. Index.html의 함수(renderAll, renderList 등)를 감싸서 동작해요.
-  연결 정보는 결과보고 데이터의 sourcePlanId, 시트의 「계획ID」 칸(8번째 칸)에 들어가요.
+  연결 정보는 결과보고 데이터의 sourcePlanId, 시트의 「계획ID」 칸(8번째 칸)에,
+  작성 완료는 결과보고 데이터의 done, 시트의 「작성완료」 칸(9번째 칸)에 들어가요.
 -->
 <style>
   #linkCard{padding:10px 16px}
@@ -16,6 +18,12 @@
   #list .lkm{font-size:11.5px;margin-top:2px}
   #list .lkm.ok{color:var(--main)}
   #list .lkm.no{color:var(--warn)}
+  #list .lkm.ing{color:#9a5b12}
+  #list .fold{display:inline-block;font-size:11.5px;color:var(--main);background:#eef3ef;border:1px solid #cfdcd3;border-radius:10px;padding:0 8px;margin-top:3px;cursor:pointer}
+  #list .fold:hover{border-color:var(--main)}
+  #linkCard .lk-done{display:flex;gap:6px;align-items:center;margin:8px 0 0;padding-top:8px;border-top:1px dashed var(--line);font-size:14px;color:var(--ink);cursor:pointer}
+  #linkCard .lk-done input{width:auto;margin:0;transform:scale(1.2)}
+  #linkCard .lk-done small{color:var(--sub)}
   /* 계획서 밑에 결과보고를 들여써서 선으로 이어 줌 */
   #list .item.lk-parent{margin-bottom:3px;border-left:3px solid var(--acc)}
   #list .item.lk-child{position:relative;margin-left:22px;margin-bottom:3px;border-left:3px solid var(--acc);background:#fdfbfc}
@@ -42,7 +50,7 @@
   main.insertBefore(card, main.firstChild);
   var side = el('section', {id:'planSide'});
   wrap.appendChild(side);
-  var sideFor = null, planCache = {}, pendingMode = null, lastDoc = null;
+  var sideFor = null, planCache = {}, pendingMode = null, lastDoc = null, expanded = {};
 
   function isResType(t){ return t==='result' || t==='execResult'; }
   function planTypeLabel(t){ return t==='execResult' ? '실행계획서' : '활동계획서'; }   // 시트 「종류」 칸 이름
@@ -95,7 +103,20 @@
       }
     }
     card.appendChild(row);
+    if (isResType(doc.type)) card.appendChild(doneRow());
     card.style.display = '';
+  }
+
+  // 결과보고 「작성 완료」 체크
+  function doneRow(){
+    var cb = el('input', {type:'checkbox'}); cb.checked = !!doc.done;
+    cb.addEventListener('change', function(){
+      doc.done = cb.checked; markDirty();
+      var s = doc.id && findSaved(doc.id); if (s){ s.done = doc.done; renderList(); }
+      toast(doc.done ? '작성 완료로 표시했어요. 목록에서 계획서 안으로 접혀요.' : '다시 「작성 중」으로 바꿨어요.', 2500);
+    });
+    return el('label', {class:'lk-done'}, [cb, document.createTextNode(' ✅ 작성 완료'),
+      el('small', {text: doc.done ? '— 목록에서 계획서 안으로 접혀 있어요' : '— 다 쓰면 체크하세요. 목록에서 계획서 안으로 접혀요'})]);
   }
 
   /* ── 계획서 옆에 펼쳐 보기 ── */
@@ -129,30 +150,40 @@
     if (items.length !== arr.length) return;
     var byId = {}, kids = {};   // 목록에 보이는 항목들, 계획서별 결과보고
     arr.forEach(function(s, i){ byId[s.id] = items[i]; });
-    arr.forEach(function(s, i){ if (s.planId && byId[s.planId]) (kids[s.planId] = kids[s.planId] || []).push(items[i]); });
+    arr.forEach(function(s, i){ if (s.planId && byId[s.planId]) (kids[s.planId] = kids[s.planId] || []).push({s: s, it: items[i]}); });
     arr.forEach(function(s, i){
       var it = items[i], m = it.querySelector('.m');
-      function note(cls, text){ m.parentNode.insertBefore(el('div', {class:'lkm ' + cls, text:text}), m.nextSibling); }
+      function note(cls, text){ var n = el('div', {class:'lkm ' + cls, text:text}); m.parentNode.insertBefore(n, m.nextSibling); return n; }
       if (s.type==='활동계획서' || s.type==='실행계획서'){
         var rs = resultsOf(s.id), below = kids[s.id] || [];
         if (!rs.length) note('no', '결과보고 아직 없음');
-        else if (below.length < rs.length) note('ok', '✓ 결과보고 ' + rs.length + '개' + (below.length ? '' : ' (지금 목록에는 안 보여요)'));
-        if (rs.length){
+        else {
+          var ing = rs.filter(function(r){ return !r.done; }).length, many = rs.length > 1;
+          var hasCur = below.some(function(k){ return doc && doc.id === k.s.id; });
+          var folded = !ing && below.length && !expanded[s.id] && !hasCur;
+          var txt = ing ? '✎ 결과보고 작성 중' + (many ? ' (' + (rs.length - ing) + '/' + rs.length + ' 완료)' : '') : '✓ 결과보고 완료' + (many ? ' (' + rs.length + '개)' : '');
+          if (!ing && below.length && !hasCur){
+            var chip = el('span', {class:'fold', title: folded ? '결과보고 펼쳐 보기' : '결과보고 접기', text: txt + (folded ? '  ▸ 펼치기' : '  ▾ 접기')});
+            chip.addEventListener('click', function(e){ e.stopPropagation(); expanded[s.id] = folded; renderList(); });
+            m.parentNode.insertBefore(el('div', {}, [chip]), m.nextSibling);
+          } else note(ing ? 'ing' : 'ok', txt + (below.length < rs.length ? ' · 지금 목록엔 다 안 보여요' : ''));
           var acts = it.querySelector('.acts');
           acts.insertBefore(el('button', {class:'sm', on:{click:function(e){ e.stopPropagation(); openReport(rs[0].id); }}, text:'결과보고 열기'}), acts.firstChild);
         }
-        // 결과보고를 계획서 바로 밑으로 옮겨 한 묶음으로
+        // 결과보고를 계획서 바로 밑으로 옮겨 한 묶음으로 (모두 작성 완료면 접어 둠)
         if (below.length){
-          it.classList.add('lk-parent');
+          if (!folded) it.classList.add('lk-parent');
           var at = it;
           below.forEach(function(k, j){
-            k.classList.add('lk-child'); if (j === below.length - 1) k.classList.add('lk-last');
-            at.parentNode.insertBefore(k, at.nextSibling); at = k;
+            k.it.classList.add('lk-child'); if (j === below.length - 1) k.it.classList.add('lk-last');
+            if (folded) k.it.style.display = 'none';
+            at.parentNode.insertBefore(k.it, at.nextSibling); at = k.it;
           });
         }
-      } else if (s.planId && !byId[s.planId]){
-        var p = findSaved(s.planId);
-        note('ok', p ? '↳ 계획서: ' + nameOf(p) : '↳ 계획서 연결 (지워짐)');
+      } else if (s.planId){
+        var st = s.done ? '✓ 작성 완료' : '✎ 작성 중';
+        if (byId[s.planId]) note(s.done ? 'ok' : 'ing', st);
+        else { var p = findSaved(s.planId); note(s.done ? 'ok' : 'ing', (p ? '↳ 계획서: ' + nameOf(p) : '↳ 계획서 연결 (지워짐)') + ' · ' + st); }
       }
     });
   }
@@ -161,7 +192,7 @@
   var _renderAll = renderAll, _renderList = renderList, _openReport = openReport, _updateListItem = updateListItem;
   renderAll = function(){
     if (doc !== lastDoc){
-      if (pendingMode === 'copy' && !doc.id) delete doc.sourcePlanId;   // 결과보고를 복사하면 연결은 따라가지 않음
+      if (pendingMode === 'copy' && !doc.id){ delete doc.sourcePlanId; delete doc.done; }   // 결과보고를 복사하면 연결·작성 완료는 따라가지 않음
       pendingMode = null; lastDoc = doc;
     }
     if (document.body.classList.contains('side') && (!doc || doc.sourcePlanId !== sideFor)) closeSide();
@@ -178,7 +209,7 @@
     return _openReport(id, mode);
   };
   updateListItem = function(d, r){
-    var s = findSaved(r.id); if (s) s.planId = d.sourcePlanId || '';
+    var s = findSaved(r.id); if (s){ s.planId = d.sourcePlanId || ''; s.done = !!d.done; }
     delete planCache[r.id];   // 계획서를 고쳐 자동 저장했으면 펼쳐 보기도 새로 불러오게
     return _updateListItem(d, r);
   };
