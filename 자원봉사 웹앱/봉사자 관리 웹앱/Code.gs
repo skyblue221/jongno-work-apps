@@ -928,6 +928,38 @@ function refreshAllDataSheet(){requireOwner_();return refreshAllDataSheet_impl_(
 function openAllDataSheet(){requireOwner_();return openAllDataSheet_impl_();}
 function refreshSheetDashboard(){requireOwner_();return refreshSheetDashboard_impl_();}
 function updateAwardStatus(a){requireOwner_();return updateAwardStatus_impl_(a);}
+/* ── 인정·포상 기록 지우기 ──
+   지운 줄은 「삭제된 포상기록」 탭에 그대로 옮겨 두어요(되살릴 때 그 줄을 AWARDS에 다시 붙여넣으면 됨). */
+const AWARD_TRASH='삭제된 포상기록';
+function removeAwardRows_(pick){
+ const sh=tab_('AWARDS'),values=sh.getDataRange().getValues(),head=values[0].map(x=>String(x).trim());
+ const col=Object.fromEntries(['기록ID','봉사자ID','종류','명칭','기준일','입력일'].map(h=>[h,head.indexOf(h)]));
+ if(col['기록ID']<0)throw Error('AWARDS에 기록ID 열이 필요합니다.');
+ const rows=[];values.forEach((r,i)=>{if(i>0&&r[col['기록ID']]&&pick(r,col))rows.push(i+1);});
+ if(!rows.length)return 0;
+ const ss=ss_();let trash=ss.getSheetByName(AWARD_TRASH);
+ if(!trash){trash=ss.insertSheet(AWARD_TRASH);trash.getRange(1,1,1,head.length+1).setValues([head.concat(['지운 날'])]).setFontWeight('bold');trash.setFrozenRows(1);}
+ const today=today_();
+ trash.getRange(trash.getLastRow()+1,1,rows.length,head.length+1).setValues(rows.map(n=>values[n-1].concat([today])));
+ rows.reverse().forEach(n=>sh.deleteRow(n));   // 아래 줄부터 지워야 줄 번호가 안 밀림
+ return rows.length;
+}
+function deleteAward_impl_(id){return withLock_(()=>{
+ id=clean_(id,60);if(!id)throw Error('지울 기록을 확인해 주세요.');
+ const n=removeAwardRows_((r,c)=>String(r[c['기록ID']])===id);
+ if(!n)throw Error('기록을 찾지 못했습니다. 새로고침해 주세요.');return n;
+},['AWARDS','EXTRA']);}
+/** 감사명단: 그해 종류 '포상' + 같은 이름 기록을 지움. personIds를 주면 그분들 것만 */
+function deleteThankAwards_impl_(o){return withLock_(()=>{
+ const name=clean_(o&&o.name,120),y=String(Number(o&&o.year)||'');
+ if(!name||!/^\d{4}$/.test(y))throw Error('지울 포상 이름과 연도를 확인해 주세요.');
+ const only=o.personIds&&o.personIds.length?new Set(o.personIds.map(String)):null;
+ const n=removeAwardRows_((r,c)=>String(r[c['종류']]).trim()==='포상'&&String(r[c['명칭']]).trim()===name
+   &&String(serialize_(r[c['기준일']])||serialize_(r[c['입력일']])).slice(0,4)===y&&(!only||only.has(String(r[c['봉사자ID']]))));
+ return {deleted:n};
+},['AWARDS','EXTRA']);}
+function deleteAward(id){requireOwner_();return deleteAward_impl_(id);}
+function deleteThankAwards(o){requireOwner_();return deleteThankAwards_impl_(o);}
 function setSmsPin(o){requireOwner_();return setSmsPin_impl_(o);}
 function statsForYear(y,all){requireOwner_();return statsForYear_impl_(y,all);}
 function getAll(){requireOwner_();return allData_();}
