@@ -1,0 +1,403 @@
+<!-- ===== 초기접수지 (min 전용 화면) · Index.html 안에 붙어요 ===== -->
+<style>
+#viewIntake .ik-tabs{display:flex;gap:4px;border-bottom:1px solid var(--ln);margin-bottom:18px;flex-wrap:wrap}
+#viewIntake .ik-tab{border:0;border-bottom:3px solid transparent;border-radius:0;background:none;font-size:15px;font-weight:700;color:var(--sub);padding:10px 14px;min-height:44px;margin-bottom:-1px}
+#viewIntake .ik-tab[aria-selected="true"]{color:var(--t);border-bottom-color:var(--t)}
+#viewIntake .ik-tab .ik-n{display:inline-block;min-width:20px;padding:0 6px;margin-left:4px;border-radius:10px;background:#a33128;color:#fff;font-size:12px;line-height:20px}
+#viewIntake .ik-bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:#fff;border:1px solid var(--ln);border-radius:6px;padding:14px 16px;margin-bottom:14px}
+#viewIntake .ik-bar input[type=search]{flex:1;min-width:180px}
+#viewIntake .ik-bar select{width:auto}
+#viewIntake table.ik-list{width:100%;border-collapse:collapse;background:#fff;border:1px solid var(--ln);font-size:14px}
+#viewIntake table.ik-list th{text-align:left;font-size:13px;color:var(--sub);font-weight:700;padding:10px;border-bottom:2px solid var(--ink);background:#faf9f6}
+#viewIntake table.ik-list td{padding:10px;border-bottom:1px solid var(--ln2);vertical-align:middle}
+#viewIntake table.ik-list tr.ik-row{cursor:pointer}
+#viewIntake table.ik-list tr.ik-row:hover td{background:#faf9f6}
+#viewIntake .ik-name{font-weight:700;color:var(--ink);background:none;border:0;padding:0;min-height:0;text-decoration:underline;text-underline-offset:3px}
+#viewIntake .ik-st{display:inline-block;font-size:12px;font-weight:700;padding:3px 8px;border-radius:3px;border:1px solid var(--ln);white-space:nowrap}
+#viewIntake .ik-st.s-신청받음{background:#a33128;border-color:#a33128;color:#fff}
+#viewIntake .ik-st.s-작성중{background:#fff;color:var(--t);border-color:var(--t)}
+#viewIntake .ik-st.s-접수완료{background:var(--t);border-color:var(--t);color:#fff}
+#viewIntake .ik-st.s-보류{background:#ececec;color:#5c5c5c}
+#viewIntake .ik-route{font-size:12px;color:var(--sub)}
+#viewIntake .ik-sec{background:#fff;border:1px solid var(--ln);border-radius:6px;padding:18px 20px;margin-bottom:14px}
+#viewIntake .ik-sec h3{font-size:16px;margin:0 0 4px;padding-bottom:8px;border-bottom:1px solid var(--ink)}
+#viewIntake .ik-sec>.hint{margin:8px 0 0}
+#viewIntake .ik-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px 16px;margin-top:14px}
+#viewIntake .ik-grid .w2{grid-column:span 2}#viewIntake .ik-grid .w3{grid-column:1/-1}
+#viewIntake .ik-f{display:grid;gap:6px;font-size:14px;align-content:start}
+#viewIntake .ik-f>span:first-child,#viewIntake .ik-f legend{font-weight:700}
+#viewIntake fieldset.ik-f{border:0;margin:0;padding:0;min-width:0}
+#viewIntake .ik-opts{display:flex;flex-wrap:wrap;gap:6px}
+#viewIntake .ik-opts label{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--ln);border-radius:4px;padding:8px 12px;min-height:42px;font-weight:400;cursor:pointer;background:#fff}
+#viewIntake .ik-opts label:has(input:checked){border-color:var(--t);background:var(--t-soft);color:var(--t-dark);font-weight:700}
+#viewIntake .ik-opts input{width:auto;min-height:0;margin:0}
+#viewIntake .ik-sub{display:grid;gap:10px;margin-top:10px;padding:10px 0 0 12px;border-left:3px solid var(--t-soft)}
+#viewIntake .ik-age{font-size:13px;color:var(--sub);font-weight:400}
+#viewIntake .ik-pick{margin-top:8px}
+#viewIntake .ik-pick-list{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+#viewIntake .ik-pick-list button{min-height:34px;padding:4px 10px;font-size:13px;border-radius:3px}
+#viewIntake .ik-pick-list small{font-size:12px;color:var(--sub)}
+#viewIntake .ik-consent{font-size:13px;line-height:1.7;color:var(--sub);background:#faf9f6;border-left:3px solid var(--ln);padding:10px 14px;margin-top:10px}
+#viewIntake .ik-consent p{margin:0 0 6px}
+#viewIntake .ik-q{margin-top:14px;font-size:14px;line-height:1.6}
+#viewIntake .ik-q b{display:block;margin-bottom:6px}
+#viewIntake .ik-pads{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:14px}
+#viewIntake .ik-pad{display:grid;gap:6px}
+#viewIntake .ik-pad .ik-cv{position:relative;height:150px;border:1px dashed var(--ink);border-radius:4px;background:#fff}
+#viewIntake .ik-pad canvas{display:block;width:100%;height:100%;touch-action:none;cursor:crosshair}
+#viewIntake .ik-pad .ik-old{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:#fff}
+#viewIntake .ik-pad .ik-old img{max-height:120px;max-width:90%}
+#viewIntake .ik-pad .ik-padbar{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:13px}
+#viewIntake .ik-pad .ik-padbar button{min-height:34px;padding:4px 10px;font-size:13px}
+#viewIntake .ik-actions{position:sticky;bottom:0;z-index:5;display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;align-items:center;background:#f6f4ef;border-top:1px solid var(--ink);padding:12px 0;margin-top:6px}
+#viewIntake .ik-actions .ik-msg{margin-right:auto;font-size:13px;color:var(--sub)}
+#viewIntake .ik-actions .ik-msg.err{color:#a33128}
+#viewIntake .ik-link{word-break:break-all;font-size:14px;background:#faf9f6;border-left:3px solid var(--t);padding:10px 12px;margin:10px 0}
+#viewIntake .ik-steps{font-size:14px;line-height:1.75;margin:10px 0 0;padding-left:20px}
+#viewIntake .ik-empty{padding:34px 20px;text-align:center;color:var(--sub);background:#fff;border:1px dashed var(--ln);border-radius:6px;line-height:1.7}
+#ikPreview{width:min(900px,calc(100vw - 24px))}
+#ikPreview iframe{width:100%;height:min(72vh,900px);border:1px solid var(--ln);background:#fff}
+@media(max-width:760px){#viewIntake .ik-grid{grid-template-columns:1fr}#viewIntake .ik-grid .w2{grid-column:auto}#viewIntake .ik-pads{grid-template-columns:1fr}#viewIntake .ik-hide-m{display:none}}
+</style>
+
+<section id="viewIntake" hidden aria-labelledby="ikTitle">
+<div class="topbar"><button type="button" class="back" id="ikBack">← 찾기 화면으로</button></div>
+<header class="home-head" style="display:block"><p class="brand">연결노트</p><h1 id="ikTitle" tabindex="-1">초기접수지</h1><p class="intro">종이 초기접수지와 같은 칸으로 쓰고, 같은 모양으로 인쇄·PDF 저장해요. 이 화면과 기록은 담당자만 볼 수 있어요.</p></header>
+
+<div class="ik-tabs" role="tablist" aria-label="초기접수 메뉴">
+<button type="button" role="tab" class="ik-tab" data-ik="list" aria-controls="ikPanelList">접수 목록 <span class="ik-n" id="ikNewCount" hidden></span></button>
+<button type="button" role="tab" class="ik-tab" data-ik="edit" aria-controls="ikPanelEdit" id="ikTabEdit">새로 쓰기</button>
+<button type="button" role="tab" class="ik-tab" data-ik="link" aria-controls="ikPanelLink">신청 링크</button>
+</div>
+
+<!-- 목록 -->
+<div id="ikPanelList" class="ik-panel" role="tabpanel">
+<div class="ik-bar">
+<label for="ikSearch" class="sr">이름·연락처 검색</label><input id="ikSearch" type="search" placeholder="이름, 연락처, 접수상담번호">
+<label for="ikFilter" class="sr">상태</label><select id="ikFilter"><option value="">모든 상태</option><option value="신청받음">신청받음 (링크)</option><option value="작성중">작성중</option><option value="접수완료">접수완료</option><option value="보류">보류</option></select>
+<button type="button" id="ikPrintSel">고른 것 인쇄·PDF</button>
+<button type="button" id="ikPrintBlank">빈 양식</button>
+<button type="button" class="primary" id="ikNew">+ 새로 쓰기</button>
+</div>
+<p id="ikListStatus" class="hint" role="status" aria-live="polite" style="margin:0 0 10px"></p>
+<div id="ikListBox"></div>
+</div>
+
+<!-- 쓰기 -->
+<form id="ikPanelEdit" class="ik-panel" role="tabpanel" hidden novalidate autocomplete="off">
+<p class="hint" id="ikEditHead" style="margin:0 0 12px"></p>
+
+<div class="ik-sec"><h3>접수</h3>
+<div class="ik-grid">
+<label class="ik-f"><span>접수일</span><input type="date" name="date"></label>
+<label class="ik-f"><span>접수상담번호</span><input type="text" name="no" maxlength="40" placeholder="전산 접수 후 적어도 돼요"></label>
+<label class="ik-f"><span>상태</span><select name="status"><option>작성중</option><option>접수완료</option><option>신청받음</option><option>보류</option></select></label>
+<fieldset class="ik-f"><legend>1인 가구</legend><div class="ik-opts"><label><input type="radio" name="alone" value="예">예</label><label><input type="radio" name="alone" value="아니오">아니오</label></div></fieldset>
+</div></div>
+
+<div class="ik-sec"><h3>기본 정보</h3>
+<div class="ik-grid">
+<label class="ik-f"><span>이름 <small>(필수)</small></span><input type="text" name="name" maxlength="40" required></label>
+<label class="ik-f"><span>생년월일 <span class="ik-age" id="ikAge"></span></span><input type="date" name="birth"></label>
+<fieldset class="ik-f"><legend>성별</legend><div class="ik-opts"><label><input type="radio" name="gender" value="남">남</label><label><input type="radio" name="gender" value="여">여</label></div></fieldset>
+<label class="ik-f"><span>핸드폰1 (본인)</span><input type="tel" name="phone1" inputmode="tel" placeholder="010-0000-0000"></label>
+<label class="ik-f"><span>핸드폰2 (보호자)</span><input type="tel" name="phone2" inputmode="tel" placeholder="010-0000-0000"></label>
+<span class="ik-hide-m"></span>
+<label class="ik-f w3"><span>주소</span><input type="text" name="address" maxlength="200"></label>
+</div></div>
+
+<div class="ik-sec"><h3>장애 · 보조기</h3>
+<div class="ik-grid">
+<fieldset class="ik-f w3"><legend>장애여부</legend><div class="ik-opts"><label><input type="radio" name="disReg" value="장애등록">장애등록</label><label><input type="radio" name="disReg" value="장애미등록">장애 미등록</label><label><input type="radio" name="disReg" value="비장애">비장애</label></div>
+<div class="ik-sub" id="ikDisMore" hidden>
+<div class="ik-grid" style="margin-top:0">
+<label class="ik-f"><span>장애유형</span><input type="text" name="disType" list="ikDisTypes" maxlength="30" placeholder="예: 지적 (‘장애’는 빼고)"></label>
+<label class="ik-f"><span>급 <small>(종이에 급을 적는 경우만)</small></span><input type="text" name="disGrade" maxlength="10"></label>
+<fieldset class="ik-f"><legend>장애정도</legend><div class="ik-opts"><label><input type="radio" name="disLevel" value="심한장애">심한 장애</label><label><input type="radio" name="disLevel" value="심하지않은장애">심하지 않은 장애</label></div></fieldset>
+</div></div></fieldset>
+<fieldset class="ik-f"><legend>중복장애</legend><div class="ik-opts"><label><input type="radio" name="multi" value="있음">있음</label><label><input type="radio" name="multi" value="없음">없음</label></div>
+<div class="ik-sub" id="ikMultiMore" hidden><label class="ik-f"><span>어떤 장애</span><input type="text" name="multiType" list="ikDisTypes" maxlength="40"></label></div></fieldset>
+<fieldset class="ik-f w2"><legend>보조기</legend><div class="ik-opts"><label><input type="radio" name="aid" value="사용">사용</label><label><input type="radio" name="aid" value="미사용">미사용</label></div>
+<div class="ik-sub" id="ikAidMore" hidden><label class="ik-f"><span>쓰는 보조기</span><input type="text" name="aidText" maxlength="60" placeholder="예: 휠체어, 보청기"></label></div></fieldset>
+</div>
+<datalist id="ikDisTypes"></datalist>
+</div>
+
+<div class="ik-sec"><h3>공공부조</h3>
+<fieldset class="ik-f" style="margin-top:14px"><legend class="sr">공공부조</legend><div class="ik-opts" id="ikSupport"><label><input type="checkbox" name="support" value="일반">일반</label><label><input type="checkbox" name="support" value="수급자">국민기초생활보장수급자</label><label><input type="checkbox" name="support" value="차상위">차상위(조건부 수급자 포함)</label><label><input type="checkbox" name="support" value="한부모">한부모 가정</label><label><input type="checkbox" name="support" value="기타">기타</label></div>
+<div class="ik-sub" id="ikBenefitMore" hidden><span style="font-size:14px;font-weight:700">수급 종류</span><div class="ik-opts"><label><input type="checkbox" name="benefits" value="생계">생계</label><label><input type="checkbox" name="benefits" value="의료">의료</label><label><input type="checkbox" name="benefits" value="주거">주거</label><label><input type="checkbox" name="benefits" value="교육">교육</label></div></div>
+<div class="ik-sub" id="ikEtcMore" hidden><label class="ik-f"><span>기타 내용</span><input type="text" name="supportEtc" maxlength="40"></label></div>
+</fieldset>
+</div>
+
+<div class="ik-sec"><h3>희망 프로그램</h3>
+<label class="ik-f" style="margin-top:14px"><span class="sr">희망 프로그램</span><textarea name="hope" rows="3" maxlength="500" placeholder="직접 적거나, 아래에서 프로그램을 찾아 눌러 넣어요"></textarea></label>
+<div class="ik-pick"><label for="ikPickQ" class="hint" style="font-weight:700">연결노트 프로그램에서 찾기</label><input id="ikPickQ" type="search" placeholder="프로그램 이름, 대상, 팀" style="margin-top:6px"><div class="ik-pick-list" id="ikPickList" aria-live="polite"></div></div>
+</div>
+
+<div class="ik-sec"><h3>개인정보 수집 · 활용 및 제3자 제공 동의</h3>
+<details><summary class="hint" style="cursor:pointer;margin-top:10px">동의서 전문 보기 (종이 양식과 같은 문구)</summary><div class="ik-consent" id="ikConsentText"></div></details>
+<div class="ik-q"><b>1. 개인정보 수집·이용 <small>(장애인복지관업무전산시스템 정보입력, 복지관 사업 홍보)</small></b><div class="ik-opts"><label><input type="radio" name="c1" value="동의">동의합니다</label><label><input type="radio" name="c1" value="동의하지않음">동의하지 않습니다</label></div></div>
+<div class="ik-q"><b>2. 제3자 제공 <small>(엔컴(주) - 장애인복지관업무전산시스템)</small></b><div class="ik-opts"><label><input type="radio" name="c2" value="동의">동의합니다</label><label><input type="radio" name="c2" value="동의하지않음">동의하지 않습니다</label></div></div>
+<div class="ik-q"><b>3. 안내 확인</b><div class="ik-opts"><label><input type="checkbox" name="ack1">동의를 거부할 수 있다는 안내를 받음</label><label><input type="checkbox" name="ack2">동의가 없으면 지원이 어려울 수 있다는 안내를 받음</label></div></div>
+</div>
+
+<div class="ik-sec"><h3>서명</h3>
+<p class="hint">화면에 손가락으로 서명받거나, 비워 두고 인쇄한 종이에 서명받아도 돼요. 비워 두면 인쇄물의 (인) 칸이 비어 나와요.</p>
+<div class="ik-grid">
+<label class="ik-f"><span>서명 날짜</span><input type="date" name="signDate"></label>
+<fieldset class="ik-f"><legend>누가 서명하나요</legend><div class="ik-opts"><label><input type="radio" name="writer" value="본인" checked>본인</label><label><input type="radio" name="writer" value="대리">대리인(보호자)</label></div></fieldset>
+<label class="ik-f" id="ikRelWrap" hidden><span>신청인과의 관계</span><input type="text" name="relation" maxlength="20" placeholder="예: 어머니"></label>
+</div>
+<div class="ik-pads">
+<div class="ik-pad" id="ikPadSelf"><span style="font-weight:700;font-size:14px">신청인(본인) 서명</span><div class="ik-cv"><canvas aria-label="본인 서명 칸"></canvas><div class="ik-old" hidden><img alt="저장된 본인 서명"></div></div><div class="ik-padbar"><span class="hint ik-padmsg">여기에 서명해요</span><button type="button" class="ik-clear">지우기</button></div></div>
+<div class="ik-pad" id="ikPadProxy"><span style="font-weight:700;font-size:14px">신청인(관계) 서명 <small>대리인·법정대리인</small></span><div class="ik-cv"><canvas aria-label="대리인 서명 칸"></canvas><div class="ik-old" hidden><img alt="저장된 대리인 서명"></div></div><div class="ik-padbar"><span class="hint ik-padmsg">여기에 서명해요</span><button type="button" class="ik-clear">지우기</button></div></div>
+</div>
+</div>
+
+<div class="ik-sec"><h3>메모 <small style="font-weight:400;color:var(--sub)">담당자만 봐요 · 인쇄되지 않아요</small></h3>
+<label class="ik-f" style="margin-top:14px"><span class="sr">메모</span><textarea name="memo" rows="2" maxlength="500"></textarea></label>
+</div>
+
+<div class="ik-actions">
+<span class="ik-msg" id="ikEditMsg" role="status" aria-live="polite"></span>
+<button type="button" id="ikCancel">목록으로</button>
+<button type="button" id="ikSavePrint">저장하고 인쇄·PDF</button>
+<button type="submit" class="primary" id="ikSave">저장</button>
+</div>
+</form>
+
+<!-- 신청 링크 -->
+<div id="ikPanelLink" class="ik-panel" role="tabpanel" hidden>
+<div class="ik-sec"><h3>방문이 어려운 분께 보내는 신청 링크</h3>
+<p class="hint">링크를 받은 분이 휴대폰으로 초기접수지를 쓰고 서명하면 <b>신청받음</b>으로 들어와요. 내용을 확인·보완한 뒤 <b>접수완료</b>로 바꿔 주세요. 신청한 분은 다른 사람의 접수 내용을 볼 수 없어요.</p>
+<div id="ikLinkNow"></div>
+<form id="ikLinkForm" class="stack" style="margin-top:12px">
+<label for="ikLinkUrl">신청 링크 주소 <small>공개용 배포의 웹앱 주소 (아래 「처음 한 번 준비」 참고)</small><input id="ikLinkUrl" type="url" placeholder="https://script.google.com/a/macros/jpurme.org/s/…/exec"></label>
+<label for="ikLinkPhone">문의 전화 <small>신청 화면과 안내 문자에 나와요</small><input id="ikLinkPhone" type="tel" style="max-width:260px"></label>
+<label for="ikLinkStaff">초기접수를 같이 볼 직원 이메일 <small>비워 두면 min 계정만 · 쉼표로 구분</small><input id="ikLinkStaff" type="text" placeholder="name@jpurme.org"></label>
+<div class="row-end"><button type="submit" class="primary">저장</button></div>
+</form>
+</div>
+<div class="ik-sec"><h3>안내 문자</h3>
+<p class="hint">고칠 곳이 있으면 고친 뒤 복사해서 문자로 보내요.</p>
+<label for="ikSms" class="sr">안내 문자</label><textarea id="ikSms" rows="8" style="width:100%;margin-top:10px;line-height:1.6"></textarea>
+<div class="row-end" style="margin-top:10px"><a id="ikOpenApply" class="ar-link" target="_blank" rel="noopener" hidden style="padding:9px 13px;border:1px solid var(--ln);text-decoration:none">신청 화면 열어 보기 ↗</a><button type="button" class="primary" id="ikCopySms">복사하기</button></div>
+</div>
+<div class="ik-sec"><h3>처음 한 번 준비</h3>
+<ol class="ik-steps">
+<li>Apps Script 편집기 → <b>배포 → 새 배포</b> → 유형 <b>웹 앱</b></li>
+<li>설명 「초기접수 신청용」, 실행 계정 <b>나</b>, 액세스 권한 <b>모든 사용자</b>로 배포해요. (지금 쓰는 연결노트 배포는 그대로 둬요)</li>
+<li>나온 웹앱 주소를 복사해 위 「신청 링크 주소」에 붙여 넣고 저장해요.</li>
+<li>이 주소로 들어온 사람은 직원 계정이 아니면 <b>신청 화면만</b> 보여요.</li>
+</ol>
+<p class="hint" id="ikFileLine"></p>
+</div>
+</div>
+</section>
+
+<dialog id="ikPreview" aria-labelledby="ikPvTitle"><div class="dlg"><h2 id="ikPvTitle">인쇄 미리보기</h2><p class="sub">인쇄 창에서 <b>대상 → PDF로 저장</b>을 골라도 PDF가 돼요. 배경 그래픽을 켜면 회색 칸이 그대로 나와요.</p><iframe id="ikPvFrame" title="초기접수지 미리보기"></iframe><div class="dlg-foot"><button type="button" id="ikPvClose">닫기</button><button type="button" id="ikPvPdf">PDF 저장</button><button type="button" class="primary" id="ikPvPrint">인쇄</button></div></div></dialog>
+
+<script>
+(function(){
+'use strict';
+const g=id=>document.getElementById(id);
+const tx=v=>String(v==null?'':v).trim();
+const esc=v=>tx(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+let boot=null,list=[],tab='list',editing=null,dirty=false,picked=new Set(),pv=null;
+
+/* ── 열기 ── */
+async function openIntake(){
+  showView('intake');setTab('list');
+  g('ikListStatus').textContent='접수 목록을 불러오는 중이에요.';g('ikListBox').replaceChildren();
+  try{boot=await runServer('getIntakeBoot');list=boot.list||[];fillStatic();renderList();renderLink();g('ikListStatus').textContent='';}
+  catch(e){g('ikListStatus').textContent='';toast(errText(e),true);}
+}
+window.openIntake=openIntake;
+function fillStatic(){
+  const dl=g('ikDisTypes');dl.replaceChildren();(boot.disTypes||[]).forEach(t=>{const o=document.createElement('option');o.value=t;dl.append(o);});
+  if(!g('ikConsentText').childElementCount){runConsent();}
+  g('ikFileLine').innerHTML=boot.fileUrl?'기록은 <a href="'+esc(boot.fileUrl)+'" target="_blank" rel="noopener">연결노트 초기접수 기록 (비공개)</a> 시트에 쌓여요. 이 시트는 공유하지 마세요.':'';
+}
+function runConsent(){const C=boot.consent;if(!C)return;const p=t=>'<p>'+esc(t)+'</p>';g('ikConsentText').innerHTML=p(C.intro)+'<p><b>1.</b> '+esc(C.q1)+'</p>'+C.q1Items.map(p).join('')+'<p><b>2.</b> '+esc(C.q2)+'</p>'+C.q2Items.map(p).join('')+'<p><b>3.</b> '+esc(C.q3a)+' / '+esc(C.q3b)+'</p><p><b>4.</b> '+esc(C.q4)+'</p>'+p(C.closing);}
+
+/* ── 탭 ── */
+function setTab(t){
+  if(t!==tab&&tab==='edit'&&dirty&&!confirm('저장하지 않은 내용이 있어요. 나갈까요?'))return false;
+  if(t!=='edit')dirty=false;
+  tab=t;document.querySelectorAll('.ik-tab').forEach(b=>{const on=b.dataset.ik===t;b.setAttribute('aria-selected',String(on));b.tabIndex=on?0:-1;});
+  g('ikPanelList').hidden=t!=='list';g('ikPanelEdit').hidden=t!=='edit';g('ikPanelLink').hidden=t!=='link';
+  if(t==='edit')setTimeout(()=>{pads.forEach(p=>p.resize());},30);
+  return true;
+}
+
+/* ── 목록 ── */
+function ageText(birth,on){if(!birth)return '';const b=birth.split('-').map(Number),t=(on||boot.today).split('-').map(Number);if(b.length<3||t.length<3)return '';const a=t[0]-b[0]-((t[1]<b[1]||(t[1]===b[1]&&t[2]<b[2]))?1:0);return a>=0?a+'세':'';}
+function renderList(){
+  const n=list.filter(x=>x.status==='신청받음').length;g('ikNewCount').textContent=n;g('ikNewCount').hidden=!n;
+  const q=tx(g('ikSearch').value).replace(/\s|-/g,'').toLowerCase(),f=g('ikFilter').value;
+  const rows=list.filter(x=>(!f||x.status===f)&&(!q||[x.name,x.phone,x.no,x.id].join(' ').replace(/\s|-/g,'').toLowerCase().includes(q)));
+  const box=g('ikListBox');
+  if(!list.length){box.innerHTML='<div class="ik-empty">아직 쓴 초기접수지가 없어요.<br><b>+ 새로 쓰기</b>로 시작하거나, 신청 링크를 보내 보세요.</div>';return;}
+  if(!rows.length){box.innerHTML='<div class="ik-empty">조건에 맞는 접수지가 없어요.</div>';return;}
+  box.innerHTML='<table class="ik-list"><thead><tr><th style="width:34px"><span class="sr">고르기</span></th><th>접수일</th><th>이름</th><th class="ik-hide-m">생년월일</th><th class="ik-hide-m">연락처</th><th class="ik-hide-m">희망 프로그램</th><th>상태</th></tr></thead><tbody>'+
+    rows.map(x=>'<tr class="ik-row" data-id="'+esc(x.id)+'"><td><input type="checkbox" class="ik-chk" data-id="'+esc(x.id)+'" aria-label="'+esc(x.name)+' 고르기"'+(picked.has(x.id)?' checked':'')+' style="width:18px;min-height:18px"></td>'+
+      '<td>'+esc(x.date)+'<div class="ik-route">'+esc(x.route)+(x.no?' · '+esc(x.no):'')+'</div></td>'+
+      '<td><button type="button" class="ik-name" data-open="'+esc(x.id)+'">'+esc(x.name)+'</button></td>'+
+      '<td class="ik-hide-m">'+esc(x.birth)+(x.age!==''?' <span class="ik-route">('+esc(x.age)+'세)</span>':'')+'</td>'+
+      '<td class="ik-hide-m">'+esc(x.phone)+'</td><td class="ik-hide-m">'+esc(tx(x.hope).slice(0,40))+'</td>'+
+      '<td><span class="ik-st s-'+esc(x.status)+'">'+esc(x.status)+'</span></td></tr>').join('')+'</tbody></table>';
+}
+async function reloadList(){try{list=await runServer('listIntakes');renderList();}catch(e){toast(errText(e),true);}}
+
+/* ── 쓰기 화면 ── */
+const F=()=>g('ikPanelEdit');
+function setVal(name,value){const els=F().elements[name];if(!els)return;if(els instanceof RadioNodeList||(els.length&&els[0]&&els[0].type)){[...els].forEach(el=>{if(el.type==='checkbox')el.checked=Array.isArray(value)?value.includes(el.value):!!value;else if(el.type==='radio')el.checked=el.value===value;});}else if(els.type==='checkbox')els.checked=!!value;else els.value=value==null?'':value;}
+function checkedList(name){return [...F().querySelectorAll('input[name="'+name+'"]:checked')].map(e=>e.value);}
+function radio(name){const c=F().querySelector('input[name="'+name+'"]:checked');return c?c.value:'';}
+function showMore(){
+  g('ikDisMore').hidden=radio('disReg')!=='장애등록';
+  g('ikMultiMore').hidden=radio('multi')!=='있음';
+  g('ikAidMore').hidden=radio('aid')!=='사용';
+  const sup=checkedList('support');
+  g('ikBenefitMore').hidden=!sup.includes('수급자');g('ikEtcMore').hidden=!sup.includes('기타');
+  g('ikRelWrap').hidden=radio('writer')!=='대리';
+  const b=F().elements.birth.value,d=F().elements.date.value;g('ikAge').textContent=b?'· 만 '+ageText(b,d||boot.today):'';
+}
+function openEditor(x){
+  if(tab==='edit'&&dirty&&!confirm('저장하지 않은 내용이 있어요. 새로 열까요?'))return;
+  dirty=false;editing=x||null;const f=F();f.reset();
+  const v=x||{date:boot.today,status:'작성중',signDate:boot.today,writer:'본인',support:[],benefits:[]};
+  ['date','no','status','name','birth','phone1','phone2','address','disType','disGrade','multiType','aidText','supportEtc','hope','signDate','relation','memo'].forEach(k=>setVal(k,v[k]));
+  ['alone','gender','disReg','disLevel','multi','aid','c1','c2','writer'].forEach(k=>{[...f.querySelectorAll('input[name="'+k+'"]')].forEach(el=>{el.checked=el.value===v[k];});});
+  [...f.querySelectorAll('input[name="support"]')].forEach(el=>{el.checked=(v.support||[]).includes(el.value);});
+  [...f.querySelectorAll('input[name="benefits"]')].forEach(el=>{el.checked=(v.benefits||[]).includes(el.value);});
+  f.elements.ack1.checked=!!v.ack1;f.elements.ack2.checked=!!v.ack2;
+  pads[0].load(v.sigSelf);pads[1].load(v.sigProxy);
+  g('ikTabEdit').textContent=x?x.name+' 고치기':'새로 쓰기';
+  g('ikEditHead').innerHTML=x?('<b>'+esc(x.id)+'</b> · '+esc(x.route)+' · 처음 '+esc(x.created)+(x.updated?' · 마지막 저장 '+esc(x.updated):'')+(x.route==='링크신청'&&x.status==='신청받음'?'<br>신청한 분이 쓴 내용이에요. 확인·보완한 뒤 상태를 <b>접수완료</b>로 바꿔 저장해 주세요.':'')):'종이 초기접수지와 같은 순서예요. 이름만 있어도 <b>작성중</b>으로 저장할 수 있어요.';
+  setMsg('');renderPick();showMore();dirty=false;setTab('edit');
+  window.scrollTo(0,0);f.elements.name.focus({preventScroll:true});
+}
+function collect(){
+  const f=F();
+  return {id:editing?editing.id:'',updated:editing?editing.updated:'',date:f.elements.date.value,no:f.elements.no.value,status:f.elements.status.value,alone:radio('alone'),
+    name:f.elements.name.value,birth:f.elements.birth.value,gender:radio('gender'),phone1:f.elements.phone1.value,phone2:f.elements.phone2.value,address:f.elements.address.value,
+    disReg:radio('disReg'),disType:f.elements.disType.value.replace(/장애$/,''),disGrade:f.elements.disGrade.value.replace(/급$/,''),disLevel:radio('disLevel'),
+    multi:radio('multi'),multiType:f.elements.multiType.value.replace(/장애$/,''),aid:radio('aid'),aidText:f.elements.aidText.value,
+    support:checkedList('support'),benefits:checkedList('benefits'),supportEtc:f.elements.supportEtc.value,hope:f.elements.hope.value,
+    c1:radio('c1'),c2:radio('c2'),ack1:f.elements.ack1.checked,ack2:f.elements.ack2.checked,signDate:f.elements.signDate.value,
+    writer:radio('writer')||'본인',relation:f.elements.relation.value,memo:f.elements.memo.value,
+    sigSelf:pads[0].value(),sigProxy:pads[1].value()};
+}
+function setMsg(m,err){const el=g('ikEditMsg');el.textContent=m;el.classList.toggle('err',!!err);}
+async function save(thenPrint){
+  const data=collect();
+  if(!tx(data.name)){setMsg('이름을 입력해 주세요.',true);F().elements.name.focus();return;}
+  const btns=[g('ikSave'),g('ikSavePrint')];btns.forEach(b=>b.disabled=true);setMsg('저장하는 중이에요…');
+  try{
+    const r=await runServer('saveIntake',data);
+    dirty=false;setMsg((r.created?'새로 저장했어요 ('+r.id+').':'저장했어요.')+' 상태: '+r.status);
+    toast(r.created?'초기접수지를 저장했어요.':'고친 내용을 저장했어요.');
+    editing=await runServer('getIntake',r.id);pads[0].load(editing.sigSelf);pads[1].load(editing.sigProxy);
+    g('ikTabEdit').textContent=editing.name+' 고치기';
+    reloadList();
+    if(thenPrint)preview([r.id]);
+  }catch(e){setMsg(errText(e),true);}
+  finally{btns.forEach(b=>b.disabled=false);}
+}
+
+/* ── 희망 프로그램 고르기 ── */
+function renderPick(){
+  const box=g('ikPickList'),q=tx(g('ikPickQ').value).replace(/\s/g,'').toLowerCase(),progs=(boot&&boot.programs)||[];
+  if(!progs.length){box.innerHTML='<span class="hint">불러온 프로그램이 없어요.</span>';return;}
+  const hits=progs.filter(p=>!q||[p.name,p.target,p.team].join(' ').replace(/\s/g,'').toLowerCase().includes(q)).slice(0,q?20:10);
+  box.innerHTML=hits.length?hits.map((p,i)=>'<button type="button" data-pi="'+progs.indexOf(p)+'">'+esc(p.name)+(p.status?' <small>'+esc(p.status)+'</small>':'')+'</button>').join('')+(q?'':'<span class="hint" style="align-self:center">… 검색하면 더 나와요</span>'):'<span class="hint">맞는 프로그램이 없어요. 직접 적어 주세요.</span>';
+}
+function addHope(name){const ta=F().elements.hope;const cur=tx(ta.value);const items=cur?cur.split(/\s*,\s*|\n/):[];if(items.includes(name)){toast('이미 들어 있어요.');return;}ta.value=cur?cur+', '+name:name;dirty=true;toast('「'+name+'」을(를) 넣었어요.');}
+
+/* ── 서명 칸 ── */
+function makePad(rootId){
+  const root=g(rootId),cv=root.querySelector('canvas'),ctx=cv.getContext('2d'),old=root.querySelector('.ik-old'),img=old.querySelector('img'),msg=root.querySelector('.ik-padmsg');
+  const pad={drawn:false,saved:'',cleared:false};let drawing=false;
+  pad.resize=function(){const r=cv.getBoundingClientRect();if(!r.width)return;const keep=pad.drawn?cv.toDataURL():'';const ratio=Math.max(window.devicePixelRatio||1,1);cv.width=Math.round(r.width*ratio);cv.height=Math.round(r.height*ratio);ctx.setTransform(ratio,0,0,ratio,0,0);ctx.lineWidth=2.6;ctx.lineCap='round';ctx.lineJoin='round';ctx.strokeStyle='#111';if(keep){const i=new Image();i.onload=()=>ctx.drawImage(i,0,0,r.width,r.height);i.src=keep;}};
+  pad.load=function(src){pad.saved=src||'';pad.drawn=false;pad.cleared=false;ctx.clearRect(0,0,cv.width,cv.height);old.hidden=!pad.saved;if(pad.saved)img.src=pad.saved;msg.textContent=pad.saved?'저장된 서명 · 지우면 다시 받을 수 있어요':'여기에 서명해요';};
+  pad.clear=function(){ctx.clearRect(0,0,cv.width,cv.height);if(pad.saved)pad.cleared=true;pad.drawn=false;old.hidden=true;msg.textContent='여기에 서명해요';dirty=true;};
+  /* 저장: 새로 그렸으면 작게 줄인 그림, 지웠으면 빈칸, 손대지 않았으면 그대로(keep) */
+  pad.value=function(){if(pad.drawn){const r=cv.getBoundingClientRect(),w=360,h=Math.round(w*r.height/r.width),c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d').drawImage(cv,0,0,w,h);return c.toDataURL('image/png');}return pad.saved&&!pad.cleared?'keep':'';};
+  const pos=e=>{const r=cv.getBoundingClientRect();return{x:e.clientX-r.left,y:e.clientY-r.top};};
+  cv.addEventListener('pointerdown',e=>{if(!old.hidden)return;e.preventDefault();drawing=true;pad.drawn=true;dirty=true;cv.setPointerCapture(e.pointerId);const p=pos(e);ctx.beginPath();ctx.moveTo(p.x,p.y);ctx.lineTo(p.x+.1,p.y+.1);ctx.stroke();msg.textContent='서명 중 · 다 되면 저장을 눌러요';});
+  cv.addEventListener('pointermove',e=>{if(!drawing)return;e.preventDefault();const p=pos(e);ctx.lineTo(p.x,p.y);ctx.stroke();});
+  ['pointerup','pointercancel'].forEach(t=>cv.addEventListener(t,()=>{drawing=false;}));
+  root.querySelector('.ik-clear').addEventListener('click',pad.clear);
+  return pad;
+}
+const pads=[];
+
+/* ── 인쇄 · PDF ── */
+async function preview(ids,blank){
+  const d=g('ikPreview');g('ikPvFrame').srcdoc='<p style="font-family:sans-serif;color:#666;padding:20px">양식을 만드는 중이에요…</p>';
+  if(!d.open)d.showModal();
+  try{const r=await runServer('makeIntakePrint',ids,!!blank);pv={ids:ids,blank:!!blank,fileName:r.fileName,base64:''};g('ikPvTitle').textContent='인쇄 미리보기 · '+(blank?'빈 양식':ids.length+'장');g('ikPvFrame').srcdoc=r.html;}
+  catch(e){d.close();toast(errText(e),true);}
+}
+function printFrame(){const f=g('ikPvFrame');try{f.contentWindow.focus();f.contentWindow.print();}catch(e){toast('바로 인쇄가 안 돼요. [PDF 저장] 뒤 파일을 열어 인쇄해 주세요.',true);}}
+async function savePdf(){
+  if(!pv)return;const b=g('ikPvPdf');b.disabled=true;b.textContent='PDF 만드는 중…';
+  try{if(!pv.base64){const r=await runServer('makeIntakePdfFile',pv.ids,pv.blank);pv.base64=r.base64;pv.fileName=r.fileName;}
+    const bytes=atob(pv.base64),arr=new Uint8Array(bytes.length);for(let i=0;i<bytes.length;i++)arr[i]=bytes.charCodeAt(i);
+    const url=URL.createObjectURL(new Blob([arr],{type:'application/pdf'})),a=document.createElement('a');a.href=url;a.download=pv.fileName;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),5000);toast('PDF를 저장했어요.');}
+  catch(e){toast(errText(e),true);}finally{b.disabled=false;b.textContent='PDF 저장';}
+}
+
+/* ── 신청 링크 ── */
+function applyUrl(){const u=tx(boot&&boot.link&&boot.link.url);if(!u)return '';return /[?&]page=apply/.test(u)?u:u+(u.includes('?')?'&':'?')+'page=apply';}
+function renderLink(){
+  const l=boot.link||{};g('ikLinkUrl').value=l.url||'';g('ikLinkPhone').value=l.phone||'';g('ikLinkStaff').value=l.staff||'';
+  const u=applyUrl();
+  g('ikLinkNow').innerHTML=u?'<div class="ik-link"><b>지금 신청 링크</b><br>'+esc(u)+'</div>':'<div class="ik-link" style="border-left-color:#a33128">아직 신청 링크가 없어요. 아래 「처음 한 번 준비」를 따라 주소를 넣어 주세요.</div>';
+  g('ikOpenApply').hidden=!u;if(u)g('ikOpenApply').href=u;
+  g('ikSms').value='[종로장애인복지관] 초기접수지 작성 안내\n\n안녕하세요. 종로장애인복지관입니다.\n복지관 이용을 위한 초기접수지를 아래 링크에서 휴대폰으로 작성하실 수 있어요.\n가족이나 보호자가 대신 작성하셔도 괜찮아요.\n\n▶ 작성하기: '+(u||'(신청 링크)')+'\n\n작성하시면 담당자가 확인하고 연락드릴게요.'+(l.phone?'\n궁금한 점은 '+l.phone+'으로 편하게 연락 주세요.':'')+'\n감사합니다.';
+}
+async function saveLink(e){
+  e.preventDefault();
+  try{const r=await runServer('saveIntakeSettings',{url:g('ikLinkUrl').value,phone:g('ikLinkPhone').value,staff:g('ikLinkStaff').value});boot.link=r;renderLink();toast('저장했어요.');}
+  catch(err){toast(errText(err),true);}
+}
+async function copySms(){const ta=g('ikSms');let ok=false;try{if(navigator.clipboard&&window.isSecureContext){await navigator.clipboard.writeText(ta.value);ok=true;}}catch(e){ok=false;}if(!ok){ta.focus();ta.select();try{ok=document.execCommand('copy');}catch(e){ok=false;}}toast(ok?'복사했어요. 문자에 붙여 넣으세요.':'글자를 길게 눌러 복사해 주세요.',!ok);}
+
+/* ── 연결 ── */
+document.addEventListener('DOMContentLoaded',()=>{
+  if(!g('viewIntake'))return;
+  pads.push(makePad('ikPadSelf'),makePad('ikPadProxy'));
+  window.addEventListener('resize',()=>{if(tab==='edit')pads.forEach(p=>p.resize());});
+  g('goIntake')&&g('goIntake').addEventListener('click',openIntake);
+  g('ikBack').addEventListener('click',()=>{if(tab==='edit'&&dirty&&!confirm('저장하지 않은 내용이 있어요. 나갈까요?'))return;dirty=false;showView('finder');});
+  const tabs=[...document.querySelectorAll('.ik-tab')];
+  tabs.forEach(b=>{b.addEventListener('click',()=>{if(b.dataset.ik==='edit'&&!editing&&tab!=='edit'){openEditor(null);return;}setTab(b.dataset.ik);});
+    b.addEventListener('keydown',e=>{if(e.key!=='ArrowRight'&&e.key!=='ArrowLeft')return;e.preventDefault();const i=tabs.indexOf(b),n=tabs[(i+(e.key==='ArrowRight'?1:tabs.length-1))%tabs.length];n.click();n.focus();});});
+  g('ikSearch').addEventListener('input',renderList);g('ikFilter').addEventListener('change',renderList);
+  g('ikNew').addEventListener('click',()=>openEditor(null));
+  g('ikListBox').addEventListener('click',async e=>{
+    const chk=e.target.closest('.ik-chk');if(chk){if(chk.checked)picked.add(chk.dataset.id);else picked.delete(chk.dataset.id);return;}
+    const row=e.target.closest('[data-open]')||e.target.closest('tr.ik-row');if(!row)return;const id=row.dataset.open||row.dataset.id;
+    g('ikListStatus').textContent='여는 중이에요…';try{openEditor(await runServer('getIntake',id));}catch(err){toast(errText(err),true);}finally{g('ikListStatus').textContent='';}
+  });
+  g('ikPrintSel').addEventListener('click',()=>{const ids=list.filter(x=>picked.has(x.id)).map(x=>x.id);if(!ids.length){toast('목록 왼쪽 칸에서 출력할 접수지를 골라 주세요.',true);return;}preview(ids);});
+  g('ikPrintBlank').addEventListener('click',()=>preview([],true));
+  const f=F();
+  f.addEventListener('input',()=>{dirty=true;showMore();});f.addEventListener('change',e=>{dirty=true;
+    if(e.target.name==='support'&&e.target.value==='일반'&&e.target.checked)[...f.querySelectorAll('input[name="support"]')].forEach(el=>{if(el.value!=='일반')el.checked=false;});
+    else if(e.target.name==='support'&&e.target.checked){const gen=f.querySelector('input[name="support"][value="일반"]');gen.checked=false;}
+    showMore();});
+  f.addEventListener('submit',e=>{e.preventDefault();save(false);});
+  g('ikSavePrint').addEventListener('click',()=>save(true));
+  g('ikCancel').addEventListener('click',()=>{if(setTab('list')){editing=null;g('ikTabEdit').textContent='새로 쓰기';}});
+  g('ikPickQ').addEventListener('input',renderPick);
+  g('ikPickList').addEventListener('click',e=>{const b=e.target.closest('[data-pi]');if(b)addHope(boot.programs[Number(b.dataset.pi)].name);});
+  g('ikLinkForm').addEventListener('submit',saveLink);g('ikCopySms').addEventListener('click',copySms);
+  g('ikPvClose').addEventListener('click',()=>g('ikPreview').close());g('ikPvPrint').addEventListener('click',printFrame);g('ikPvPdf').addEventListener('click',savePdf);
+  window.addEventListener('beforeunload',e=>{if(tab==='edit'&&dirty){e.preventDefault();e.returnValue='';}});
+});
+})();
+</script>
