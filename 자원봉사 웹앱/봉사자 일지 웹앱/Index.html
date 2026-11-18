@@ -243,6 +243,10 @@
     .consent-q { margin: 16px 0 8px; font-weight: 700; font-size: 15px; }
     .hint-small { margin: 6px 0 0; color: var(--subtext); font-size: 14px; }
     #applyArea { display: none; }
+    .edu-box { display: flex; gap: 14px; align-items: center; margin-top: 14px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 4px; background: #fff; text-align: left; line-height: 1.6; }
+    .edu-box[hidden] { display: none; }
+    .edu-qr { width: 110px; height: 110px; flex: 0 0 auto; }
+    .edu-link { display: inline-block; margin-top: 6px; color: var(--primary-dark); font-weight: 700; }
     #applyDone { display: none; }
     @media (max-width: 520px) {
       .first-time { flex-direction: column; align-items: stretch; }
@@ -640,8 +644,17 @@
         <h1>자원봉사활동 신청서</h1>
         <p>
           참 좋은 인연입니다. 귀한 시간과 열정을 나누어주셔서 감사합니다.
-          봉사하신 시간이 잘 기록될 수 있도록 아래 정보를 적어 주세요.
+          봉사하신 시간이 잘 기록될 수 있도록 아래 정보를 적어 주시고,
+          자원봉사 기본 교육에도 꼭 참여해 주세요.
         </p>
+        <div class="edu-box" data-edu hidden>
+          <img class="edu-qr" alt="자원봉사 기본 교육 QR코드">
+          <div>
+            <b>자원봉사 기본 교육</b><br>
+            <span class="hint-small">내 휴대폰 카메라로 QR을 찍거나, 아래 버튼을 눌러 참여해 주세요.</span><br>
+            <a class="edu-link" target="_blank" rel="noopener">기본 교육 참여하기 ›</a>
+          </div>
+        </div>
       </header>
 
       <section class="card">
@@ -760,7 +773,14 @@
       <p><strong id="apDoneName"></strong>님, 함께해 주셔서 고맙습니다.</p>
       <div class="log-id">신청번호: <span id="apDoneId"></span></div>
       <p class="meal-note">담당자가 확인하면 봉사자로 등록돼요.</p>
-      <a id="apEdu" href="#" target="_blank" rel="noopener" style="display:none"><button type="button" class="new-entry-button" style="background:var(--soft);color:var(--primary-dark);border-color:var(--primary)">자원봉사 기본 교육 참여하기</button></a>
+      <div class="edu-box" data-edu hidden>
+        <img class="edu-qr" alt="자원봉사 기본 교육 QR코드">
+        <div>
+          <b>아직 기본 교육 전이라면 지금 참여해 주세요</b><br>
+          <span class="hint-small">내 휴대폰 카메라로 QR을 찍거나, 아래 버튼을 눌러 주세요.</span><br>
+          <a class="edu-link" target="_blank" rel="noopener">기본 교육 참여하기 ›</a>
+        </div>
+      </div>
       <button type="button" id="apToLog" class="submit-button" style="margin-top:12px" onclick="continueToLog()">이어서 오늘 활동일지 쓰기</button>
       <p id="apNoLog" class="meal-note" style="display:none">활동일지 개인정보 수집에 동의하지 않으셔서, 활동일지는 종이로 써 주세요. 담당자에게 말씀해 주시면 돼요.</p>
     </section>
@@ -829,6 +849,15 @@
         loadProgramList();
         loadActivityContentList();
         changeRegistrationType();
+        google.script.run.withSuccessHandler(function (info) {
+          if (!info || !info.eduUrl) return;
+          document.querySelectorAll('[data-edu]').forEach(function (box) {
+            box.querySelector('.edu-link').href = info.eduUrl;
+            const img = box.querySelector('.edu-qr');
+            if (info.eduQr) img.src = info.eduQr; else img.remove();
+            box.hidden = false;
+          });
+        }).getApplyInfo();
       }
     );
 
@@ -2366,8 +2395,6 @@
           lastApply = r;
           document.getElementById('apDoneName').textContent = r.name;
           document.getElementById('apDoneId').textContent = r.applicationId;
-          const edu = document.getElementById('apEdu');
-          if (r.eduUrl) { edu.href = r.eduUrl; edu.style.display = 'block'; } else { edu.style.display = 'none'; }
           document.getElementById('apToLog').style.display = r.logAllowed ? 'block' : 'none';
           document.getElementById('apNoLog').style.display = r.logAllowed ? 'none' : 'block';
           document.getElementById('applyArea').style.display = 'none';
