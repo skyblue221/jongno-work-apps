@@ -7,7 +7,7 @@
  *       서명이 모두 끝난 일지는 매달 봉사자별 PDF로 드라이브에 자동 보관
  ****************************************************************/
 
-const ACTIVITY_LOG_BUILD = '활동일지 v2.3 · 담당자 출력';
+const ACTIVITY_LOG_BUILD = '활동일지 v2.4 · 처음 오신 분 신청서';
 const CONTENT_SHEET_NAME = '활동내용 문구';
 const CONTENT_HEADERS = ['프로그램', '활동내용', '사용(Y/N)'];
 

@@ -376,6 +376,28 @@
         </div>
       </section>
 
+      <!-- 신청서 (처음 오신 분) -->
+      <section id="tab-apply" hidden>
+        <div class="card">
+          <div class="row" style="justify-content:space-between">
+            <h2 style="margin:0">자원봉사 신청서</h2>
+            <div class="row">
+              <select id="applyScope" onchange="loadApplications()">
+                <option value="확인대기">확인할 신청서 (대기·보류)</option>
+                <option value="전체">전체 (등록 완료 포함)</option>
+              </select>
+              <button class="b gray sm" onclick="loadApplications()">새로고침</button>
+            </div>
+          </div>
+          <p class="hint" style="margin-top:10px">봉사자 화면의 「처음 오셨나요?」에서 쓴 신청서예요. 확인(서명)하면 활동일지 봉사자 명단에 등록되고, 그 전에 「명단에 없어요」로 쓴 일지도 자동으로 이어져요. 통합관리 PEOPLE에는 매일 밤 명단 연동 때 들어가요.</p>
+          <div id="applyList"></div>
+          <div class="row" style="justify-content:flex-end;margin-top:8px">
+            <span id="applyCount" class="hint" style="margin:0"></span>
+            <button class="b soft" onclick="printApplications()">선택한 신청서 출력</button>
+          </div>
+        </div>
+      </section>
+
       <!-- 담당자 관리 -->
       <section id="tab-staffadmin" hidden>
         <div class="card">
@@ -468,6 +490,50 @@
         <textarea id="rejectReason" placeholder="반려 사유 (예: 활동시간 확인 필요)" style="margin-top:8px"></textarea>
         <button class="b red" style="margin-top:8px" onclick="reject()">반려</button>
       </details>
+      </div>
+    </div>
+  </div>
+
+  <!-- 신청서 상세 -->
+  <div id="applyDetail" class="overlay" hidden onclick="if(event.target===this)this.hidden=true">
+    <div class="sheet">
+      <div class="row" style="justify-content:space-between">
+        <h2 style="margin:0" id="adTitle">신청서 확인</h2>
+        <button class="b gray sm" onclick="document.getElementById('applyDetail').hidden=true">닫기</button>
+      </div>
+      <p class="hint" style="margin-top:8px">오타가 있으면 고친 뒤 확인하세요. 고친 내용으로 명단에 등록돼요.</p>
+      <div class="row">
+        <div style="flex:1;min-width:140px"><label class="f">성명</label><input id="adName" style="width:100%"></div>
+        <div style="flex:1;min-width:140px"><label class="f">생년월일</label><input id="adBirth" type="date" style="width:100%"></div>
+      </div>
+      <div class="row">
+        <div style="flex:1;min-width:140px"><label class="f">연락처</label><input id="adPhone" style="width:100%"></div>
+        <div style="flex:1;min-width:140px"><label class="f">소속</label><input id="adOrg" style="width:100%"></div>
+      </div>
+      <div class="row">
+        <div style="flex:1;min-width:140px"><label class="f">실적등록처</label>
+          <select id="adSystem" style="width:100%"><option value="">없음</option><option>VMS</option><option>1365</option></select></div>
+        <div style="flex:1;min-width:140px"><label class="f">아이디</label><input id="adPerfId" style="width:100%"></div>
+      </div>
+      <dl class="d" id="adInfo" style="margin-top:14px"></dl>
+      <div id="adGuardian" class="timebox" hidden>
+        <b>14세 미만</b> — 보호자 동의를 받았는지 확인해 주세요.
+        <div id="adGuardianInfo" class="hint" style="margin:6px 0"></div>
+        <label class="row" style="font-weight:700"><input type="checkbox" id="adGuardianOk" class="check"> 보호자 확인</label>
+      </div>
+      <div id="adActions">
+        <div class="row" style="margin-top:12px">
+          <button class="b" id="adApprove" style="flex:1" onclick="approveApply()">확인 (서명) · 명단 등록</button>
+          <button class="b soft" onclick="printApplications([currentApply.id])">출력</button>
+        </div>
+        <details style="margin-top:14px">
+          <summary style="cursor:pointer;color:var(--err);font-weight:700">보류하기</summary>
+          <textarea id="adMemo" placeholder="보류 사유 (예: 연락처 다시 확인 필요)" style="margin-top:8px"></textarea>
+          <button class="b red" style="margin-top:8px" onclick="holdApply()">보류</button>
+        </details>
+      </div>
+      <div id="adDoneRow" class="row" style="margin-top:12px" hidden>
+        <button class="b soft" style="flex:1" onclick="printApplications([currentApply.id])">출력</button>
       </div>
     </div>
   </div>
@@ -611,7 +677,7 @@
       if (ME.isLeader || ME.isAdmin) tabs.push(['leader', '팀장 확인']);
       if (ME.isAdmin) tabs.push(['dash', '현황판'], ['input', '실적 입력']);
       if (ME.registered || ME.isAdmin) tabs.push(['print', '일지 출력']);
-      if (ME.isAdmin) tabs.push(['staffadmin', '담당자 관리']);
+      if (ME.isAdmin) tabs.push(['apply', '신청서'], ['staffadmin', '담당자 관리']);
       tabs.push(['me', '내 정보']);
 
       const nav = document.getElementById('tabs');
@@ -641,6 +707,7 @@
       }
 
       if (ME.isLeader || ME.isAdmin) loadLeaderQueue(true);
+      if (ME.isAdmin) loadApplications(true);
     }
 
     function showTab(name) {
@@ -651,6 +718,7 @@
       if (name === 'dash') loadDashboard();
       if (name === 'input') loadInputList();
       if (name === 'staffadmin') loadStaffAdmin();
+      if (name === 'apply') loadApplications();
       if (name === 'me') loadMe();
     }
 
@@ -1044,12 +1112,14 @@
 
     let lastPdf = null;
     let lastPrintArgs = null;
+    let lastPdfFn = 'makeLogPdfFile';
 
     function makePdf() {
       const btn = document.getElementById('printBtn');
       btn.disabled = true;
       btn.textContent = '일지 만드는 중...';
       lastPrintArgs = [printKey, document.getElementById('printFrom').value, document.getElementById('printTo').value];
+      lastPdfFn = 'makeLogPdfFile';
       run.apply(null, ['makeLogPdf'].concat(lastPrintArgs))
         .then(function (r) {
           lastPdf = r;
@@ -1077,7 +1147,7 @@
       if (!lastPdf || !lastPrintArgs) return;
       if (lastPdf.base64) { downloadPdf(); return; }
       toast('PDF 파일을 만드는 중이에요... (10초쯤 걸릴 수 있어요)', 'info');
-      run.apply(null, ['makeLogPdfFile'].concat(lastPrintArgs))
+      run.apply(null, [lastPdfFn].concat(lastPrintArgs))
         .then(function (r) { lastPdf.base64 = r.base64; lastPdf.fileName = r.fileName; downloadPdf(); })
         .catch(fail);
     }
@@ -1094,6 +1164,141 @@
       a.click();
       a.remove();
       toast('PDF를 저장했어요.');
+    }
+
+
+    /* ---------- 신청서 ---------- */
+    let applyRows = [];
+    let currentApply = null;
+
+    function loadApplications(badgeOnly) {
+      const scope = badgeOnly ? '확인대기' : document.getElementById('applyScope').value;
+      const box = document.getElementById('applyList');
+      if (!badgeOnly) box.innerHTML = '<div class="empty">불러오는 중...</div>';
+      run('getApplications', scope).then(function (list) {
+        if (scope === '확인대기') setBadge('apply', list.filter(function (a) { return a.status === '확인대기'; }).length);
+        if (badgeOnly) return;
+        applyRows = list;
+        if (!list.length) { box.innerHTML = '<div class="empty">확인할 신청서가 없어요 👍</div>'; updateApplyCount(); return; }
+        box.innerHTML = '<div class="scroll"><table class="t"><tr>' +
+          '<th><input type="checkbox" class="check" onchange="document.querySelectorAll(\'.achk\').forEach(function(c){c.checked=this.checked}.bind(this));updateApplyCount()"></th>' +
+          '<th>신청일</th><th>성명</th><th class="hide-sm">생년월일</th><th>소속</th><th>상태</th><th></th></tr>' +
+          list.map(function (a, i) {
+            const chip = a.status === '등록완료' ? '<span class="chip ok">등록완료</span>' + (a.confirmer ? '<div class="hint" style="margin:0;font-size:12px">' + esc(a.confirmer) + '</div>' : '')
+              : a.status === '보류' ? '<span class="chip err">보류</span>' + (a.memo ? '<div class="hint" style="margin:0;font-size:12px">' + esc(a.memo) + '</div>' : '')
+              : '<span class="chip warn">확인대기</span>';
+            return '<tr><td><input type="checkbox" class="check achk" data-i="' + i + '" onchange="updateApplyCount()"></td>' +
+              '<td>' + esc(String(a.submittedAt).slice(0, 10)) + '</td>' +
+              '<td><b>' + esc(a.name) + '</b>' + (a.under14 ? ' <span class="chip blue">14세 미만</span>' : '') +
+              (a.logAllowed ? '' : ' <span class="chip">일지 동의 안 함</span>') + '</td>' +
+              '<td class="hide-sm">' + esc(a.birthDate) + '</td><td>' + esc(a.organization) + '</td><td>' + chip + '</td>' +
+              '<td><button class="b soft sm" onclick="openApplyDetail(' + a.rowNumber + ',\'' + esc(a.id) + '\')">상세보기</button></td></tr>';
+          }).join('') + '</table></div>';
+        updateApplyCount();
+      }).catch(function (e) { if (!badgeOnly) { box.innerHTML = ''; fail(e); } });
+    }
+
+    function selectedApplyIds() {
+      return Array.prototype.map.call(document.querySelectorAll('.achk:checked'), function (c) { return applyRows[c.dataset.i].id; });
+    }
+
+    function updateApplyCount() {
+      const n = selectedApplyIds().length;
+      document.getElementById('applyCount').textContent = n ? n + '장 선택' : '';
+    }
+
+    function openApplyDetail(rowNumber, id) {
+      toast('불러오는 중...', 'info');
+      run('getApplicationDetail', rowNumber, id).then(function (a) {
+        currentApply = a;
+        document.getElementById('msg').className = 'msg';
+        document.getElementById('adTitle').textContent = '신청서 확인 · ' + a.id;
+        document.getElementById('adName').value = a.name;
+        document.getElementById('adBirth').value = a.birthDate;
+        document.getElementById('adPhone').value = a.phoneText;
+        document.getElementById('adOrg').value = a.org;
+        document.getElementById('adSystem').value = a.system;
+        document.getElementById('adPerfId').value = a.perfId;
+        const done = a.status === '등록완료';
+        ['adName', 'adBirth', 'adPhone', 'adOrg', 'adSystem', 'adPerfId'].forEach(function (x) { document.getElementById(x).disabled = done; });
+
+        const sig = a.signatureImage ? '<img class="sigimg" src="' + a.signatureImage + '">' : '<span class="chip err">서명 이미지를 불러오지 못했어요</span>';
+        const items = [
+          ['신청일', esc(a.submittedAt)],
+          ['성별', esc(a.gender)],
+          ['직업', esc(a.job || '-')],
+          ['주소', esc(a.address || '-')],
+          ['이메일', esc(a.email || '-')],
+          ['희망 활동', esc(a.hope || '-')],
+          ['동의', '개인정보 ' + esc(a.c1) + '<br>활동일지 ' + esc(a.c2) + '<br>소식 받기 ' + esc(a.c3)],
+          ['신청자 서명', sig]
+        ];
+        if (done) items.push(['확인', esc(a.confirmer) + ' · ' + esc(a.confirmedAt) + (a.confirmerSignatureImage ? '<br><img class="sigimg" src="' + a.confirmerSignatureImage + '">' : '')]);
+        if (a.memo) items.push(['메모', '<span style="color:var(--err)">' + esc(a.memo) + '</span>']);
+        document.getElementById('adInfo').innerHTML = items.map(function (i) { return '<dt>' + i[0] + '</dt><dd>' + i[1] + '</dd>'; }).join('');
+
+        document.getElementById('adGuardian').hidden = !a.under14;
+        document.getElementById('adGuardianInfo').textContent = '보호자 동의: ' + (a.gConsent || '-') + ' · 연락처 ' + (a.gPhone || '-') + ' · 관계 ' + (a.gRelation || '-');
+        document.getElementById('adGuardianOk').checked = a.gVerified;
+        document.getElementById('adGuardianOk').disabled = done;
+        document.getElementById('adActions').hidden = done;
+        document.getElementById('adDoneRow').hidden = !done;
+        document.getElementById('adMemo').value = a.memo || '';
+        document.getElementById('adApprove').disabled = false;
+        document.getElementById('applyDetail').hidden = false;
+      }).catch(fail);
+    }
+
+    function approveApply() {
+      if (!currentApply) return;
+      if (!ME.hasSignature) { toast('「내 정보」에서 서명을 먼저 등록해 주세요.', 'err'); return; }
+      const btn = document.getElementById('adApprove');
+      btn.disabled = true;
+      toast('등록하는 중... (신청서 PDF 보관까지 10초쯤 걸려요)', 'info');
+      run('approveApplication', {
+        rowNumber: currentApply.rowNumber,
+        id: currentApply.id,
+        guardianVerified: document.getElementById('adGuardianOk').checked,
+        edits: {
+          name: document.getElementById('adName').value.trim(),
+          birthDate: document.getElementById('adBirth').value,
+          phone: document.getElementById('adPhone').value.trim(),
+          organization: document.getElementById('adOrg').value.trim(),
+          perfSystem: document.getElementById('adSystem').value,
+          perfId: document.getElementById('adPerfId').value.trim()
+        }
+      }).then(function (r) {
+        toast(r.message);
+        document.getElementById('applyDetail').hidden = true;
+        loadApplications();
+      }).catch(function (e) { btn.disabled = false; fail(e); });
+    }
+
+    function holdApply() {
+      if (!currentApply) return;
+      const memo = document.getElementById('adMemo').value.trim();
+      if (!memo) { toast('보류 사유를 적어 주세요.', 'err'); return; }
+      run('holdApplication', currentApply.rowNumber, currentApply.id, memo).then(function () {
+        toast('보류했어요.');
+        document.getElementById('applyDetail').hidden = true;
+        loadApplications();
+      }).catch(fail);
+    }
+
+    function printApplications(ids) {
+      ids = ids || selectedApplyIds();
+      if (!ids.length) { toast('출력할 신청서를 골라 주세요.', 'err'); return; }
+      toast('신청서를 만드는 중...', 'info');
+      run('makeApplicationPrint', ids).then(function (r) {
+        document.getElementById('msg').className = 'msg';
+        lastPdf = { fileName: r.fileName };
+        lastPrintArgs = [ids];
+        lastPdfFn = 'makeApplicationPdfFile';
+        document.getElementById('previewTitle').textContent = '신청서 미리보기 · ' + r.count + '장';
+        document.getElementById('previewFrame').srcdoc = r.html;
+        document.getElementById('applyDetail').hidden = true;
+        document.getElementById('preview').hidden = false;
+      }).catch(fail);
     }
 
     /* ---------- 담당자 관리 ---------- */
