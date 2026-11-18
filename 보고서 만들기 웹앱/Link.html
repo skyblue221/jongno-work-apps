@@ -41,6 +41,14 @@
   @media (max-width:900px){
     body.side .wrap{grid-template-columns:1fr}
     body.side #planSide{position:static;max-height:60vh}
+    /* 연결된 계획서 칸은 목록 바로 밑에 붙어 있고, 그 아래 내용만 스크롤 */
+    #linkCard{position:sticky;top:calc(var(--hh,0px) + var(--ah,0px));z-index:7;padding:8px 10px;overflow:visible;box-shadow:0 3px 8px rgba(0,0,0,.08)}
+    #linkCard .lk{font-size:13px;gap:6px}
+    #linkCard .lk b{flex:1 1 60%;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    #linkCard .lk .sp{display:none}
+    #linkCard select{min-width:0;flex:1}
+    #linkCard .lk-done{margin-top:6px;padding-top:6px;font-size:13px}
+    #linkCard .lk-done small{display:none}
   }
 </style>
 <script>
