@@ -1,6 +1,6 @@
 <!--
   계획서 ↔ 결과보고 연결 (2026-11)
-  - 결과보고 화면: 연결된 계획서를 오른쪽에 펼쳐 보기 / 연결 끊기 / 예전 결과보고는 계획서를 골라 연결
+  - 결과보고 화면: 연결된 계획서를 왼쪽에 펼쳐 보기 (결과보고 입력칸은 오른쪽) / 연결 끊기 / 예전 결과보고는 계획서를 골라 연결
   - 계획서 화면: 이 계획서로 만든 결과보고 바로 열기, 없으면 「결과보고 만들기」
   - 왼쪽 목록: 계획서마다 「결과보고 있음 / 아직 없음」, 결과보고마다 「계획서 연결됨」
   Code.gs의 doGet()에서 Index 뒤에 붙여요. Index.html의 함수(renderAll, renderList 등)를 감싸서 동작해요.
@@ -19,13 +19,13 @@
   #planSide{display:none}
   body.side .wrap{grid-template-columns:minmax(0,1fr) minmax(0,1fr);max-width:1800px}
   body.side aside{display:none}
-  body.side #planSide{display:block;position:sticky;top:64px;align-self:start;max-height:calc(100vh - 80px);overflow:auto;background:#ebe8e1;border:1px solid var(--line);border-radius:6px;padding:0 10px 10px}
+  body.side #planSide{order:-1;display:block;position:sticky;top:64px;align-self:start;max-height:calc(100vh - 80px);overflow:auto;background:#ebe8e1;border:1px solid var(--line);border-radius:6px;padding:0 10px 10px}
   #planSide .sh{position:sticky;top:0;z-index:5;background:#ebe8e1;display:flex;align-items:center;gap:8px;padding:10px 0 8px;font-size:14px}
   #planSide .sh b{flex:1}
   #planSide .pg{padding:24px 20px;margin-bottom:10px;box-shadow:none;border:1px solid var(--line)}
   @media (max-width:900px){
     body.side .wrap{grid-template-columns:1fr}
-    body.side #planSide{position:static;max-height:60vh;order:-1}
+    body.side #planSide{position:static;max-height:60vh}
   }
 </style>
 <script>
