@@ -144,11 +144,28 @@ const DEFAULT_CRITERIA = [
 
 ];
 
-function doGet() {
-  return HtmlService.createTemplateFromFile('Index')
-    .evaluate()
+function doGet(e) {
+  const page = normalizeText_(e && e.parameter && e.parameter.page).toLowerCase();
+  const email = normalizeText_(Session.getActiveUser().getEmail());
+  // 초기접수 신청 링크: ?page=apply 이거나, 직원 계정이 아닌 사람(공개용 배포로 들어온 사람)은 신청 화면만 보여요
+  if (page === 'apply' || !email) {
+    const apply = HtmlService.createTemplateFromFile('Apply');
+    apply.pageData = JSON.stringify(intakeApplyPageData_()).replace(/</g, '\\u003c');
+    return apply.evaluate()
+      .setTitle('초기접수 신청 · ' + INTAKE_ORG)
+      .addMetaTag('viewport', 'width=device-width, initial-scale=1')
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  }
+  const t = HtmlService.createTemplateFromFile('Index');
+  t.intakeOwner = isIntakeOwner_(email);
+  return t.evaluate()
     .setTitle('연결노트')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
+
+/** 화면 조각 붙이기 (Index 안의 초기접수 화면) */
+function include(name) {
+  return HtmlService.createHtmlOutputFromFile(name).getContent();
 }
 
 function setupSheets() { return withFinderRefresh_(setupSheets_impl_, arguments); }
@@ -721,9 +738,14 @@ function splitTags_(text) {
     .filter(Boolean);
 }
 
+// PIN을 5번 틀리면 15분 동안 PIN 확인을 멈춰요 (공개용 신청 링크로 들어와 PIN을 맞혀 보는 것 막기)
 function verifyAdminPin_(pin) {
+  const cache = CacheService.getScriptCache();
+  const fails = Number(cache.get('pinFails') || 0);
+  if (fails >= 5) throw new Error('PIN을 여러 번 틀려서 15분 동안 잠겼어요. 직원 계정으로 접속하거나 잠시 뒤에 다시 해주세요.');
   const savedPin = PropertiesService.getScriptProperties().getProperty('ADMIN_PIN') || DEFAULT_ADMIN_PIN;
   if (normalizeText_(pin) !== normalizeText_(savedPin)) {
+    cache.put('pinFails', String(fails + 1), 900);
     throw new Error('관리자 PIN이 맞지 않습니다.');
   }
 }
