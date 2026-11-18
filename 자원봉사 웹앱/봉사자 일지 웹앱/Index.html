@@ -215,6 +215,8 @@
     }
     #message.success { display: block; border-color: var(--success); background: var(--soft); color: var(--success); }
     #message.error { display: block; border-color: var(--error); background: #fbefed; color: var(--error); }
+    #apMessage { display: none; margin-top: 16px; padding: 12px 14px; border-left: 3px solid; font-weight: 700; line-height: 1.6; }
+    #apMessage.error { border-color: var(--error); background: #fbefed; color: var(--error); }
 
     .loading { padding: 16px; color: var(--subtext); text-align: center; }
 
@@ -224,7 +226,26 @@
     .log-id { margin: 18px 0; padding: 14px; border: 1px dashed var(--primary); border-radius: 4px; font-weight: 700; }
     .new-entry-button { width: 100%; margin-top: 12px; background: #fff; color: var(--text); border: 1px solid var(--border); }
 
+    /* ── 처음 오신 분 안내 ── */
+    .first-time {
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      margin-top: 14px; padding: 12px 14px;
+      border: 1px solid var(--primary); border-radius: 4px; background: var(--soft);
+    }
+    .first-time p { margin: 0; color: var(--primary-dark); font-size: 15px; }
+    .first-time button, .inline-apply {
+      flex: 0 0 auto; min-height: 44px; padding: 8px 14px;
+      background: var(--primary); color: #fff; font-size: 15px;
+    }
+    .inline-apply { margin-top: 10px; width: 100%; }
+    .back-button { min-height: 40px; padding: 6px 12px; margin-bottom: 10px; background: #fff; color: var(--text); border: 1px solid var(--border); font-size: 15px; }
+    .consent-text { max-height: 210px; overflow-y: auto; padding: 12px 14px; border: 1px solid var(--border); border-radius: 4px; background: #f8f7f3; font-size: 14px; line-height: 1.65; color: var(--subtext); }
+    .consent-q { margin: 16px 0 8px; font-weight: 700; font-size: 15px; }
+    .hint-small { margin: 6px 0 0; color: var(--subtext); font-size: 14px; }
+    #applyArea { display: none; }
+    #applyDone { display: none; }
     @media (max-width: 520px) {
+      .first-time { flex-direction: column; align-items: stretch; }
       body { padding: 20px 12px 32px; }
       .card { padding: 19px 16px; }
       .two-columns { grid-template-columns: 1fr; gap: 0; }
@@ -246,6 +267,11 @@
           봉사자 정보를 확인하고 활동내용을 작성한 뒤
           직접 서명해 주세요.
         </p>
+
+        <div class="first-time">
+          <p><b>처음 오셨나요?</b><br>활동일지를 쓰기 전에 신청서를 먼저 써 주세요.</p>
+          <button type="button" onclick="openApply()">신청서 쓰기</button>
+        </div>
       </header>
 
 
@@ -378,7 +404,8 @@
 
           <div class="notice-box">
             명단에 없는 봉사자는 활동일지만 임시로 기록됩니다.
-            정식 봉사자 등록은 담당자가 신청서를 확인한 뒤 별도로 처리합니다.
+            신청서를 써 주시면 담당자가 확인한 뒤 봉사자로 등록되고, 그 전에 쓴 일지도 자동으로 이어져요.
+            <span id="applyAskWrap"><button type="button" class="inline-apply" onclick="openApply()">아직 신청서를 안 썼어요 → 신청서 쓰기</button></span>
           </div>
 
         </div>
@@ -604,6 +631,139 @@
 
     </div>
 
+
+    <!-- ───────── 처음 오신 분: 자원봉사활동 신청서 ───────── -->
+    <div id="applyArea">
+
+      <header class="header">
+        <button type="button" class="back-button" onclick="closeApply()">← 활동일지로 돌아가기</button>
+        <h1>자원봉사활동 신청서</h1>
+        <p>
+          참 좋은 인연입니다. 귀한 시간과 열정을 나누어주셔서 감사합니다.
+          봉사하신 시간이 잘 기록될 수 있도록 아래 정보를 적어 주세요.
+        </p>
+      </header>
+
+      <section class="card">
+        <h2 class="section-title">필수 정보</h2>
+
+        <div class="two-columns">
+          <div class="field">
+            <label for="apName">성명 <span class="required">*</span></label>
+            <input id="apName" type="text" autocomplete="off" placeholder="예: 홍길동">
+          </div>
+          <fieldset class="field">
+            <legend>성별 <span class="required">*</span></legend>
+            <div class="radio-group">
+              <label class="radio-option"><input type="radio" name="apGender" value="남"> 남</label>
+              <label class="radio-option"><input type="radio" name="apGender" value="여"> 여</label>
+            </div>
+          </fieldset>
+        </div>
+
+        <div class="two-columns">
+          <div class="field">
+            <label for="apBirth">생년월일 <span class="required">*</span></label>
+            <input id="apBirth" type="date" onchange="applyBirthChanged()">
+          </div>
+          <div class="field">
+            <label for="apPhone">연락처 <span class="required">*</span></label>
+            <input id="apPhone" type="tel" inputmode="numeric" autocomplete="off" placeholder="예: 010-1234-5678">
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="apOrg">소속 <span class="required">*</span></label>
+          <input id="apOrg" type="text" placeholder="학교, 회사, 단체 등 (없으면 「개인」)">
+        </div>
+
+        <fieldset class="field">
+          <legend>봉사시간 인증 (필요한 분만)</legend>
+          <div class="radio-group">
+            <label class="radio-option"><input type="radio" name="apSystem" value="VMS" onchange="applySystemChanged()"> VMS</label>
+            <label class="radio-option"><input type="radio" name="apSystem" value="1365" onchange="applySystemChanged()"> 1365</label>
+            <label class="radio-option"><input type="radio" name="apSystem" value="" checked onchange="applySystemChanged()"> 필요 없어요</label>
+          </div>
+          <div id="apIdWrap" style="display:none;margin-top:10px">
+            <label for="apPerfId">아이디 <span class="required">*</span></label>
+            <input id="apPerfId" type="text" autocomplete="off" placeholder="VMS 또는 1365 아이디">
+          </div>
+        </fieldset>
+      </section>
+
+      <section class="card">
+        <h2 class="section-title">선택 정보</h2>
+        <div class="two-columns">
+          <div class="field"><label for="apJob">직업</label><input id="apJob" type="text"></div>
+          <div class="field"><label for="apEmail">이메일</label><input id="apEmail" type="email" autocomplete="off"></div>
+        </div>
+        <div class="field"><label for="apAddress">주소</label><input id="apAddress" type="text"></div>
+        <div class="field"><label for="apHope">희망 활동 분야</label><input id="apHope" type="text" placeholder="예: 주말 나들이 동행, 밑반찬 배달"></div>
+      </section>
+
+      <section class="card">
+        <h2 class="section-title">개인정보 수집·이용 동의</h2>
+
+        <div class="consent-text">
+          종로장애인복지관은 「개인정보보호법」 등 관계 법령에 따라 자원봉사자 이력관리, 봉사활동 배치 및 실적 등록, 확인서 발급을 위하여 아래와 같이 개인정보를 수집 및 이용하고자 합니다.<br>
+          1. 수집·이용 목적 : 자원봉사 신청 및 관리, 봉사활동 배치, 실적 등록 및 확인서 발급<br>
+          2. 수집 항목 : (필수) 성명, 성별, 생년월일, VMS ID, 연락처, 소속 / (선택) 직업, 주소, 이메일, 희망 활동 분야<br>
+          3. 보유·이용 기간 : 봉사활동일로부터 3년<br>
+          4. 제3자 제공 : 자원봉사 실적 등록 및 행정 관리를 위하여 1365 자원봉사포털 및 VMS에 개인정보가 제공될 수 있습니다.<br>
+          5. 동의하지 않으실 수 있습니다. 동의 거부 시에도 봉사신청은 가능하나 서비스는 제한될 수 있습니다. (단, 필수정보 미 입력 시에는 신청불가)
+        </div>
+
+        <p class="consent-q">위와 같이 개인정보를 수집 및 이용하는데 동의하십니까? <span class="required">*</span></p>
+        <div class="radio-group">
+          <label class="radio-option"><input type="radio" name="apC1" value="동의함"> 동의함</label>
+          <label class="radio-option"><input type="radio" name="apC1" value="동의하지않음"> 동의하지 않음</label>
+        </div>
+
+        <p class="consent-q">자원봉사활동 후 활동일지에 성명, 생년월일, 연락처 등의 개인정보를 수집 및 이용하는데 동의하십니까? <span class="required">*</span></p>
+        <div class="radio-group">
+          <label class="radio-option"><input type="radio" name="apC2" value="동의함"> 동의함</label>
+          <label class="radio-option"><input type="radio" name="apC2" value="동의하지않음"> 동의하지 않음</label>
+        </div>
+
+        <p class="consent-q">연락처를 활용하여 복지관 자원봉사 관련 소식을 받아보시는데 동의하십니까? <span class="required">*</span></p>
+        <div class="radio-group">
+          <label class="radio-option"><input type="radio" name="apC3" value="동의함"> 동의함</label>
+          <label class="radio-option"><input type="radio" name="apC3" value="동의하지않음"> 동의하지 않음</label>
+        </div>
+
+        <div id="apGuardian" style="display:none">
+          <p class="consent-q">14세 미만은 보호자 동의가 필요해요. 보호자께서 아이의 개인정보 수집·이용에 동의하십니까? <span class="required">*</span></p>
+          <div class="radio-group">
+            <label class="radio-option"><input type="radio" name="apGC" value="동의함"> 동의함</label>
+            <label class="radio-option"><input type="radio" name="apGC" value="동의하지않음"> 동의하지 않음</label>
+          </div>
+          <div class="two-columns" style="margin-top:12px">
+            <div class="field"><label for="apGPhone">보호자 연락처 <span class="required">*</span></label><input id="apGPhone" type="tel" inputmode="numeric"></div>
+            <div class="field"><label for="apGRel">관계 <span class="required">*</span></label><input id="apGRel" type="text" placeholder="예: 어머니"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2 class="section-title">신청자 서명</h2>
+        <div class="canvas-wrap"><canvas id="apCanvas" aria-label="신청자 서명 입력란"></canvas></div>
+        <p class="signature-guide">손가락, 터치펜 또는 마우스로 서명해 주세요.</p>
+        <button type="button" class="clear-button" onclick="apPad.clear()">서명 다시 쓰기</button>
+      </section>
+
+      <button type="button" id="apSubmit" class="submit-button" onclick="submitApply()">신청서 제출</button>
+      <div id="apMessage" role="alert" aria-live="assertive"></div>
+    </div>
+
+    <section id="applyDone" class="card completion">
+      <h2>신청서가 접수되었습니다</h2>
+      <p><strong id="apDoneName"></strong>님, 함께해 주셔서 고맙습니다.</p>
+      <div class="log-id">신청번호: <span id="apDoneId"></span></div>
+      <p class="meal-note">담당자가 확인하면 봉사자로 등록돼요.</p>
+      <a id="apEdu" href="#" target="_blank" rel="noopener" style="display:none"><button type="button" class="new-entry-button" style="background:var(--soft);color:var(--primary-dark);border-color:var(--primary)">자원봉사 기본 교육 참여하기</button></a>
+      <button type="button" id="apToLog" class="submit-button" style="margin-top:12px" onclick="continueToLog()">이어서 오늘 활동일지 쓰기</button>
+      <p id="apNoLog" class="meal-note" style="display:none">활동일지 개인정보 수집에 동의하지 않으셔서, 활동일지는 종이로 써 주세요. 담당자에게 말씀해 주시면 돼요.</p>
+    </section>
 
     <section
       id="completionArea"
@@ -1874,6 +2034,9 @@
 
     function resetForNewEntry() {
 
+      document.getElementById('applyAskWrap').innerHTML = APPLY_ASK_HTML;
+      lastApply = null;
+
       document
         .getElementById(
           'formArea'
@@ -2108,6 +2271,169 @@
     }
 
 
+  
+
+    /* ───────── 처음 오신 분: 신청서 ───────── */
+    let lastApply = null;
+    const APPLY_ASK_HTML = document.getElementById('applyAskWrap').innerHTML;
+
+    function openApply() {
+      document.getElementById('formArea').style.display = 'none';
+      document.getElementById('completionArea').style.display = 'none';
+      document.getElementById('applyDone').style.display = 'none';
+      document.getElementById('applyArea').style.display = 'block';
+      window.scrollTo(0, 0);
+      setTimeout(function () { apPad.resize(); }, 30);
+    }
+
+    function closeApply() {
+      document.getElementById('applyArea').style.display = 'none';
+      document.getElementById('applyDone').style.display = 'none';
+      document.getElementById('formArea').style.display = 'block';
+      window.scrollTo(0, 0);
+      setTimeout(resizeCanvas, 30);
+    }
+
+    function radioValue(name) {
+      const el = document.querySelector('input[name="' + name + '"]:checked');
+      return el ? el.value : '';
+    }
+
+    function applySystemChanged() {
+      document.getElementById('apIdWrap').style.display = radioValue('apSystem') ? 'block' : 'none';
+    }
+
+    function applyBirthChanged() {
+      const v = document.getElementById('apBirth').value;
+      let under14 = false;
+      if (isRealDate(v)) {
+        const b = v.split('-').map(Number), t = new Date();
+        const age = t.getFullYear() - b[0] - ((t.getMonth() + 1 < b[1] || (t.getMonth() + 1 === b[1] && t.getDate() < b[2])) ? 1 : 0);
+        under14 = age < 14;
+      }
+      document.getElementById('apGuardian').style.display = under14 ? 'block' : 'none';
+    }
+
+    function apMessage(text, type) {
+      const box = document.getElementById('apMessage');
+      box.textContent = text || '';
+      box.className = text ? type : '';
+      box.style.display = text ? 'block' : 'none';
+      if (text) box.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    function submitApply() {
+      apMessage('');
+      const data = {
+        name: document.getElementById('apName').value.trim(),
+        gender: radioValue('apGender'),
+        birthDate: document.getElementById('apBirth').value,
+        phone: document.getElementById('apPhone').value.trim(),
+        organization: document.getElementById('apOrg').value.trim(),
+        perfSystem: radioValue('apSystem'),
+        perfId: document.getElementById('apPerfId').value.trim(),
+        job: document.getElementById('apJob').value.trim(),
+        address: document.getElementById('apAddress').value.trim(),
+        email: document.getElementById('apEmail').value.trim(),
+        hope: document.getElementById('apHope').value.trim(),
+        consentPrivacy: radioValue('apC1'),
+        consentLog: radioValue('apC2'),
+        consentNews: radioValue('apC3'),
+        guardianConsent: radioValue('apGC'),
+        guardianPhone: document.getElementById('apGPhone').value.trim(),
+        guardianRelation: document.getElementById('apGRel').value.trim(),
+        signature: apPad.has ? apPad.data() : ''
+      };
+
+      // 화면에서 먼저 빠진 칸을 알려줌 (최종 확인은 서버에서)
+      if (!data.name) return apMessage('성명을 입력해 주세요.', 'error');
+      if (!data.gender) return apMessage('성별을 골라 주세요.', 'error');
+      if (!isRealDate(data.birthDate)) return apMessage('생년월일을 입력해 주세요.', 'error');
+      if (data.phone.replace(/\D/g, '').length < 9) return apMessage('연락처를 입력해 주세요.', 'error');
+      if (!data.organization) return apMessage('소속을 입력해 주세요. 없으면 「개인」이라고 써 주세요.', 'error');
+      if (data.perfSystem && !data.perfId) return apMessage(data.perfSystem + ' 아이디를 입력해 주세요.', 'error');
+      if (!data.consentPrivacy || !data.consentLog || !data.consentNews) return apMessage('동의 여부를 모두 골라 주세요.', 'error');
+      if (data.consentPrivacy !== '동의함') return apMessage('개인정보 수집·이용에 동의해야 신청할 수 있어요. 동의하기 어려우시면 담당자에게 말씀해 주세요.', 'error');
+      if (!apPad.has) return apMessage('신청자 서명을 해 주세요.', 'error');
+
+      const btn = document.getElementById('apSubmit');
+      btn.disabled = true;
+      btn.textContent = '보내는 중...';
+      google.script.run
+        .withSuccessHandler(function (r) {
+          btn.disabled = false;
+          btn.textContent = '신청서 제출';
+          lastApply = r;
+          document.getElementById('apDoneName').textContent = r.name;
+          document.getElementById('apDoneId').textContent = r.applicationId;
+          const edu = document.getElementById('apEdu');
+          if (r.eduUrl) { edu.href = r.eduUrl; edu.style.display = 'block'; } else { edu.style.display = 'none'; }
+          document.getElementById('apToLog').style.display = r.logAllowed ? 'block' : 'none';
+          document.getElementById('apNoLog').style.display = r.logAllowed ? 'none' : 'block';
+          document.getElementById('applyArea').style.display = 'none';
+          document.getElementById('applyDone').style.display = 'block';
+          window.scrollTo(0, 0);
+          resetApplyForm();
+        })
+        .withFailureHandler(function (e) {
+          btn.disabled = false;
+          btn.textContent = '신청서 제출';
+          apMessage(e && e.message ? e.message : String(e), 'error');
+        })
+        .submitApplication(data);
+    }
+
+    function resetApplyForm() {
+      ['apName', 'apBirth', 'apPhone', 'apOrg', 'apPerfId', 'apJob', 'apAddress', 'apEmail', 'apHope', 'apGPhone', 'apGRel']
+        .forEach(function (id) { document.getElementById(id).value = ''; });
+      document.querySelectorAll('#applyArea input[type="radio"]').forEach(function (r) { r.checked = r.name === 'apSystem' && r.value === ''; });
+      applySystemChanged();
+      applyBirthChanged();
+      apPad.clear();
+      apMessage('');
+    }
+
+    /* 신청서를 낸 뒤 바로 일지: 「명단에 없어요」로 이름·생년월일·연락처를 채워 둠 */
+    function continueToLog() {
+      if (!lastApply) return closeApply();
+      const unreg = document.querySelector('input[name="registrationType"][value="미등록봉사자"]');
+      unreg.checked = true;
+      changeRegistrationType();
+      document.getElementById('unregisteredName').value = lastApply.name;
+      document.getElementById('unregisteredBirthDate').value = lastApply.birthDate;
+      document.getElementById('unregisteredPhoneLast4').value = lastApply.phoneLast4;
+      document.getElementById('unregisteredOrganization').value = lastApply.organization;
+      document.getElementById('applyAskWrap').innerHTML = '<br><b>신청서 접수 완료 (' + escapeHtml(lastApply.applicationId) + ')</b>';
+      closeApply();
+    }
+
+    /* 신청서 서명 패드 (활동일지 서명과 따로) */
+    const apPad = (function () {
+      const cv = document.getElementById('apCanvas');
+      const ctx = cv.getContext('2d');
+      let drawing = false;
+      const pad = { has: false };
+      pad.resize = function () {
+        const r = cv.getBoundingClientRect();
+        if (!r.width) return;
+        const ratio = Math.max(window.devicePixelRatio || 1, 1);
+        cv.width = Math.round(r.width * ratio);
+        cv.height = Math.round(r.height * ratio);
+        ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+        ctx.lineWidth = 3; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#111';
+        pad.has = false;
+      };
+      pad.clear = function () { ctx.clearRect(0, 0, cv.width, cv.height); pad.has = false; };
+      pad.data = function () { return cv.toDataURL('image/png'); };
+      function pos(e) { const r = cv.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
+      cv.addEventListener('pointerdown', function (e) {
+        e.preventDefault(); drawing = true; pad.has = true; cv.setPointerCapture(e.pointerId);
+        const p = pos(e); ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x + .1, p.y + .1); ctx.stroke();
+      });
+      cv.addEventListener('pointermove', function (e) { if (!drawing) return; e.preventDefault(); const p = pos(e); ctx.lineTo(p.x, p.y); ctx.stroke(); });
+      ['pointerup', 'pointercancel'].forEach(function (t) { cv.addEventListener(t, function () { drawing = false; }); });
+      return pad;
+    })();
   </script>
 
 </body>

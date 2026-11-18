@@ -26,10 +26,18 @@ function syncVolunteerListToLog() {
   return syncVolunteerListToLog_impl_();
 }
 
-/** 매일 밤 자동 실행용 (결과 숫자만 돌려줌) */
+/** 매일 밤 자동 실행용 (결과 숫자만 돌려줌) — 신청서 → PEOPLE 먼저, 그다음 PEOPLE → 일지 명단 */
 function syncVolunteerListNightly() {
+  let imported = null;
+  try { imported = importApplicationsToPeople_impl_(); } catch (e) { imported = { error: e.message }; }
   const r = syncVolunteerListToLog_impl_();
-  return { added: r.added, updated: r.updated };
+  return { added: r.added, updated: r.updated, applications: imported };
+}
+
+/** 편집기에서 바로 실행: 활동일지 「자원봉사 신청서」 중 등록완료된 분을 PEOPLE에 넣기 (min만) */
+function importApplicationsToPeople() {
+  syncRequireOwner_();
+  return importApplicationsToPeople_impl_();
 }
 
 /** 처음 한 번 편집기에서 실행: 매일 오전 1시 자동 연동 */
@@ -196,4 +204,113 @@ function syncReadPeople_() {
 function cellText_(v) {
   if (v instanceof Date) return Utilities.formatDate(v, Session.getScriptTimeZone(), 'yyyy-MM-dd');
   return String(v == null ? '' : v).trim();
+}
+
+
+
+/****************************************************************
+ * 활동일지 「자원봉사 신청서」 → 통합관리 PEOPLE
+ *  - 활동일지 앱에서 확인(등록완료)됐고 'PEOPLE ID' 칸이 빈 신청서만 가져옴
+ *  - PEOPLE에 같은 분이 이미 있으면(이름·생년월일 / 이름·연락처 / VMS·1365 ID) 새로 넣지 않고 그 ID만 적어 둠
+ *  - 새로 넣을 때: 상태 '활동 중', 구분 '개인', 등록일 = 확인일, 관심활동 = 희망 활동 분야,
+ *    참고사항 = '활동일지 신청서 AP-…' (+ 직업)
+ *  - 결과는 신청서 탭의 'PEOPLE ID'와 '메모'에 남김
+ ****************************************************************/
+const LOG_APPLY_SHEET = '자원봉사 신청서';
+
+function importApplicationsToPeople_impl_() {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    const applySheet = SpreadsheetApp.openById(LOG_SPREADSHEET_ID).getSheetByName(LOG_APPLY_SHEET);
+    if (!applySheet || applySheet.getLastRow() < 2) return { added: 0, matched: 0 };
+
+    const head = applySheet.getRange(1, 1, 1, applySheet.getLastColumn()).getDisplayValues()[0].map(x => String(x).trim());
+    const ac = name => { const i = head.indexOf(name); if (i < 0) throw Error('신청서 탭에 「' + name + '」 칸이 없어요.'); return i; };
+    const A = {
+      id: ac('신청번호'), name: ac('성명'), birth: ac('생년월일'), phone: ac('연락처'), org: ac('소속'),
+      system: ac('실적등록처'), perfId: ac('실적ID'), job: ac('직업'), hope: ac('희망활동분야'),
+      status: ac('상태'), confirmedAt: ac('확인일시'), memo: ac('메모'), peopleId: ac('PEOPLE ID')
+    };
+    const apps = applySheet.getRange(2, 1, applySheet.getLastRow() - 1, head.length).getDisplayValues();
+    const todo = apps.map((r, i) => ({ r: r, row: i + 2 }))
+      .filter(x => String(x.r[A.status]).trim() === '등록완료' && !String(x.r[A.peopleId]).trim() && String(x.r[A.name]).trim());
+    if (!todo.length) return { added: 0, matched: 0 };
+
+    const peopleSheet = SpreadsheetApp.openById(PEOPLE_SPREADSHEET_ID).getSheetByName('PEOPLE');
+    if (!peopleSheet) throw Error('「★ 자원봉사 통합관리」 시트에서 PEOPLE 탭을 찾지 못했어요.');
+    const pv = peopleSheet.getDataRange().getValues();
+    const ph = pv[0].map(x => String(x).trim());
+    const pc = name => { const i = ph.indexOf(name); if (i < 0) throw Error('PEOPLE에 「' + name + '」 열이 없어요.'); return i; };
+    const P = {
+      id: pc('ID'), name: pc('이름'), birth: pc('생년월일'), phone: pc('연락처'), vms: pc('VMS ID'), v1365: pc('1365 ID'),
+      org: pc('소속'), kind: pc('구분'), reg: pc('등록일'), status: pc('상태'), interests: pc('관심활동'), notes: pc('참고사항'),
+      updated: ph.indexOf('최종수정일')
+    };
+    const norm = v => String(v == null ? '' : v).replace(/\s+/g, '');
+    const digits = v => String(v == null ? '' : v).replace(/\D/g, '');
+    const people = pv.slice(1).filter(r => String(r[P.name]).trim()).map(r => ({
+      id: String(r[P.id] || '').trim(), name: norm(r[P.name]), birth: cellText_(r[P.birth]),
+      phone: digits(r[P.phone]), vms: String(r[P.vms] || '').trim(), v1365: String(r[P.v1365] || '').trim()
+    }));
+
+    const today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+    const newRows = [];
+    let matched = 0;
+
+    todo.forEach(x => {
+      const r = x.r;
+      const name = String(r[A.name]).trim();
+      const birth = String(r[A.birth]).trim();
+      const phone = digits(r[A.phone]);
+      const system = String(r[A.system]).trim();
+      const perfId = String(r[A.perfId]).trim();
+
+      const hit = people.find(p =>
+        (system === 'VMS' && perfId && p.vms === perfId) ||
+        (system === '1365' && perfId && p.v1365 === perfId) ||
+        (p.name === norm(name) && birth && p.birth === birth) ||
+        (p.name === norm(name) && phone.length >= 9 && p.phone === phone));
+
+      if (hit && hit.id) {
+        applySheet.getRange(x.row, A.peopleId + 1).setValue(hit.id);
+        const memo = String(r[A.memo] || '').trim();
+        applySheet.getRange(x.row, A.memo + 1).setValue((memo ? memo + ' / ' : '') + 'PEOPLE에 이미 있던 분 — 새로 넣지 않음');
+        matched++;
+        return;
+      }
+
+      const id = Utilities.getUuid();
+      const row = new Array(ph.length).fill('');
+      row[P.id] = id;
+      row[P.name] = name;
+      row[P.birth] = birth;
+      row[P.phone] = String(r[A.phone]).trim();
+      if (system === 'VMS') row[P.vms] = perfId;
+      if (system === '1365') row[P.v1365] = perfId;
+      row[P.org] = String(r[A.org]).trim();
+      row[P.kind] = '개인';
+      row[P.reg] = String(r[A.confirmedAt]).slice(0, 10) || today;
+      row[P.status] = '활동 중';
+      row[P.interests] = String(r[A.hope]).trim();
+      const job = String(r[A.job]).trim();
+      row[P.notes] = '활동일지 신청서 ' + String(r[A.id]).trim() + (job ? ' · 직업: ' + job : '');
+      if (P.updated >= 0) row[P.updated] = today;
+      newRows.push(row);
+      people.push({ id: id, name: norm(name), birth: birth, phone: phone, vms: row[P.vms], v1365: row[P.v1365] }); // 같은 실행 안 중복 방지
+      applySheet.getRange(x.row, A.peopleId + 1).setValue(id);
+    });
+
+    if (newRows.length) {
+      const start = peopleSheet.getLastRow() + 1;
+      peopleSheet.getRange(start, 1, newRows.length, ph.length).setValues(newRows);
+      // 같은 프로젝트에 있는 통합관리 도구로 연령 계산·화면 기억 지우기
+      if (typeof fillPeopleAges_ === 'function') { try { fillPeopleAges_(peopleSheet, start, start + newRows.length - 1); } catch (e) {} }
+    }
+    if (typeof invalidateReadCache_ === 'function') { try { invalidateReadCache_(['PEOPLE']); } catch (e) {} }
+
+    return { added: newRows.length, matched: matched };
+  } finally {
+    lock.releaseLock();
+  }
 }
