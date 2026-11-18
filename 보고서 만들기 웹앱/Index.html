@@ -140,6 +140,7 @@
   .thumb .mv button{background:rgba(255,255,255,.85);border:0;padding:0 6px;font-size:12px}
   .upl{display:inline-block;border:1px dashed var(--main);color:var(--main);border-radius:8px;padding:6px 12px;cursor:pointer;font-size:14px;margin-top:8px}
   .upl input{display:none}
+  .dropping{outline:2px dashed var(--acc,#7a2f55);outline-offset:-4px;background:var(--acc2,#f5ebf0)!important}
   .att{border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:10px;background:#FCFCFB}
   /* 장애이해교육 */
   table.att{width:100%;border-collapse:collapse}
@@ -322,7 +323,8 @@
 
     <div class="card">
       <h2><span id="budgetTitle">소요예산</span>
-        <select id="wonMark" style="width:auto;margin-left:auto;font-size:13px;padding:3px 6px" title="금액 칸·계 표시 방식"><option value="">276,000원</option><option value="1">₩276,000</option></select></h2>
+        <span style="margin-left:auto;font-size:12.5px;font-weight:normal;color:var(--sub)">금액 쓰는 모양</span>
+        <select id="wonMark" style="width:auto;font-size:13px;padding:3px 6px" title="보고서의 금액 칸·계를 어떤 모양으로 쓸지 (계산과는 상관없어요)"><option value="">1,000원</option><option value="1">₩1,000</option></select></h2>
       <div class="hint" style="margin:0 0 10px">한 구분 안에서 금액을 나눠 적으려면 「＋ 구분 추가」 후 <b>구분 이름을 비워두세요</b> — 위 구분 칸과 합쳐지고 금액은 따로 나와요.</div>
       <div id="budget"></div>
       <button class="sm" onclick="addCat()">＋ 구분 추가</button>
@@ -470,7 +472,7 @@
    </div>
 
     <div class="card" id="photoCard">
-      <h2>활동사진 <small>2장씩 나란히 들어가요</small></h2>
+      <h2>활동사진 <small>2장씩 나란히 들어가요 · 사진 파일을 이 칸에 끌어다 놓아도 돼요</small></h2>
       <div class="thumbs" id="photos"></div>
       <label class="upl">＋ 사진 올리기<input type="file" accept="image/*" multiple onchange="uploadTo(this, doc.photos, renderPhotos)"></label>
     </div>
@@ -1514,6 +1516,33 @@ function uploadTo(input, list, rerender){
     });
   });
 }
+/* ── 사진 끌어다 놓기: 활동사진 칸, 첨부 자료 칸에 파일을 놓으면 「올리기」 버튼과 똑같이 올라가요 ── */
+(function(){
+  function zoneOf(t){ return t && t.closest ? (t.closest('div.att') || t.closest('#photoCard')) : null; }
+  function hasFiles(e){ return e.dataTransfer && Array.prototype.indexOf.call(e.dataTransfer.types || [], 'Files') >= 0; }
+  var cur = null;
+  function mark(z){ if (cur === z) return; if (cur) cur.classList.remove('dropping'); cur = z; if (z) z.classList.add('dropping'); }
+  document.addEventListener('dragover', function(e){
+    if (!hasFiles(e)) return;
+    e.preventDefault();                                  // 칸 밖에 놓아도 브라우저가 사진을 열어버리지 않게
+    var z = zoneOf(e.target);
+    e.dataTransfer.dropEffect = z ? 'copy' : 'none';
+    mark(z);
+  });
+  document.addEventListener('dragleave', function(e){ if (!e.relatedTarget) mark(null); });
+  document.addEventListener('drop', function(e){
+    if (!hasFiles(e)) return;
+    e.preventDefault(); var z = zoneOf(e.target); mark(null);
+    if (!z) return;
+    var input = z.querySelector('.upl input[type=file]');
+    var imgs = Array.prototype.filter.call(e.dataTransfer.files, function(f){ return /^image\//.test(f.type) || /\.(jpe?g|png|gif|webp|heic)$/i.test(f.name); });
+    if (!input) return;
+    if (!imgs.length) return toast('사진(그림) 파일만 올릴 수 있어요.');
+    var dt = new DataTransfer(); imgs.forEach(function(f){ dt.items.add(f); });
+    input.files = dt.files;
+    input.dispatchEvent(new Event('change'));
+  });
+})();
 function thumbs(box, list, rerender, withCaption){
   box.innerHTML = '';
   list.forEach(function(p, i){
@@ -1547,7 +1576,7 @@ function renderAtts(){
         el('button', {class:'sm ghost', on:{click:function(){ if(i>0){ var x=doc.attachments[i]; doc.attachments[i]=doc.attachments[i-1]; doc.attachments[i-1]=x; markDirty(); renderAtts(); } }}, text:'▲'}),
         el('button', {class:'sm ghost del', on:{click:function(){ if(confirm('이 첨부 자료를 뺄까요?')){ doc.attachments.splice(i,1); markDirty(); renderAtts(); } }}, text:'✕'})]),
       t, th,
-      el('label', {class:'upl'}, [document.createTextNode('＋ 그림 올리기'), file]),
+      el('label', {class:'upl'}, [document.createTextNode('＋ 그림 올리기 (끌어다 놓아도 돼요)'), file]),
       el('label', {text:'설명 글 (없어도 돼요)'}), ta(a.text, function(v){ a.text = v; }, 2)
     ]));
   });
