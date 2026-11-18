@@ -1,0 +1,169 @@
+<!--
+  계획서 ↔ 결과보고 연결 (2026-11)
+  - 결과보고 화면: 연결된 계획서를 오른쪽에 펼쳐 보기 / 연결 끊기 / 예전 결과보고는 계획서를 골라 연결
+  - 계획서 화면: 이 계획서로 만든 결과보고 바로 열기, 없으면 「결과보고 만들기」
+  - 왼쪽 목록: 계획서마다 「결과보고 있음 / 아직 없음」, 결과보고마다 「계획서 연결됨」
+  Code.gs의 doGet()에서 Index 뒤에 붙여요. Index.html의 함수(renderAll, renderList 등)를 감싸서 동작해요.
+  연결 정보는 결과보고 데이터의 sourcePlanId, 시트의 「계획ID」 칸(8번째 칸)에 들어가요.
+-->
+<style>
+  #linkCard{padding:10px 16px}
+  #linkCard .lk{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:14px}
+  #linkCard .lk b{font-weight:700}
+  #linkCard .lk .sp{flex:1}
+  #linkCard select{width:auto;max-width:100%;min-width:220px}
+  #linkCard .muted{color:var(--sub)}
+  #list .lkm{font-size:11.5px;margin-top:2px}
+  #list .lkm.ok{color:var(--main)}
+  #list .lkm.no{color:var(--warn)}
+  #planSide{display:none}
+  body.side .wrap{grid-template-columns:minmax(0,1fr) minmax(0,1fr);max-width:1800px}
+  body.side aside{display:none}
+  body.side #planSide{display:block;position:sticky;top:64px;align-self:start;max-height:calc(100vh - 80px);overflow:auto;background:#ebe8e1;border:1px solid var(--line);border-radius:6px;padding:0 10px 10px}
+  #planSide .sh{position:sticky;top:0;z-index:5;background:#ebe8e1;display:flex;align-items:center;gap:8px;padding:10px 0 8px;font-size:14px}
+  #planSide .sh b{flex:1}
+  #planSide .pg{padding:24px 20px;margin-bottom:10px;box-shadow:none;border:1px solid var(--line)}
+  @media (max-width:900px){
+    body.side .wrap{grid-template-columns:1fr}
+    body.side #planSide{position:static;max-height:60vh;order:-1}
+  }
+</style>
+<script>
+(function(){
+  var main = document.querySelector('main'), wrap = document.querySelector('.wrap');
+  var card = el('div', {class:'card', id:'linkCard', style:'display:none'});
+  main.insertBefore(card, main.firstChild);
+  var side = el('section', {id:'planSide'});
+  wrap.appendChild(side);
+  var sideFor = null, planCache = {}, pendingMode = null, lastDoc = null;
+
+  function isResType(t){ return t==='result' || t==='execResult'; }
+  function planTypeLabel(t){ return t==='execResult' ? '실행계획서' : '활동계획서'; }   // 시트 「종류」 칸 이름
+  function findSaved(id){ for (var i = 0; i < saved.length; i++) if (saved[i].id === id) return saved[i]; return null; }
+  function resultsOf(planId){ return planId ? saved.filter(function(s){ return s.planId === planId; }) : []; }
+  function nameOf(s){ return s.title || s.programName || '(제목 없음)'; }
+
+  /* ── 연결 칸 (입력 화면 맨 위) ── */
+  function renderLink(){
+    card.innerHTML = '';
+    if (!doc || doc.type==='edu'){ card.style.display = 'none'; return; }
+    var row = el('div', {class:'lk'});
+    if (isResType(doc.type)){
+      if (doc.sourcePlanId){
+        var p = findSaved(doc.sourcePlanId), open = sideFor === doc.sourcePlanId && document.body.classList.contains('side');
+        row.appendChild(el('span', {text:'📎 연결된 계획서'}));
+        row.appendChild(p ? el('b', {text: nameOf(p)}) : el('span', {class:'muted', text: saved.length ? '찾을 수 없어요 (지워졌을 수 있어요)' : '불러오는 중…'}));
+        row.appendChild(el('span', {class:'sp'}));
+        if (p) row.appendChild(el('button', {class:'sm' + (open ? '' : ' pri'), on:{click:function(){ open ? closeSide() : openSide(doc.sourcePlanId); }}, text: open ? '계획서 닫기' : '계획서 옆에 펼쳐 보기'}));
+        row.appendChild(el('button', {class:'sm ghost del', on:{click:function(){
+          if (!confirm('계획서와의 연결을 끊을까요? (두 보고서 내용은 그대로 남아요)')) return;
+          delete doc.sourcePlanId; closeSide(); markDirty(); renderLink();
+        }}, text:'연결 끊기'}));
+      } else {
+        var want = planTypeLabel(doc.type);
+        var plans = saved.filter(function(s){ return s.type === want && s.id !== doc.id; });
+        row.appendChild(el('span', {class:'muted', text:'📎 연결된 계획서가 없어요'}));
+        row.appendChild(el('span', {class:'sp'}));
+        if (plans.length){
+          var sel = el('select');
+          sel.appendChild(el('option', {value:'', text: want + ' 고르기…'}));
+          plans.forEach(function(s){ sel.appendChild(el('option', {value:s.id, text: nameOf(s) + (s.date ? ' (' + s.date + ')' : '')})); });
+          row.appendChild(sel);
+          row.appendChild(el('button', {class:'sm', on:{click:function(){
+            if (!sel.value) return toast('연결할 계획서를 골라주세요.');
+            doc.sourcePlanId = sel.value; markDirty(); renderLink(); renderList(); toast('계획서와 연결했어요.');
+          }}, text:'연결하기'}));
+        } else row.appendChild(el('span', {class:'muted', text: saved.length ? '(연결할 ' + want + '가 아직 없어요)' : ''}));
+      }
+    } else {
+      if (!doc.id){ card.style.display = 'none'; return; }
+      var rs = resultsOf(doc.id);
+      if (rs.length){
+        row.appendChild(el('span', {text:'📎 이 계획서로 만든 결과보고'}));
+        rs.forEach(function(s){ row.appendChild(el('button', {class:'sm', title:'열기', on:{click:function(){ openReport(s.id); }}, text: nameOf(s) + ' 열기'})); });
+      } else {
+        row.appendChild(el('span', {class:'muted', text:'📎 아직 결과보고가 없어요'}));
+        row.appendChild(el('span', {class:'sp'}));
+        row.appendChild(el('button', {class:'sm', on:{click:function(){ openReport(doc.id, 'toResult'); }}, text: doc.type==='exec' ? '→ 사업결과보고서 만들기' : '→ 활동결과보고 만들기'}));
+      }
+    }
+    card.appendChild(row);
+    card.style.display = '';
+  }
+
+  /* ── 계획서 옆에 펼쳐 보기 ── */
+  function openSide(id){
+    function show(p){
+      ensureImages(neededImages(p), function(){
+        if (!doc || doc.sourcePlanId !== id) return;      // 그 사이 다른 보고서로 넘어갔으면 그만
+        sideFor = id; side.innerHTML = '';
+        side.appendChild(el('div', {class:'sh'}, [el('b', {text:'📄 계획서 — 보기만 돼요'}),
+          el('button', {class:'sm', title:'계획서를 열어서 고치기', on:{click:function(){ closeSide(); openReport(id); }}, text:'계획서 열기'}),
+          el('button', {class:'sm', on:{click:closeSide}, text:'닫기 ✕'})]));
+        var body = el('div'); body.innerHTML = isExec(p) ? previewExecHtml(p) : previewHtml(p);
+        side.appendChild(body);
+        document.body.classList.add('side'); side.scrollTop = 0; toast('', 1); renderLink();
+      });
+    }
+    if (planCache[id]) return show(planCache[id]);
+    toast('계획서 불러오는 중…', 20000);
+    google.script.run.withSuccessHandler(function(p){ planCache[id] = p; show(p); }).withFailureHandler(fail).getReport(id);
+  }
+  function closeSide(){
+    document.body.classList.remove('side'); side.innerHTML = ''; sideFor = null;
+    if (doc) renderLink();
+  }
+
+  /* ── 왼쪽 목록에 연결 표시 ── */
+  function decorateList(){
+    var q = document.getElementById('q').value.trim();
+    var arr = saved.filter(function(s){ return (!filterType || s.type===filterType) && (!q || (s.title+s.programName).indexOf(q) >= 0); });
+    var items = document.querySelectorAll('#list .item');
+    if (items.length !== arr.length) return;
+    arr.forEach(function(s, i){
+      var it = items[i], m = it.querySelector('.m');
+      if (s.type==='활동계획서' || s.type==='실행계획서'){
+        var rs = resultsOf(s.id);
+        m.parentNode.insertBefore(el('div', {class:'lkm ' + (rs.length ? 'ok' : 'no'), text: rs.length ? '✓ 결과보고 있음' + (rs.length > 1 ? ' (' + rs.length + '개)' : '') : '결과보고 아직 없음'}), m.nextSibling);
+        if (rs.length){
+          var acts = it.querySelector('.acts');
+          acts.insertBefore(el('button', {class:'sm', on:{click:function(e){ e.stopPropagation(); openReport(rs[0].id); }}, text:'결과보고 열기'}), acts.firstChild);
+        }
+      } else if (s.planId){
+        m.parentNode.insertBefore(el('div', {class:'lkm ok', text: findSaved(s.planId) ? '↳ 계획서 연결됨' : '↳ 계획서 연결 (지워짐)'}), m.nextSibling);
+      }
+    });
+  }
+
+  /* ── Index.html 함수 감싸기 ── */
+  var _renderAll = renderAll, _renderList = renderList, _openReport = openReport, _updateListItem = updateListItem;
+  renderAll = function(){
+    if (doc !== lastDoc){
+      if (pendingMode === 'copy' && !doc.id) delete doc.sourcePlanId;   // 결과보고를 복사하면 연결은 따라가지 않음
+      pendingMode = null; lastDoc = doc;
+    }
+    if (document.body.classList.contains('side') && (!doc || doc.sourcePlanId !== sideFor)) closeSide();
+    _renderAll.apply(this, arguments);
+    renderLink();
+  };
+  renderList = function(){ _renderList.apply(this, arguments); decorateList(); renderLink(); };
+  openReport = function(id, mode){
+    if (mode === 'toResult'){
+      var rs = resultsOf(id);
+      if (rs.length && !confirm('이 계획서로 만든 결과보고가 이미 있어요 (「' + nameOf(rs[0]) + '」).\n하나 더 만들까요?\n\n[취소]를 누르면 있는 결과보고를 열어요.')){ return _openReport(rs[0].id); }
+    }
+    pendingMode = mode || null;
+    return _openReport(id, mode);
+  };
+  updateListItem = function(d, r){
+    var s = findSaved(r.id); if (s) s.planId = d.sourcePlanId || '';
+    delete planCache[r.id];   // 계획서를 고쳐 자동 저장했으면 펼쳐 보기도 새로 불러오게
+    return _updateListItem(d, r);
+  };
+  // 계획서를 고쳐 저장하면 펼쳐 보기 내용도 새로 불러오게
+  var _save = save;
+  save = function(cb){ if (doc && doc.id) delete planCache[doc.id]; return _save(cb); };
+
+  renderLink();
+})();
+</script>

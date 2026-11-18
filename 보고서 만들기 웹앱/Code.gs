@@ -4,12 +4,14 @@
  * 저장 시트: 「보고서」 (없으면 자동으로 만들어요)
  */
 var SHEET_NAME = '보고서';
-var HEADERS = ['ID', '종류', '프로그램명', '날짜', '제목', '수정일', '데이터'];
+// 8번째 「계획ID」: 결과보고가 어느 계획서에서 나왔는지 (계획서 ↔ 결과보고 연결)
+var HEADERS = ['ID', '종류', '프로그램명', '날짜', '제목', '수정일', '데이터', '계획ID'];
 // 시트 「종류」 칸에 들어가는 이름 (활동결과보고는 예전 저장분과 맞추려고 「결과보고서」 그대로)
 var TYPE_LABEL = { plan: '활동계획서', result: '결과보고서', edu: '장애이해교육', exec: '실행계획서', execResult: '사업결과보고서' };
 
 function doGet() {
   return HtmlService.createTemplateFromFile('Index').evaluate()
+    .append(include('Link'))   // 계획서 ↔ 결과보고 연결 기능
     .setTitle('보고서 만들기')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1');
 }
@@ -27,6 +29,9 @@ function getSheet_() {
     sh.setFrozenRows(1);
     sh.setColumnWidth(5, 360);
     sh.hideColumns(7);
+  } else if (sh.getRange(1, 8).getValue() !== '계획ID') {
+    // 예전에 만든 시트: 「계획ID」 칸 제목만 붙여요
+    sh.getRange(1, 8).setValue('계획ID').setFontWeight('bold').setBackground('#F2F2F2');
   }
   return sh;
 }
@@ -41,10 +46,25 @@ function listReports() {
   var sh = getSheet_();
   var n = sh.getLastRow() - 1;
   if (n < 1) return [];
-  var rows = sh.getRange(2, 1, n, 6).getDisplayValues();
+  var rows = sh.getRange(2, 1, n, 8).getDisplayValues();
+  fillPlanIds_(sh, rows);
   return rows.filter(function (r) { return r[0]; }).map(function (r) {
-    return { id: r[0], type: r[1], programName: r[2], date: r[3], title: r[4], updated: r[5] };
+    return { id: r[0], type: r[1], programName: r[2], date: r[3], title: r[4], updated: r[5], planId: r[7] };
   }).sort(function (a, b) { return a.updated < b.updated ? 1 : -1; });
+}
+
+/** 처음 한 번만: 예전에 「→ 결과보고 만들기」로 만든 보고서의 계획ID를 데이터에서 꺼내 「계획ID」 칸에 채워요 */
+function fillPlanIds_(sh, rows) {
+  var props = PropertiesService.getScriptProperties();
+  if (props.getProperty('PLAN_ID_FILLED')) return;
+  var data = sh.getRange(2, 7, rows.length, 1).getValues();
+  var out = rows.map(function (r, i) {
+    if (r[7]) return [r[7]];
+    try { return [JSON.parse(data[i][0]).sourcePlanId || '']; } catch (e) { return ['']; }
+  });
+  sh.getRange(2, 8, out.length, 1).setNumberFormat('@').setValues(out);
+  out.forEach(function (o, i) { rows[i][7] = o[0]; });
+  props.setProperty('PLAN_ID_FILLED', '1');
 }
 
 /** 보고서 하나 불러오기 */
@@ -66,11 +86,13 @@ function saveReport(data) {
     if (json.length > 49000) throw new Error('내용이 너무 길어서 저장할 수 없어요. (글자 수를 조금 줄여주세요)');
     var now = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm');
     var values = [data.id, TYPE_LABEL[data.type] || '활동계획서', data.programName || '',
-      data.date || '', data.title || '', now, json];
+      data.date || '', data.title || '', now, json, data.sourcePlanId || ''];
     var row = findRow_(sh, data.id);
     if (row) sh.getRange(row, 1, 1, values.length).setValues([values]);
     else sh.appendRow(values);
-    sh.getRange(2, 1, Math.max(sh.getLastRow() - 1, 1), 1).setNumberFormat('@');
+    var last = Math.max(sh.getLastRow() - 1, 1);
+    sh.getRange(2, 1, last, 1).setNumberFormat('@');
+    sh.getRange(2, 8, last, 1).setNumberFormat('@');
     return { id: data.id, updated: now };
   } finally {
     lock.releaseLock();
