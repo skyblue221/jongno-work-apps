@@ -16,6 +16,13 @@
   #list .lkm{font-size:11.5px;margin-top:2px}
   #list .lkm.ok{color:var(--main)}
   #list .lkm.no{color:var(--warn)}
+  /* 계획서 밑에 결과보고를 들여써서 선으로 이어 줌 */
+  #list .item.lk-parent{margin-bottom:3px;border-left:3px solid var(--acc)}
+  #list .item.lk-child{position:relative;margin-left:22px;margin-bottom:3px;border-left:3px solid var(--acc);background:#fdfbfc}
+  #list .item.lk-child.on{background:var(--main2)}
+  #list .item.lk-child.lk-last{margin-bottom:10px}
+  #list .item.lk-child::before{content:'';position:absolute;left:-17px;top:-6px;height:calc(50% + 6px);width:12px;border-left:2px solid var(--acc);border-bottom:2px solid var(--acc);border-bottom-left-radius:6px}
+  #list .item.lk-child:not(.lk-last)::after{content:'';position:absolute;left:-17px;top:50%;bottom:-6px;border-left:2px solid var(--acc)}
   #planSide{display:none}
   body.side .wrap{grid-template-columns:minmax(0,1fr) minmax(0,1fr);max-width:1800px}
   body.side aside{display:none}
@@ -120,17 +127,32 @@
     var arr = saved.filter(function(s){ return (!filterType || s.type===filterType) && (!q || (s.title+s.programName).indexOf(q) >= 0); });
     var items = document.querySelectorAll('#list .item');
     if (items.length !== arr.length) return;
+    var byId = {}, kids = {};   // 목록에 보이는 항목들, 계획서별 결과보고
+    arr.forEach(function(s, i){ byId[s.id] = items[i]; });
+    arr.forEach(function(s, i){ if (s.planId && byId[s.planId]) (kids[s.planId] = kids[s.planId] || []).push(items[i]); });
     arr.forEach(function(s, i){
       var it = items[i], m = it.querySelector('.m');
+      function note(cls, text){ m.parentNode.insertBefore(el('div', {class:'lkm ' + cls, text:text}), m.nextSibling); }
       if (s.type==='활동계획서' || s.type==='실행계획서'){
-        var rs = resultsOf(s.id);
-        m.parentNode.insertBefore(el('div', {class:'lkm ' + (rs.length ? 'ok' : 'no'), text: rs.length ? '✓ 결과보고 있음' + (rs.length > 1 ? ' (' + rs.length + '개)' : '') : '결과보고 아직 없음'}), m.nextSibling);
+        var rs = resultsOf(s.id), below = kids[s.id] || [];
+        if (!rs.length) note('no', '결과보고 아직 없음');
+        else if (below.length < rs.length) note('ok', '✓ 결과보고 ' + rs.length + '개' + (below.length ? '' : ' (지금 목록에는 안 보여요)'));
         if (rs.length){
           var acts = it.querySelector('.acts');
           acts.insertBefore(el('button', {class:'sm', on:{click:function(e){ e.stopPropagation(); openReport(rs[0].id); }}, text:'결과보고 열기'}), acts.firstChild);
         }
-      } else if (s.planId){
-        m.parentNode.insertBefore(el('div', {class:'lkm ok', text: findSaved(s.planId) ? '↳ 계획서 연결됨' : '↳ 계획서 연결 (지워짐)'}), m.nextSibling);
+        // 결과보고를 계획서 바로 밑으로 옮겨 한 묶음으로
+        if (below.length){
+          it.classList.add('lk-parent');
+          var at = it;
+          below.forEach(function(k, j){
+            k.classList.add('lk-child'); if (j === below.length - 1) k.classList.add('lk-last');
+            at.parentNode.insertBefore(k, at.nextSibling); at = k;
+          });
+        }
+      } else if (s.planId && !byId[s.planId]){
+        var p = findSaved(s.planId);
+        note('ok', p ? '↳ 계획서: ' + nameOf(p) : '↳ 계획서 연결 (지워짐)');
       }
     });
   }
