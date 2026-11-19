@@ -1,0 +1,51 @@
+<!--
+  휴대폰 화면 다듬기 (2026-11-19)
+  - 예산·결산 입력표(활동계획서 소요예산/결산, 실행계획서 예산, 사업결과보고서 예산집행내역)
+    폰에서는 한 항목을 작은 카드처럼 보여줘요.
+      1줄: 항목 이름 (넓게)
+      2줄: 단가 · 수량 · 단위
+      3줄: 금액 · ✕
+    칸마다 위에 작은 제목(단가(원), 수량 …)이 붙어요. PC 화면은 그대로.
+  - 구분 이름 칸 옆 소계가 좁아서 「소계 190, / 500원」처럼 끊기던 것
+    → 구분 이름은 한 줄 전체, 소계는 다음 줄 오른쪽에 한 줄로.
+  Code.gs의 doGet()에서 Link 뒤에 붙여요.
+  Index.html의 renderBudget·renderXBudget를 감싸서, 그린 뒤에 칸 제목(data-l)만 달아 줘요.
+-->
+<style>
+  .cat .sum{white-space:nowrap}
+  @media (max-width:640px){
+    .cat{padding:10px 10px 8px}
+    .cat .ch{flex-wrap:wrap;gap:6px}
+    .cat .ch input{max-width:none;flex:1 1 100%;min-width:0}
+    .cat .ch .sum{margin-left:auto}
+    table.bud,table.bud tbody{display:block;width:100%}
+    table.bud tr:first-child{display:none}
+    table.bud tr{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px 8px;padding:10px 0;border-top:1px dashed var(--line)}
+    table.bud tr:nth-child(2){border-top:0;padding-top:4px}
+    table.bud td{display:block;padding:0;width:auto!important;min-width:0}
+    table.bud td:first-child{grid-column:1 / -1}
+    table.bud td[data-l]::before{content:attr(data-l);display:block;font-size:12px;color:var(--sub);margin-bottom:2px}
+    table.bud input{width:100%!important;min-width:0}
+    table.bud td.amt{align-self:end;text-align:left;white-space:nowrap;font-weight:700;padding-bottom:6px}
+    table.bud td:last-child{grid-column:3;justify-self:end;align-self:end}
+    table.bud td:last-child button{padding:6px 12px;font-size:15px}
+  }
+</style>
+<script>
+(function(){
+  // 표 첫 줄(제목)의 글자를 아래 칸마다 data-l로 달아 줌 → 폰에서 칸 위 작은 제목으로 보여요
+  function label(box){
+    if (!box) return;
+    box.querySelectorAll('table.bud').forEach(function(t){
+      var rows = t.querySelectorAll('tr'); if (!rows.length) return;
+      var hs = Array.prototype.map.call(rows[0].children, function(th){ return th.textContent.trim(); });
+      for (var i = 1; i < rows.length; i++)
+        Array.prototype.forEach.call(rows[i].children, function(td, k){ if (hs[k]) td.setAttribute('data-l', hs[k]); });
+    });
+  }
+  var _rb = renderBudget, _rx = renderXBudget;
+  renderBudget = function(){ var r = _rb.apply(this, arguments); label(document.getElementById('budget')); return r; };
+  renderXBudget = function(){ var r = _rx.apply(this, arguments); label(document.getElementById('xBudget')); return r; };
+  label(document.getElementById('budget')); label(document.getElementById('xBudget'));
+})();
+</script>
