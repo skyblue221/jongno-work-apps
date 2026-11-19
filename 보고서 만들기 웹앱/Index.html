@@ -530,7 +530,7 @@
 <div id="errbox" style="display:none;position:fixed;top:70px;left:50%;transform:translateX(-50%);max-width:640px;width:92%;background:#FBEDE8;border:1px solid #B54A2A;color:#7A2E18;border-radius:10px;padding:12px 16px;z-index:60;font-size:14px"></div>
 <div id="pvWrap">
   <div id="pvBar"><span>미리보기 — 실제 한글 파일과 줄바꿈·쪽 나눔은 조금 다를 수 있어요</span>
-    <button onclick="window.print()">🖨 인쇄하기</button>
+    <button onclick="printReport()">🖨 인쇄하기 · PDF</button>
     <button class="pri" onclick="closePreview();download()">한글로 내려받기</button>
     <button onclick="closePreview()">닫기</button></div>
   <div id="pv"></div>
@@ -1635,8 +1635,7 @@ function download(){
         }).then(function(z){
           return z.generateAsync({type:'blob', compression:'DEFLATE', mimeType:'application/hwp+zip'});
         }).then(function(blob){
-          var base = isEdu ? '장애이해교육 결과보고서_' + (d.date || '') + (((d.attendees||[])[0]||{}).names ? '_' + String(d.attendees[0].names).split('\n')[0].slice(0,20) : '') : (d.title || autoTitle());
-          var name = base.replace(/\s*\n\s*/g,' ').replace(/[\\/:*?"<>|]/g,'_') + '.hwpx';
+          var name = fileBase(d) + '.hwpx';
           var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
           document.body.appendChild(a); a.click(); a.remove();
           toast('내려받았어요: ' + name, 3000);
@@ -1842,6 +1841,18 @@ function openPreview(){
     toast('', 1);
   });
 }
+// 파일 이름 (한글 내려받기·PDF 저장 같이 씀): 보고서 제목, 교육은 「장애이해교육 결과보고서_날짜_대상」
+function fileBase(d){
+  d = d || payload();
+  var base = d.type==='edu' ? '장애이해교육 결과보고서_' + (d.date || '') + (((d.attendees||[])[0]||{}).names ? '_' + String(d.attendees[0].names).split('\n')[0].slice(0,20) : '')
+    : (d.title || (isExec(d) ? SaupGen.defaultTitle(d) : autoTitle()));
+  return String(base).replace(/\s*\n\s*/g,' ').replace(/[\\/:*?"<>|]/g,'_').trim() || '보고서';
+}
+// 인쇄 → PDF로 저장할 때 파일 이름이 「보고서 만들기」가 아니라 보고서 제목이 되도록 (브라우저는 페이지 제목을 PDF 이름으로 써요)
+var APP_TITLE = document.title;
+function printReport(){ document.title = fileBase(); window.print(); }
+window.addEventListener('beforeprint', function(){ if (document.getElementById('pvWrap').style.display==='block') document.title = fileBase(); });
+window.addEventListener('afterprint', function(){ document.title = APP_TITLE; });
 function closePreview(){ document.getElementById('pvWrap').style.display = 'none'; }
 
 function toast(msg, ms){
