@@ -679,7 +679,7 @@ function ikEsc_(value) {
 
 function buildIntakeHtml_(list) {
   const C = IK_CONSENT;
-  const bx = function (on) { return '<span class="bx' + (on ? ' on' : '') + '">' + (on ? 'V' : '') + '</span>'; };
+  const bx = function (on) { return '<span class="bx' + (on ? ' on' : '') + '">' + (on ? '■' : '') + '</span>'; };
   const sp = function (n) { return new Array(n + 1).join('&nbsp;'); };
   const fill = function (value, width) {
     return '<span class="fl" style="min-width:' + width + 'mm">' + (value ? ikEsc_(value) : '') + '</span>';
@@ -765,7 +765,8 @@ function buildIntakeHtml_(list) {
     '.sig{height:9mm;max-width:30mm;vertical-align:middle;margin-right:1mm}' +
     'table.t table.sg td.kid{font-size:7.5pt;text-align:right;height:5mm}' +
     '.fl{display:inline-block;text-align:center;white-space:nowrap}td.two div{white-space:nowrap;overflow:hidden}' +
-    '.bx{display:inline-block;width:10px;height:10px;line-height:10px;border:1.2px solid #000;font-size:8px;font-weight:bold;text-align:center;vertical-align:-1px}' +
+    '.bx{display:inline-block;width:10px;height:10px;line-height:9px;border:1.2px solid #000;font-size:11px;text-align:center;vertical-align:-1px;overflow:hidden;font-family:\"Malgun Gothic\",\"Noto Sans KR\",sans-serif}' +
+    '.bx.on{background:#000}' +
     'table.foot{width:100%;margin-top:2mm;table-layout:fixed}table.foot td{padding:0;vertical-align:middle}table.foot .pr{width:30%;font-size:7pt;color:#777}table.foot .lg{text-align:center}.logo{height:6.5mm}' +
     '</style></head><body>' + pages.join('') + '</body></html>';
 }
