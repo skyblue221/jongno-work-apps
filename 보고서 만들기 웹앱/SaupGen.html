@@ -189,7 +189,7 @@ var SaupGen = (function () {
     });
   }
   // rows: [[{c,cs,rs,body,hdr,hdrLast,diag,valign}]]
-  function grid(w, rows) {
+  function grid(w, rows, uniform) {
     var n = w.length, nR = rows.length, hs = [];
     // 안쪽 표는 높이를 넉넉하지 않게 어림 (모자라면 한글이 열 때 늘려요)
     rows.forEach(function (cells, r) {
@@ -204,6 +204,8 @@ var SaupGen = (function () {
         if (need > have) hs[r + rs - 1] += need - have;
       });
     });
+    // 명단표: 머리 줄 아래 모든 줄을 같은 높이로
+    if (uniform && nR > 1) { var um = 1700; for (var u = 1; u < nR; u++) um = Math.max(um, hs[u]); for (u = 1; u < nR; u++) hs[u] = um; }
     var H = L.sum(hs, 0, nR), nHdr = 0;
     while (nHdr < nR && rows[nHdr].some(function (o) { return o.hdr; })) nHdr++;
     var trs = rows.map(function (cells, r) {
@@ -276,7 +278,7 @@ var SaupGen = (function () {
       }
       rows.push(cells);
     });
-    return grid(w, rows);
+    return grid(w, rows, b.uniform);
   }
   function blockChunks(blocks, w) {
     var chunks = [], pending = null, avail = w - PAD;

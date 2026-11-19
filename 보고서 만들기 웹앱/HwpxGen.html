@@ -36,11 +36,39 @@ var HwpxGen = (function () {
   };
   // 자유 표: 칸 수·너비를 제목 칸 글자로 정함 (연번은 좁게, 내용·주소 등은 넓게)
   //   block.cw: [칸 너비 비율…] — 칸마다 넓게/좁게 (없으면 양식 기본값 / 자유 표는 제목 글자로 짐작)
+  //   글자에 맞추기(isFit): 칸마다 가장 긴 글자가 한 줄에 들어가는 너비를 재서 나눔 — 연번처럼 짧은 칸은 좁게
+  //     참여자 명단표는 따로 너비를 고르지 않으면 늘 이 방식
+  function isFit(b) { return !!b && (b.fit === true || (b.preset === 'people' && !b.cwSet)); }
+  var FIT_PAD = CELL_PAD + 400;   // 칸 안 여백 + 여유
+  function fitNeed(cols, rows, autoNo) {
+    return cols.map(function (h, c) {
+      var m = textUnits(String(h || ''));
+      (rows || []).forEach(function (r, i) {
+        var v = autoNo && c === 0 ? String(i + 1) : String((r || [])[c] == null ? '' : r[c]);
+        v.replace(/\*\*|__/g, '').split('\n').forEach(function (l) { m = Math.max(m, textUnits(l.replace(/^\s*[-*•·]\s+/, '   '))); });
+      });
+      return Math.max(1100, m) + FIT_PAD;
+    });
+  }
+  // 남는 폭은 숫자만 있는 칸(연번 등)엔 안 주고 나머지 칸에 글자 길이 비율로 / 모자라면 모두 같은 비율로 줄임
+  function fitWidths(need, T, numCol) {
+    var s = need.reduce(function (a, b) { return a + b; }, 0);
+    if (s >= T) return need.map(function (x) { return x * T / s; });
+    var grow = need.map(function (x, c) { return numCol[c] ? 0 : x; }), g = grow.reduce(function (a, b) { return a + b; }, 0) || 1;
+    return need.map(function (x, c) { return x + (T - s) * grow[c] / g; });
+  }
+  function numCols(cols, rows, autoNo) {
+    return cols.map(function (_, c) { return (autoNo && c === 0) || ((rows || []).length > 0 && rows.every(function (r) { return /^[\d\s.,\-]*$/.test(String((r || [])[c] || '')); }) && /연번|번호|^no/i.test(String(cols[c] || ''))); });
+  }
   function presetOf(block) {
     var pre = PRESETS[block.preset] || PRESETS.schedule, free = block.preset === 'custom' || block.preset === 'people';
-    var cols = (free && block.cols && block.cols.length) ? block.cols : pre.cols, n = cols.length;
-    var cw = Array.isArray(block.cw) && block.cw.length === n ? block.cw.map(function (x) { return Number(x) > 0 ? Number(x) : 1; }) : null;
-    if (!free && !cw) return pre;
+    var cols = (free && block.cols && block.cols.length) ? block.cols : pre.cols, n = cols.length, fit = isFit(block);
+    var cw = !fit && Array.isArray(block.cw) && block.cw.length === n ? block.cw.map(function (x) { return Number(x) > 0 ? Number(x) : 1; }) : null;
+    if (!free && !cw && !fit) return pre;
+    if (fit) {
+      var hd = (block.cols && block.cols.length === n) ? block.cols : cols, auto = block.preset === 'people' && /연번|번호/.test(String(hd[0] || ''));
+      cw = fitWidths(fitNeed(hd, block.rows, auto), 39600, numCols(hd, block.rows, auto));
+    }
     var wt = cw || (block.preset === 'people' && n === pre.cols.length ? pre.w : cols.map(function (c) { c = String(c || ''); return /연번|번호|^no/i.test(c) ? 0.5 : /내용|주소|업무|설명|의견|비고/.test(c) ? (/비고/.test(c) ? 0.8 : 2) : 1; }));
     var tw = wt.reduce(function (a, b) { return a + b; }, 0);
     var align = !free ? pre.align : block.preset === 'people' ? cols.map(function () { return 'c'; }) : cols.map(function (c) { return /내용|업무|설명|의견/.test(String(c)) ? 'l' : 'c'; });
@@ -51,9 +79,16 @@ var HwpxGen = (function () {
     if (!b || b.preset !== 'people') return b;
     var pre = presetOf(b), cols = pre.cols, n = cols.length, auto = /연번|번호/.test(String(cols[0] || ''));
     var rows = (b.rows || []).map(function (r, i) { r = (r || []).slice(0, n); while (r.length < n) r.push(''); if (auto) r[0] = String(i + 1); return r; });
-    var two = Number(b.split) !== 1 && rows.length > 1;
-    var v = { kind: 'table', preset: 'custom', keepEmpty: true, rows: rows, hspan: [],
-      cols: two ? cols.concat(cols) : cols.slice(), cw: two ? pre.w.concat(pre.w) : pre.w.slice(), align: two ? pre.align.concat(pre.align) : pre.align.slice() };
+    // 배치: b.split 2 = 두 줄 나란히, 1 = 한 줄로, 없으면 자동 (글자가 반쪽 폭에 다 들어가면 두 줄 나란히)
+    var hw = pre.w;
+    if (isFit(b)) {
+      var need = fitNeed(cols, rows, auto), nc = numCols(cols, rows, auto);
+      var fitsHalf = need.reduce(function (a, x) { return a + x; }, 0) <= 19800;
+      var two = rows.length > 1 && (Number(b.split) === 2 || (!b.split && fitsHalf));
+      hw = fitWidths(need, two ? 19800 : 39600, nc);
+    } else var two = Number(b.split) !== 1 && rows.length > 1 && (Number(b.split) === 2 || !b.split);
+    var v = { kind: 'table', preset: 'custom', keepEmpty: true, uniform: true, rows: rows, hspan: [], two: two,
+      cols: two ? cols.concat(cols) : cols.slice(), cw: two ? hw.concat(hw) : hw.slice(), align: two ? pre.align.concat(pre.align) : pre.align.slice() };
     if (two) {
       var half = Math.ceil(rows.length / 2); v.rows = [];
       for (var i = 0; i < half; i++) {
@@ -212,10 +247,12 @@ var HwpxGen = (function () {
     });
     function rsOf(ri, c) { return ri === 0 ? 1 : (sp.span[ri - 1][c] || 1); }
     var hs = bodies.map(function (bs, ri) {
-      var m = 1300;
+      var m = block.uniform ? 1700 : 1300;
       bs.forEach(function (b, c) { if (b && rsOf(ri, c) === 1) m = Math.max(m, b.h + CELL_VPAD + 100); });
       return m;
     });
+    // 명단표: 모든 줄을 같은 높이로 (가장 높은 줄에 맞춤)
+    if (block.uniform && hs.length > 1) { var um = Math.max.apply(null, hs.slice(1)); for (var u = 1; u < hs.length; u++) hs[u] = um; }
     bodies.forEach(function (bs, ri) {
       bs.forEach(function (b, c) {
         var rs = rsOf(ri, c); if (!b || rs === 1) return;
@@ -520,7 +557,7 @@ var HwpxGen = (function () {
   var lib = {
     P: P, C: C, FULL_W: FULL_W, CELL_PAD: CELL_PAD, CELL_VPAD: CELL_VPAD, BF_FIRST: BF_CONTENT_FIRST, BF_MID: BF_CONTENT_MID, BF_LAST: BF_CONTENT_LAST,
     para: para, lines: lines, simpleLines: simpleLines, join: join, cell: cell, tblOpen: tblOpen, sum: sum, nid: nid, esc: esc,
-    innerTable: innerTable, viewBlock: viewBlock, spansOf: spansOf, alignOf: alignOf, mergeColsOf: mergeColsOf, picPara: picPara, attachments: attachments, patchHeader: patchHeader, presetOf: presetOf, pOpen: pOpen,
+    innerTable: innerTable, viewBlock: viewBlock, isFit: isFit, spansOf: spansOf, alignOf: alignOf, mergeColsOf: mergeColsOf, picPara: picPara, attachments: attachments, patchHeader: patchHeader, presetOf: presetOf, pOpen: pOpen,
     begin: function (imgs) { seq = 0; picList = []; IMGS = imgs || {}; }, pics: function () { return picList.slice(); },
     dataRows: dataRows, picCol: picCol, cellPics: cellPics
   };

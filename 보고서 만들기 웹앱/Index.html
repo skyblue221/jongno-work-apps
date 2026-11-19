@@ -1236,7 +1236,8 @@ function tblFree(b){
   b.name = b.name || BLOCK_NAMES[b.preset];
   b.cols = (b.cols && b.cols.length===n ? b.cols : pre.cols).slice();
   b.align = L.alignOf(b, pre); b.mergeCols = L.mergeColsOf(b, n); delete b.merge;
-  b.cw = tblWeights(b); b.preset = 'custom';
+  if (!HwpxGen.lib.isFit(b)) b.cw = tblWeights(b);
+  b.preset = 'custom';
 }
 function tblNumbered(b){ return /연번|번호/.test(String((b.cols||[])[0]||'')) && b.rows.length && b.rows.every(function(r){ return /^\d+$/.test(String(r[0]||'').trim()); }); }
 function tblRenumber(b, was){ if (was && b.preset!=='people') b.rows.forEach(function(r, i){ r[0] = String(i+1); }); }
@@ -1244,8 +1245,9 @@ function tblInsertCol(b, at){
   var L = HwpxGen.lib;
   tblFree(b);
   if (b.cols.length >= tblMaxCols(b)) return toast('칸은 ' + tblMaxCols(b) + '개까지 넣을 수 있어요.' + (b.preset==='people' ? ' (두 줄 나란히라서 한쪽에 ' + tblMaxCols(b) + '칸)' : ''));
-  var pre = L.presetOf(b), al = L.alignOf(b, pre), cw = (b.cw && b.cw.length===b.cols.length) ? b.cw : tblWeights(b);
-  cw.splice(at, 0, 1); al.splice(at, 0, 'c'); b.cw = cw; b.align = al;
+  var pre = L.presetOf(b), al = L.alignOf(b, pre);
+  if (!L.isFit(b)){ var cw = (b.cw && b.cw.length===b.cols.length) ? b.cw : tblWeights(b); cw.splice(at, 0, 1); b.cw = cw; }
+  al.splice(at, 0, 'c'); b.align = al;
   b.cols.splice(at, 0, '');
   b.rows.forEach(function(r){ while (r.length < b.cols.length - 1) r.push(''); r.splice(at, 0, ''); });
   b.mergeCols = L.mergeColsOf(b, b.cols.length + 1).map(function(c){ return c >= at ? c + 1 : c; }); delete b.merge;
@@ -1258,14 +1260,21 @@ function tblDeleteCol(b, at){
   var full = b.rows.some(function(r){ return String(r[at]||'').trim(); });
   if (!confirm('「' + name + '」 칸을 지울까요?' + (full ? '\n이 칸에 쓴 글도 같이 지워져요.' : ''))) return false;
   tblFree(b);
-  var pre = L.presetOf(b), al = L.alignOf(b, pre), cw = (b.cw && b.cw.length===b.cols.length) ? b.cw : tblWeights(b);
-  cw.splice(at, 1); al.splice(at, 1); b.cw = cw; b.align = al;
+  var pre = L.presetOf(b), al = L.alignOf(b, pre);
+  if (!L.isFit(b)){ var cw = (b.cw && b.cw.length===b.cols.length) ? b.cw : tblWeights(b); cw.splice(at, 1); b.cw = cw; }
+  al.splice(at, 1); b.align = al;
   b.mergeCols = L.mergeColsOf(b, b.cols.length).filter(function(c){ return c !== at; }).map(function(c){ return c > at ? c - 1 : c; }); delete b.merge;
   b.cols.splice(at, 1);
   b.rows.forEach(function(r){ r.splice(at, 1); });
   markDirty(); return true;
 }
-function tblSetWidth(b, ci, v){ if (!b.cw || b.cw.length !== HwpxGen.lib.presetOf(b).cols.length) b.cw = tblWeights(b); b.cw[ci] = v; markDirty(); }
+// 칸 너비를 직접 고르면 「글자에 맞추기」는 꺼지고, 지금 너비에서 그 칸만 바뀌어요
+function tblSetWidth(b, ci, v){
+  var L = HwpxGen.lib, n = L.presetOf(b).cols.length;
+  if (L.isFit(b) || !b.cw || b.cw.length !== n) b.cw = tblWeights(b);
+  b.cw[ci] = v; delete b.fit; b.cwSet = true; markDirty();
+}
+function tblFitOn(b){ delete b.cw; delete b.cwSet; b.fit = true; markDirty(); }
 function tblSetAlign(b, ci, v){ if (!b.align) b.align = []; b.align[ci] = v; markDirty(); }
 function tblRowOp(b, ri, op){
   var n = HwpxGen.lib.presetOf(b).cols.length, was = tblNumbered(b), pics = b.rowPics || (b.rowPics = []);
@@ -1303,12 +1312,13 @@ function popMenu(anchor, items){
 }
 function colMenu(b, ci, anchor, rerender){
   var L = HwpxGen.lib, pre = L.presetOf(b), al = L.alignOf(b, pre)[ci], cw = (b.cw && b.cw.length===pre.cols.length ? b.cw : tblWeights(b))[ci];
-  var near = COL_W.reduce(function(a, o){ return Math.abs(o[0] - cw) < Math.abs(a[0] - cw) ? o : a; });
+  var fit = L.isFit(b), near = fit ? null : COL_W.reduce(function(a, o){ return Math.abs(o[0] - cw) < Math.abs(a[0] - cw) ? o : a; });
   var items = [{label:'칸 넣기 · 빼기'},
     {text:'왼쪽에 칸 넣기', on:function(){ tblInsertCol(b, ci); rerender(); }},
     {text:'오른쪽에 칸 넣기', on:function(){ tblInsertCol(b, ci + 1); rerender(); }},
     {text:'이 칸 지우기', danger:true, on:function(){ if (tblDeleteCol(b, ci)) rerender(); }},
-    {sep:true}, {label:'칸 너비'}];
+    {sep:true}, {label:'칸 너비'},
+    {text:'글자에 맞추기 (자동 · 모든 칸)', checked: fit, on:function(){ tblFitOn(b); rerender(); }}];
   COL_W.forEach(function(o){ items.push({text:o[1], checked: o===near, on:function(){ tblSetWidth(b, ci, o[0]); rerender(); }}); });
   if (b.preset!=='people'){
     items.push({sep:true}, {label:'글자 정렬'},
@@ -1397,14 +1407,16 @@ function tableEditor(b, rerender, opt){
   if (!opt.fixedCols) bar.appendChild(el('button', {class:'sm', title:'맨 오른쪽에 칸 하나 더', on:{click:function(){ tblInsertCol(b, b.cols.length); rerender(); }}, text:'＋ 칸'}));
   if (people){
     var seg = el('div', {class:'seg'});
-    [[2,'두 줄 나란히'],[1,'한 줄로']].forEach(function(o){
-      seg.appendChild(el('button', {class:(Number(b.split)===1 ? 1 : 2)===o[0] ? 'on' : '', on:{click:function(){ b.split = o[0]; markDirty(); rerender(); }}, text:o[1]}));
+    var cur = Number(b.split) || 0;
+    [[0,'자동'],[2,'두 줄 나란히'],[1,'한 줄로']].forEach(function(o){
+      seg.appendChild(el('button', {class: cur===o[0] ? 'on' : '', on:{click:function(){ if (o[0]) b.split = o[0]; else delete b.split; markDirty(); rerender(); }}, text:o[1]}));
     });
     bar.appendChild(el('span', {style:'font-size:13px;color:var(--sub);margin-left:6px', text:'보고서에는'}));
     bar.appendChild(seg);
+    if (!cur) bar.appendChild(el('span', {class:'preview', style:'margin:0 0 0 6px;font-size:12.5px', text:'→ 지금은 ' + (L.viewBlock(b).two ? '두 줄 나란히' : '한 줄로') + (L.viewBlock(b).two || b.rows.length < 2 ? '' : ' (글자가 길어 반쪽에 다 안 들어가요)')}));
   }
   var tip = people
-    ? '한 명씩 줄로 쓰면, 보고서에는 앞의 절반은 왼쪽·나머지는 오른쪽에 나란히 들어가요. 빈 줄은 빈 칸으로 남아요(손으로 쓸 명단용). 칸 위 ⋮ 로 칸을 넣고 빼거나 너비를 바꿔요.'
+    ? '한 명씩 줄로 쓰면 돼요. 칸 너비는 글자 길이에 맞춰 저절로 정해지고(연번은 좁게, 긴 비고는 넓게), 모든 줄은 같은 높이로 들어가요. 「자동」은 글자가 반쪽 폭에 다 들어가면 두 줄 나란히, 아니면 한 줄로. 빈 줄은 빈 칸으로 남아요(손으로 쓸 명단용). 너비를 직접 바꾸려면 칸 위 ⋮ → 칸 너비.'
     : opt.fixedCols ? '줄 끝 ⋮ 로 줄을 넣고·옮기고·복사해요.'
     : '칸 위 ⋮ → 칸 넣기·지우기·너비·정렬 / 줄 끝 ⋮ → 줄 넣기·옮기기·복사 · 「합치기」를 켠 칸은 비워두면 위 칸과 하나로 합쳐져요 · 📷 사진은 「' + (b.cols[pc]||'') + '」 칸 글 아래에 들어가요';
   return el('div', {}, [tbl, bar, el('div', {class:'hint', text:tip})]);
@@ -1414,7 +1426,7 @@ function addBlock(kind){
   else if (kind==='text') doc.blocks.push({kind:'text', text:''});
   else if (kind==='gantt') doc.blocks.push(blankGantt());
   else if (kind==='custom') doc.blocks.push({kind:'table', preset:'custom', cols:['구분','내용'], rows:[['','']]});
-  else if (kind==='people') doc.blocks.push({kind:'table', preset:'people', cols:PRESETS.people.cols.slice(), cw:[0.65,1,1.2,0.65,1.3], split:2, rows:[['','','','',''],['','','','',''],['','','','','']]});
+  else if (kind==='people') doc.blocks.push({kind:'table', preset:'people', cols:PRESETS.people.cols.slice(), rows:[['','','','',''],['','','','',''],['','','','','']]});
   else {
     var n = PRESETS[kind].cols.length, row = []; for (var i=0;i<n;i++) row.push('');
     if (kind==='roles'||kind==='lecturers') row[0]='1';
