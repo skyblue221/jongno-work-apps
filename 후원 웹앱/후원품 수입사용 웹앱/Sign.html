@@ -49,6 +49,18 @@ td:last-child{text-align:right;font-weight:700;white-space:nowrap}
 <header><h1>후원품 수령 확인</h1></header>
 <main><div class="card" id="box">확인하는 중이에요...</div></main>
 <script>
+/** 서명 저장: 빈 공간을 잘라내고(여백 조금) 저장해서 수령증 칸에 크게·진하게 보이게 */
+function sigCrop(cv){
+  const W=cv.width,H=cv.height,d=cv.getContext('2d').getImageData(0,0,W,H).data;
+  let x0=W,y0=H,x1=-1,y1=-1;
+  for(let y=0;y<H;y++)for(let x=0;x<W;x++)if(d[(y*W+x)*4+3]>20){if(x<x0)x0=x;if(x>x1)x1=x;if(y<y0)y0=y;if(y>y1)y1=y;}
+  if(x1<0)return cv.toDataURL('image/png');
+  const pad=Math.round(Math.max(W,H)*0.03);x0=Math.max(0,x0-pad);y0=Math.max(0,y0-pad);x1=Math.min(W-1,x1+pad);y1=Math.min(H-1,y1+pad);
+  const bw=x1-x0+1,bh=y1-y0+1,s=Math.min(1,900/Math.max(bw,bh)),o=document.createElement('canvas');
+  o.width=Math.max(1,Math.round(bw*s));o.height=Math.max(1,Math.round(bh*s));o.getContext('2d').drawImage(cv,x0,y0,bw,bh,0,0,o.width,o.height);
+  return o.toDataURL('image/png');
+}
+
 const $=s=>document.querySelector(s);
 const esc=v=>String(v==null?'':v).replace(/[&\x3c>"']/g,c=>({'&':'&amp;','\x3c':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const call=(fn,...a)=>new Promise((res,rej)=>google.script.run.withSuccessHandler(res).withFailureHandler(e=>rej(e&&e.message?e.message:e))[fn](...a));
@@ -78,7 +90,7 @@ function second(d){
     \x3ccanvas id="pad">\x3c/canvas>
     \x3cbutton class="btn line" id="clr">다시 쓰기\x3c/button>\x3cbutton class="btn" id="ok">서명 보내기\x3c/button>\x3cdiv id="msg">\x3c/div>`;
   const cv=$('#pad'), dpr=window.devicePixelRatio||1, w=cv.clientWidth, h=cv.clientHeight;
-  cv.width=w*dpr; cv.height=h*dpr; const g=cv.getContext('2d'); g.scale(dpr,dpr); g.lineWidth=2.8; g.lineCap='round'; g.lineJoin='round'; g.strokeStyle='#111';
+  cv.width=w*dpr; cv.height=h*dpr; const g=cv.getContext('2d'); g.scale(dpr,dpr); g.lineWidth=4.5; g.lineCap='round'; g.lineJoin='round'; g.strokeStyle='#000';
   let down=false, drew=false, last=null;
   const pt=e=>{const r=cv.getBoundingClientRect();return {x:e.clientX-r.left,y:e.clientY-r.top};};
   cv.onpointerdown=e=>{down=true;last=pt(e);cv.setPointerCapture(e.pointerId);};
@@ -88,8 +100,7 @@ function second(d){
   $('#ok').onclick=async e=>{
     if(!drew){ $('#msg').innerHTML='\x3cdiv class="warn">서명을 해 주세요.\x3c/div>'; return; }
     e.target.disabled=true; e.target.textContent='보내는 중...';
-    const o=document.createElement('canvas'); o.width=Math.round(w*1.2); o.height=Math.round(h*1.2); o.getContext('2d').drawImage(cv,0,0,o.width,o.height);
-    try{ await call('publicSign',TOKEN,CODE,o.toDataURL('image/png'));
+    try{ await call('publicSign',TOKEN,CODE,sigCrop(cv));
       $('#box').innerHTML='\x3cdiv class="ok">\x3ch2 style="margin:0 0 6px">고맙습니다!\x3c/h2>서명이 잘 전달됐어요. 이 창은 닫으셔도 돼요.\x3c/div>';
     }catch(err){ $('#msg').innerHTML=`\x3cdiv class="warn">${esc(err)}\x3c/div>`; e.target.disabled=false; e.target.textContent='서명 보내기'; }
   };
