@@ -76,6 +76,14 @@
   table.grid tr.colset label{display:inline;margin:0;font-size:12px}
   table.grid tr.colset input[type=checkbox]{width:auto;margin:0 2px 0 0;vertical-align:middle}
   table.grid td.x .picbtn{display:block;cursor:pointer;padding:2px;font-size:15px;text-align:center}
+  table.grid td.x .rowbtn{display:block;width:100%;padding:1px 0}
+  table.grid td.no{text-align:center;vertical-align:middle;color:var(--sub);font-size:13px;background:#f8f7f4}
+  table.grid tr.colset button.cm{padding:1px 5px;font-size:12px;color:var(--ink);border:1px solid var(--line);background:#fff;margin-right:4px}
+  .menu.pop{position:fixed;display:block;z-index:70;min-width:190px;max-height:70vh;overflow-y:auto}
+  .menu.pop button{padding:6px 10px;font-size:13.5px}
+  .menu.pop button.del{color:var(--warn)}
+  .menu .mlab{font-size:11.5px;color:var(--sub);padding:6px 10px 2px}
+  .menu .msep{border-top:1px solid var(--line);margin:4px 0}
   .cellpics{display:flex;flex-wrap:wrap;gap:6px;padding:4px 6px}
   .cellpics select{width:auto;padding:1px 4px;font-size:12px;margin-top:2px;display:block}
   .thumb.sm{width:90px;height:68px}
@@ -317,8 +325,8 @@
       </div>
       <label>프로그램명</label>
       <input id="programName" placeholder="예: 장애이해 마을이음캠페인(씨네큐브 11회차) 활동계획">
-      <label>문서 제목 (맨 위 큰 제목) — 프로그램명을 쓰면 자동으로 채워져요</label>
-      <input id="title">
+      <label>문서 제목 (맨 위 큰 제목) — 프로그램명을 쓰면 자동으로 채워져요 · 길면 Enter로 줄을 바꿔요</label>
+      <textarea id="title" rows="1" placeholder="줄을 바꾸려면 Enter — 보고서 제목 상자에 두 줄로 들어가요"></textarea>
       <div class="row r4">
         <div><label>날짜</label><input type="date" id="date"></div>
         <div><label>끝나는 날짜 (여러 날일 때만)</label><input type="date" id="dateEnd"></div>
@@ -347,6 +355,8 @@
         <button class="sm" onclick="addBlock('roles')">＋ 업무분장표</button>
         <button class="sm" onclick="addBlock('lecturers')">＋ 강사 명단표</button>
         <button class="sm" onclick="addBlock('campaign')">＋ 캠페인 내용표</button>
+        <button class="sm" onclick="addBlock('people')">＋ 참여자 명단표</button>
+        <button class="sm" onclick="addBlock('custom')">＋ 자유 표</button>
       </div>
     </div>
 
@@ -358,6 +368,8 @@
       <div id="budget"></div>
       <button class="sm" onclick="addCat()">＋ 구분 추가</button>
       <div class="total" id="budgetTotal"></div>
+      <label>예산 없이 쓰는 말 (비예산일 때 — 예: ○○교육지원청 연계사업으로 비예산으로 진행됨.)</label>
+      <textarea id="budgetNote" rows="1" placeholder="항목은 비워두고 여기에 쓰면, 산출내역 칸 가운데에 들어가고 금액·계는 비어 있어요"></textarea>
     </div>
    </div>
 
@@ -407,8 +419,8 @@
         <div><label>연도</label><input id="xYear" placeholder="2027"></div>
         <div><label>사업명</label><input id="xProgramName" placeholder="예: 열린 마을 만들기"></div>
       </div>
-      <label>문서 제목 (맨 위 큰 제목) — 연도·사업명을 쓰면 자동으로 채워져요</label>
-      <input id="xTitle">
+      <label>문서 제목 (맨 위 큰 제목) — 연도·사업명을 쓰면 자동으로 채워져요 · 길면 Enter로 줄을 바꿔요</label>
+      <textarea id="xTitle" rows="1" placeholder="줄을 바꾸려면 Enter"></textarea>
       <label>재원</label>
       <div class="seg wrap" id="xFund"></div>
       <label>작은 글씨 크기 — 성과목표의 평가지표·평가방법, 예산 산출식, 비고</label>
@@ -470,6 +482,7 @@
         <button class="sm" onclick="addBlock('custom')">＋ 자유 표</button>
         <button class="sm" onclick="addBlock('roles2')">＋ 업무분장표</button>
         <button class="sm" onclick="addBlock('lecturers')">＋ 강사 명단표</button>
+        <button class="sm" onclick="addBlock('people')">＋ 참여자 명단표</button>
       </div>
     </div>
 
@@ -530,7 +543,7 @@
 <script>
 var doc = null, saved = [], dirty = false, tplB64 = null, filterType = '';
 var PRESETS = HwpxGen.PRESETS;
-var BLOCK_NAMES = {heading:'소제목', text:'글', schedule:'일정표', roles:'업무분장표', lecturers:'강사 명단표', campaign:'캠페인 내용표', gantt:'추진일정표', progress:'세부 진행표', custom:'자유 표', roles2:'업무분장표'};
+var BLOCK_NAMES = {heading:'소제목', text:'글', schedule:'일정표', roles:'업무분장표', lecturers:'강사 명단표', campaign:'캠페인 내용표', people:'참여자 명단표', gantt:'추진일정표', progress:'세부 진행표', custom:'자유 표', roles2:'업무분장표'};
 function isExec(d){ d = d || doc; return d && (d.type==='exec' || d.type==='execResult'); }
 
 function blankPlan() {
@@ -766,7 +779,7 @@ function renderRoles(){
     return;
   }
   doc.roles.preset = 'roles2';
-  box.appendChild(tableEditor(doc.roles, renderRoles));
+  box.appendChild(tableEditor(doc.roles, renderRoles, {fixedCols:true}));
   box.appendChild(el('button', {class:'sm ghost del', style:'margin-top:6px', on:{click:function(){ if(confirm('업무분장을 뺄까요?')){ doc.roles = null; markDirty(); renderRoles(); } }}, text:'업무분장 빼기'}));
 }
 
@@ -917,15 +930,15 @@ function pvBlock(b){
 }
 // 표 미리보기 (칸 합치기·정렬·행 사진 반영) — 활동계획서·실행계획서 공통
 function pvTable(b){
-  var L = HwpxGen.lib, pre = L.presetOf(b), n = pre.cols.length;
+  var L = HwpxGen.lib; b = L.viewBlock(b); var pre = L.presetOf(b), n = pre.cols.length;
   var hc = (b.cols && b.cols.length === n) ? b.cols : pre.cols, tw = pre.w.reduce(function(a, c){ return a + c; }, 0);
   var dr = (b.rows||[]).map(function(r, i){ return {r: r||[], pics: ((b.rowPics||[])[i]||[]).filter(function(p){ return p && imgCache[p.fileId]; })}; })
-    .filter(function(x){ return x.pics.length || x.r.some(function(v){ return String(v||'').trim(); }); });
+    .filter(function(x){ return b.keepEmpty || x.pics.length || x.r.some(function(v){ return String(v||'').trim(); }); });
   var rows = dr.map(function(x){ return x.r; }), al = L.alignOf(b, pre), sp = L.spansOf(b, rows, n), pc = L.picCol(al);
   return '<table class="in"><tr>' + hc.map(function(c, i){ return '<th style="width:' + Math.round(pre.w[i]/tw*100) + '%">' + h(c) + '</th>'; }).join('') + '</tr>' +
     rows.map(function(r, ri){ return '<tr>' + pre.cols.map(function(_, i){
       if (sp.skip[ri][i]) return '';
-      var rs = sp.span[ri][i] ? ' rowspan="' + sp.span[ri][i] + '"' : '';
+      var rs = (sp.span[ri][i] ? ' rowspan="' + sp.span[ri][i] + '"' : '') + (sp.cspan[ri][i] ? ' colspan="' + sp.cspan[ri][i] + '"' : '');
       var pics = (i === pc ? dr[ri].pics : []).map(function(p){ return '<div style="text-align:' + (p.align==='r' ? 'right' : 'center') + '"><img src="data:image/jpeg;base64,' + imgCache[p.fileId].b64 + '" style="max-width:60%;max-height:150px;margin-top:4px"></div>'; }).join('');
       return (al[i]==='l' ? '<td' + rs + '>' + pvLines(r[i]) : '<td class="c"' + rs + '>' + rich(r[i]).replace(/\n/g,'<br>')) + pics + '</td>'; }).join('') + '</tr>'; }).join('') + '</table>';
 }
@@ -1050,7 +1063,7 @@ function previewExecHtml(d){
     }));
     if (pl.length) block('사진자료', pl, 0, 3);
   }
-  var o = '<div class="pg"><div class="ttl2">' + h(d.title || S.defaultTitle(d)) + '</div><table class="main x6" style="table-layout:fixed"><colgroup>';
+  var o = '<div class="pg"><div class="ttl2">' + h(d.title || S.defaultTitle(d)).replace(/\n/g,'<br>') + '</div><table class="main x6" style="table-layout:fixed"><colgroup>';
   for (var c = 0; c < 100; c++) o += '<col style="width:1%">';
   var PX = {1:'1px', 2:'1.5px', 3:'2px'};
   o += '</colgroup>' + rows.map(function(r, ri){
@@ -1069,7 +1082,7 @@ function baseName(p){ return String(p||'').replace(/\s*(활동계획|결과보�
 function autoTitle(){ return baseName(doc.programName) + (doc.type==='result' ? ' 결과보고서' : ' 활동계획서'); }
 
 /* ── 화면 그리기 ── */
-var FIELDS = ['programName','title','date','dateEnd','timeStart','timeEnd','place','participants','manager','goal'];
+var FIELDS = ['programName','title','date','dateEnd','timeStart','timeEnd','place','participants','manager','goal','budgetNote'];
 function renderAll(){
   var isEdu = doc.type==='edu', isX = isExec();
   document.getElementById('planForm').style.display = (isEdu || isX) ? 'none' : '';
@@ -1087,7 +1100,7 @@ function renderAll(){
     renderEdu(); renderPhotos(); renderAtts(); renderStatus(); renderList();
     return;
   }
-  FIELDS.forEach(function(f){ document.getElementById(f).value = doc[f] || ''; });
+  FIELDS.forEach(function(f){ var e = document.getElementById(f); e.value = doc[f] || ''; if (e.tagName==='TEXTAREA') setTimeout(function(){ autoGrow(e); }); });
   document.querySelectorAll('#typeSeg button').forEach(function(b){ b.classList.toggle('on', b.dataset.v===doc.type); });
   document.getElementById('budgetTitle').textContent = doc.type==='result' ? '결산' : '소요예산';
   document.getElementById('wonMark').value = doc.wonMark ? '1' : '';
@@ -1152,6 +1165,7 @@ FIELDS.forEach(function(f){
     if (f==='programName' && doc.titleAuto){ doc.title = autoTitle(); document.getElementById('title').value = doc.title; }
     if (f==='participants' && doc.flagParticipants){ doc.flagParticipants=false; e.target.classList.remove('flag'); }
     if (/date|time/.test(f)) renderPreview();
+    if (e.target.tagName==='TEXTAREA') autoGrow(e.target);
     markDirty();
   });
 });
@@ -1177,12 +1191,13 @@ function ta(val, onInput, rows){
   return t;
 }
 function blockKey(b){ return b.kind==='table' ? b.preset : b.kind; }
+function blockName(b){ return b.name || BLOCK_NAMES[blockKey(b)] || '블록'; }
 function renderBlocks(){
   var box = document.getElementById(isExec() ? 'xblocks' : 'blocks'); box.innerHTML = '';
   if (!doc.blocks.length) box.appendChild(el('div', {class:'empty', style:'text-align:left;padding:4px 0 8px', text:'아래 ＋ 버튼으로 필요한 것만 순서대로 넣어요. (지난 보고서와 구성이 같으면 왼쪽 목록에서 「복사해서 새로」가 편해요)'}));
   doc.blocks.forEach(function(b, i){
     var head = el('div', {class:'bh'}, [
-      el('b', {text: BLOCK_NAMES[blockKey(b)] || '블록'}), el('span', {class:'sp'}),
+      el('b', {text: blockName(b)}), el('span', {class:'sp'}),
       el('button', {class:'sm ghost', title:'위로', on:{click:function(){ moveBlock(i,-1); }}, text:'▲'}),
       el('button', {class:'sm ghost', title:'아래로', on:{click:function(){ moveBlock(i,1); }}, text:'▼'}),
       el('button', {class:'sm ghost del', title:'삭제', on:{click:function(){ if(confirm('이 블록을 지울까요?')){ doc.blocks.splice(i,1); markDirty(); renderBlocks(); } }}, text:'✕'})
@@ -1202,34 +1217,144 @@ function renderBlocks(){
     box.appendChild(el('div', {class:'blk' + (b.kind==='heading'?' head':'')}, [head, body]));
   });
 }
-function tableEditor(b, rerender){
-  rerender = rerender || renderBlocks;
-  var pre = HwpxGen.lib.presetOf(b), cols = pre.cols, w = pre.w;
-  var tbl = el('table', {class:'grid'});
-  if (!b.cols || b.cols.length !== cols.length) b.cols = cols.slice();
-  if (!b.rowPics) b.rowPics = [];
-  var mc = HwpxGen.lib.mergeColsOf(b, cols.length), al = HwpxGen.lib.alignOf(b, pre), pc = HwpxGen.lib.picCol(al);
-  var hr = el('tr'); b.cols.forEach(function(c, ci){
-    var inp = el('input', {class:'hd', title:'제목 칸도 고칠 수 있어요'}); inp.value = c;
-    inp.addEventListener('input', function(){ b.cols[ci] = inp.value; markDirty(); });
-    hr.appendChild(el('th', {style:'width:'+Math.round(w[ci]/396)+'%'}, [inp]));
-  }); hr.appendChild(el('th',{class:'x', style:'width:40px'}));
-  tbl.appendChild(hr);
-  // 칸 설정 줄: 정렬 · 빈 칸 합치기
-  var sr = el('tr', {class:'colset'});
-  cols.forEach(function(_, ci){
-    var sel = el('select', {title:'이 칸 글자 정렬'});
-    [['c','가운데'],['l','왼쪽']].forEach(function(o){ var op = el('option', {value:o[0], text:o[1]}); if (al[ci]===o[0]) op.selected = true; sel.appendChild(op); });
-    sel.addEventListener('change', function(){ if (!b.align) b.align = []; b.align[ci] = sel.value; markDirty(); rerender(); });
-    var cb = el('input', {type:'checkbox'}); cb.checked = mc.indexOf(ci) >= 0;
-    cb.addEventListener('change', function(){ var m = HwpxGen.lib.mergeColsOf(b, cols.length).filter(function(x){ return x !== ci; }); if (cb.checked) m.push(ci); b.mergeCols = m.sort(); delete b.merge; markDirty(); });
-    sr.appendChild(el('td', {}, [sel, el('label', {title:'이 칸이 비어 있으면 위 칸과 하나로 합쳐요'}, [cb, document.createTextNode(' 빈 칸 합치기')])]));
+/* ── 표 편집: 칸(열)·줄(행)을 어디서든 넣고 빼기 ──
+   양식 표(일정표·업무분장표 등)에서 칸을 넣거나 빼면 「자유 표」로 바뀌어요 (칸 이름·너비·정렬은 그대로 이어받음).
+   칸 너비는 b.cw(비율), 정렬은 b.align, 빈 칸 합치기는 b.mergeCols. 참여자 명단표(people)는 연번이 저절로 매겨져요. */
+var COL_W = [[0.5,'아주 좁게'],[0.7,'좁게'],[1,'보통'],[1.4,'조금 넓게'],[2,'넓게'],[3,'아주 넓게']];
+function tblWeights(b){
+  var w = HwpxGen.lib.presetOf(b).w, avg = w.reduce(function(a, x){ return a + x; }, 0) / (w.length || 1);
+  return w.map(function(x){ return Math.round(x / avg * 100) / 100; });
+}
+function tblMaxCols(b){ return b.preset==='people' ? 6 : 10; }
+function tblFree(b){
+  if (b.preset==='custom' || b.preset==='people') return;
+  var L = HwpxGen.lib, pre = L.presetOf(b), n = pre.cols.length;
+  b.name = b.name || BLOCK_NAMES[b.preset];
+  b.cols = (b.cols && b.cols.length===n ? b.cols : pre.cols).slice();
+  b.align = L.alignOf(b, pre); b.mergeCols = L.mergeColsOf(b, n); delete b.merge;
+  b.cw = tblWeights(b); b.preset = 'custom';
+}
+function tblNumbered(b){ return /연번|번호/.test(String((b.cols||[])[0]||'')) && b.rows.length && b.rows.every(function(r){ return /^\d+$/.test(String(r[0]||'').trim()); }); }
+function tblRenumber(b, was){ if (was && b.preset!=='people') b.rows.forEach(function(r, i){ r[0] = String(i+1); }); }
+function tblInsertCol(b, at){
+  var L = HwpxGen.lib;
+  tblFree(b);
+  if (b.cols.length >= tblMaxCols(b)) return toast('칸은 ' + tblMaxCols(b) + '개까지 넣을 수 있어요.' + (b.preset==='people' ? ' (두 줄 나란히라서 한쪽에 ' + tblMaxCols(b) + '칸)' : ''));
+  var pre = L.presetOf(b), al = L.alignOf(b, pre), cw = (b.cw && b.cw.length===b.cols.length) ? b.cw : tblWeights(b);
+  cw.splice(at, 0, 1); al.splice(at, 0, 'c'); b.cw = cw; b.align = al;
+  b.cols.splice(at, 0, '');
+  b.rows.forEach(function(r){ while (r.length < b.cols.length - 1) r.push(''); r.splice(at, 0, ''); });
+  b.mergeCols = L.mergeColsOf(b, b.cols.length + 1).map(function(c){ return c >= at ? c + 1 : c; }); delete b.merge;
+  markDirty();
+}
+function tblDeleteCol(b, at){
+  var L = HwpxGen.lib;
+  if (L.presetOf(b).cols.length <= 1) return toast('칸이 하나뿐이라 지울 수 없어요.');
+  var name = (b.cols||[])[at] || L.presetOf(b).cols[at] || (at+1) + '번째';
+  var full = b.rows.some(function(r){ return String(r[at]||'').trim(); });
+  if (!confirm('「' + name + '」 칸을 지울까요?' + (full ? '\n이 칸에 쓴 글도 같이 지워져요.' : ''))) return false;
+  tblFree(b);
+  var pre = L.presetOf(b), al = L.alignOf(b, pre), cw = (b.cw && b.cw.length===b.cols.length) ? b.cw : tblWeights(b);
+  cw.splice(at, 1); al.splice(at, 1); b.cw = cw; b.align = al;
+  b.mergeCols = L.mergeColsOf(b, b.cols.length).filter(function(c){ return c !== at; }).map(function(c){ return c > at ? c - 1 : c; }); delete b.merge;
+  b.cols.splice(at, 1);
+  b.rows.forEach(function(r){ r.splice(at, 1); });
+  markDirty(); return true;
+}
+function tblSetWidth(b, ci, v){ if (!b.cw || b.cw.length !== HwpxGen.lib.presetOf(b).cols.length) b.cw = tblWeights(b); b.cw[ci] = v; markDirty(); }
+function tblSetAlign(b, ci, v){ if (!b.align) b.align = []; b.align[ci] = v; markDirty(); }
+function tblRowOp(b, ri, op){
+  var n = HwpxGen.lib.presetOf(b).cols.length, was = tblNumbered(b), pics = b.rowPics || (b.rowPics = []);
+  function blank(){ var r = []; for (var i = 0; i < n; i++) r.push(''); return r; }
+  if (op==='above' || op==='below'){ var at = op==='above' ? ri : ri + 1; b.rows.splice(at, 0, blank()); pics.splice(at, 0, []); }
+  else if (op==='copy'){ b.rows.splice(ri + 1, 0, b.rows[ri].slice()); pics.splice(ri + 1, 0, []); }
+  else if (op==='up' || op==='down'){
+    var j = op==='up' ? ri - 1 : ri + 1; if (j < 0 || j >= b.rows.length) return;
+    var t = b.rows[ri]; b.rows[ri] = b.rows[j]; b.rows[j] = t;
+    var p = pics[ri]; pics[ri] = pics[j]; pics[j] = p;
+  }
+  else if (op==='del'){ b.rows.splice(ri, 1); pics.splice(ri, 1); }
+  tblRenumber(b, was && op!=='up' && op!=='down');
+  markDirty();
+}
+/* 작은 팝업 메뉴 */
+var popEl = null;
+function closePop(){ if (popEl){ popEl.remove(); popEl = null; } }
+document.addEventListener('click', closePop);
+window.addEventListener('scroll', function(e){ if (popEl && !popEl.contains(e.target)) closePop(); }, true);
+function popMenu(anchor, items){
+  closePop();
+  var m = el('div', {class:'menu open pop'});
+  items.forEach(function(it){
+    if (!it) return;
+    if (it.label){ m.appendChild(el('div', {class:'mlab', text:it.label})); return; }
+    if (it.sep){ m.appendChild(el('div', {class:'msep'})); return; }
+    m.appendChild(el('button', {class: it.danger ? 'del' : '', on:{click:function(e){ e.stopPropagation(); closePop(); it.on(); }}, text:(it.checked ? '✓ ' : '　') + it.text}));
   });
-  sr.appendChild(el('td', {class:'x'}));
-  tbl.appendChild(sr);
+  m.addEventListener('click', function(e){ e.stopPropagation(); });
+  document.body.appendChild(m); popEl = m;
+  var r = anchor.getBoundingClientRect(), mw = m.offsetWidth, mh = m.offsetHeight;
+  m.style.left = Math.max(6, Math.min(r.left, innerWidth - mw - 6)) + 'px';
+  m.style.top = (r.bottom + mh + 6 > innerHeight && r.top - mh - 4 > 0 ? r.top - mh - 4 : r.bottom + 4) + 'px';
+}
+function colMenu(b, ci, anchor, rerender){
+  var L = HwpxGen.lib, pre = L.presetOf(b), al = L.alignOf(b, pre)[ci], cw = (b.cw && b.cw.length===pre.cols.length ? b.cw : tblWeights(b))[ci];
+  var near = COL_W.reduce(function(a, o){ return Math.abs(o[0] - cw) < Math.abs(a[0] - cw) ? o : a; });
+  var items = [{label:'칸 넣기 · 빼기'},
+    {text:'왼쪽에 칸 넣기', on:function(){ tblInsertCol(b, ci); rerender(); }},
+    {text:'오른쪽에 칸 넣기', on:function(){ tblInsertCol(b, ci + 1); rerender(); }},
+    {text:'이 칸 지우기', danger:true, on:function(){ if (tblDeleteCol(b, ci)) rerender(); }},
+    {sep:true}, {label:'칸 너비'}];
+  COL_W.forEach(function(o){ items.push({text:o[1], checked: o===near, on:function(){ tblSetWidth(b, ci, o[0]); rerender(); }}); });
+  if (b.preset!=='people'){
+    items.push({sep:true}, {label:'글자 정렬'},
+      {text:'가운데', checked: al==='c', on:function(){ tblSetAlign(b, ci, 'c'); rerender(); }},
+      {text:'왼쪽 (긴 글 · 「- 」 글머리)', checked: al==='l', on:function(){ tblSetAlign(b, ci, 'l'); rerender(); }});
+  }
+  popMenu(anchor, items);
+}
+function rowMenu(b, ri, anchor, rerender){
+  function go(op){ return function(){ tblRowOp(b, ri, op); rerender(); }; }
+  popMenu(anchor, [
+    {text:'위에 줄 넣기', on:go('above')}, {text:'아래에 줄 넣기', on:go('below')}, {text:'이 줄 복사해서 아래에', on:go('copy')},
+    {sep:true}, {text:'위로 옮기기', on:go('up')}, {text:'아래로 옮기기', on:go('down')},
+    {sep:true}, {text:'이 줄 지우기', danger:true, on:go('del')}]);
+}
+function tableEditor(b, rerender, opt){
+  rerender = rerender || renderBlocks; opt = opt || {};
+  var L = HwpxGen.lib, pre = L.presetOf(b), cols = pre.cols, w = pre.w, n = cols.length, people = b.preset==='people';
+  var tw = w.reduce(function(a, x){ return a + x; }, 0);
+  var tbl = el('table', {class:'grid'});
+  if (!b.cols || b.cols.length !== n) b.cols = cols.slice();
+  if (!b.rowPics) b.rowPics = [];
+  if (!b.rows) b.rows = [];
+  b.rows.forEach(function(r){ while (r.length < n) r.push(''); });
+  var mc = L.mergeColsOf(b, n), al = L.alignOf(b, pre), pc = L.picCol(al), autoNo = people && /연번|번호/.test(String(b.cols[0]||''));
+  var hr = el('tr'); b.cols.forEach(function(c, ci){
+    var inp = el('input', {class:'hd', title:'제목 칸도 고칠 수 있어요', placeholder:'제목'}); inp.value = c;
+    inp.addEventListener('input', function(){ b.cols[ci] = inp.value; markDirty(); });
+    hr.appendChild(el('th', {style:'width:' + Math.round(w[ci] / tw * 100) + '%'}, [inp]));
+  }); hr.appendChild(el('th', {class:'x', style:'width:40px'}));
+  tbl.appendChild(hr);
+  // 칸 설정 줄: ⋮ 칸 메뉴(넣기·빼기·너비·정렬) · 빈 칸 합치기
+  if (!opt.fixedCols){
+    var sr = el('tr', {class:'colset'});
+    cols.forEach(function(_, ci){
+      var kids = [el('button', {class:'sm ghost cm', title:'이 칸: 넣기·지우기·너비·정렬', on:{click:function(e){ e.stopPropagation(); colMenu(b, ci, e.currentTarget, rerender); }}, text:'⋮ ' + (people ? '칸' : al[ci]==='l' ? '왼쪽' : '가운데')})];
+      if (!people){
+        var cb = el('input', {type:'checkbox'}); cb.checked = mc.indexOf(ci) >= 0;
+        cb.addEventListener('change', function(){ var m = L.mergeColsOf(b, n).filter(function(x){ return x !== ci; }); if (cb.checked) m.push(ci); b.mergeCols = m.sort(); delete b.merge; markDirty(); });
+        kids.push(el('label', {title:'이 칸이 비어 있으면 위 칸과 하나로 합쳐요'}, [cb, document.createTextNode('합치기')]));
+      }
+      sr.appendChild(el('td', {}, kids));
+    });
+    sr.appendChild(el('td', {class:'x'}));
+    tbl.appendChild(sr);
+  }
   b.rows.forEach(function(r, ri){
     var tr = el('tr');
     cols.forEach(function(c, ci){
+      if (autoNo && ci===0){ tr.appendChild(el('td', {class:'no', title:'연번은 저절로 매겨져요', text:String(ri+1)})); return; }
       var kids = [ta(r[ci], function(v){ r[ci] = v; })];
       var pics = b.rowPics[ri] || [];
       if (ci === pc && pics.length){
@@ -1247,35 +1372,45 @@ function tableEditor(b, rerender){
       }
       tr.appendChild(el('td', {}, kids));
     });
-    var file = el('input', {type:'file', accept:'image/*', multiple:'multiple', style:'display:none'});
-    file.addEventListener('change', function(){ if (!b.rowPics[ri]) b.rowPics[ri] = []; uploadTo(file, b.rowPics[ri], rerender); });
-    tr.appendChild(el('td', {class:'x'}, [
-      el('label', {class:'sm ghost picbtn', title:'이 행에 사진 넣기 (글 아래에 들어가요)'}, [document.createTextNode('📷'), file]),
-      el('button', {class:'sm ghost del', title:'행 삭제', on:{click:function(){ b.rows.splice(ri,1); b.rowPics.splice(ri,1); markDirty(); rerender(); }}, text:'✕'})]));
+    var x = [];
+    if (!people){
+      var file = el('input', {type:'file', accept:'image/*', multiple:'multiple', style:'display:none'});
+      file.addEventListener('change', function(){ if (!b.rowPics[ri]) b.rowPics[ri] = []; uploadTo(file, b.rowPics[ri], rerender); });
+      x.push(el('label', {class:'sm ghost picbtn', title:'이 행에 사진 넣기 (글 아래에 들어가요)'}, [document.createTextNode('📷'), file]));
+    }
+    x.push(el('button', {class:'sm ghost rowbtn', title:'줄 넣기·옮기기·복사', on:{click:function(e){ e.stopPropagation(); rowMenu(b, ri, e.currentTarget, rerender); }}, text:'⋮'}));
+    x.push(el('button', {class:'sm ghost del rowbtn', title:'행 삭제', on:{click:function(){ tblRowOp(b, ri, 'del'); rerender(); }}, text:'✕'}));
+    tr.appendChild(el('td', {class:'x'}, x));
     tbl.appendChild(tr);
   });
-  var add = el('button', {class:'sm', style:'margin-top:6px', on:{click:function(){
-    var nr = cols.map(function(){ return ''; });
-    if (b.preset==='roles' || b.preset==='lecturers' || (b.preset==='custom' && /연번/.test(b.cols[0]))) nr[0] = String(b.rows.length+1);
-    b.rows.push(nr); markDirty(); rerender();
-  }}, text:'＋ 행 추가'});
-  var extra = [el('span', {class:'hint', style:'display:inline-block;margin-left:8px;padding:3px 8px', text:'「빈 칸 합치기」를 켠 칸은 비워두면 위 칸과 하나로 합쳐져요 · 📷 사진은 「' + (b.cols[pc]||'') + '」 칸 글 아래에 들어가요'})];
-  if (b.preset==='custom'){
-    extra.push(el('button', {class:'sm', style:'margin:6px 0 0 6px', on:{click:function(){
-      if (b.cols.length >= 7) return toast('칸은 7개까지 넣을 수 있어요.');
-      b.cols.push('제목'); b.rows.forEach(function(r){ r.push(''); }); markDirty(); rerender(); }}, text:'＋ 칸'}));
-    extra.push(el('button', {class:'sm', style:'margin:6px 0 0 6px', on:{click:function(){
-      if (b.cols.length <= 2) return;
-      if (!confirm('맨 오른쪽 칸을 지울까요?')) return;
-      b.cols.pop(); b.rows.forEach(function(r){ r.pop(); }); if (b.align) b.align.length = Math.min(b.align.length, b.cols.length); markDirty(); rerender(); }}, text:'－ 칸'}));
+  var bar = el('div', {class:'addbar'});
+  bar.appendChild(el('button', {class:'sm', on:{click:function(){
+    var was = tblNumbered(b), nr = cols.map(function(){ return ''; });
+    if (!b.rows.length && /연번|번호/.test(String(b.cols[0]||'')) && !people) was = true;
+    b.rows.push(nr); b.rowPics.push([]); tblRenumber(b, was); markDirty(); rerender();
+  }}, text:'＋ 행 추가'}));
+  if (people) bar.appendChild(el('button', {class:'sm', on:{click:function(){ for (var i = 0; i < 5; i++) b.rows.push(cols.map(function(){ return ''; })); markDirty(); rerender(); }}, text:'＋ 5줄'}));
+  if (!opt.fixedCols) bar.appendChild(el('button', {class:'sm', title:'맨 오른쪽에 칸 하나 더', on:{click:function(){ tblInsertCol(b, b.cols.length); rerender(); }}, text:'＋ 칸'}));
+  if (people){
+    var seg = el('div', {class:'seg'});
+    [[2,'두 줄 나란히'],[1,'한 줄로']].forEach(function(o){
+      seg.appendChild(el('button', {class:(Number(b.split)===1 ? 1 : 2)===o[0] ? 'on' : '', on:{click:function(){ b.split = o[0]; markDirty(); rerender(); }}, text:o[1]}));
+    });
+    bar.appendChild(el('span', {style:'font-size:13px;color:var(--sub);margin-left:6px', text:'보고서에는'}));
+    bar.appendChild(seg);
   }
-  return el('div', {}, [tbl, add].concat(extra));
+  var tip = people
+    ? '한 명씩 줄로 쓰면, 보고서에는 앞의 절반은 왼쪽·나머지는 오른쪽에 나란히 들어가요. 빈 줄은 빈 칸으로 남아요(손으로 쓸 명단용). 칸 위 ⋮ 로 칸을 넣고 빼거나 너비를 바꿔요.'
+    : opt.fixedCols ? '줄 끝 ⋮ 로 줄을 넣고·옮기고·복사해요.'
+    : '칸 위 ⋮ → 칸 넣기·지우기·너비·정렬 / 줄 끝 ⋮ → 줄 넣기·옮기기·복사 · 「합치기」를 켠 칸은 비워두면 위 칸과 하나로 합쳐져요 · 📷 사진은 「' + (b.cols[pc]||'') + '」 칸 글 아래에 들어가요';
+  return el('div', {}, [tbl, bar, el('div', {class:'hint', text:tip})]);
 }
 function addBlock(kind){
   if (kind==='heading') doc.blocks.push({kind:'heading', text:''});
   else if (kind==='text') doc.blocks.push({kind:'text', text:''});
   else if (kind==='gantt') doc.blocks.push(blankGantt());
   else if (kind==='custom') doc.blocks.push({kind:'table', preset:'custom', cols:['구분','내용'], rows:[['','']]});
+  else if (kind==='people') doc.blocks.push({kind:'table', preset:'people', cols:PRESETS.people.cols.slice(), cw:[0.65,1,1.2,0.65,1.3], split:2, rows:[['','','','',''],['','','','',''],['','','','','']]});
   else {
     var n = PRESETS[kind].cols.length, row = []; for (var i=0;i<n;i++) row.push('');
     if (kind==='roles'||kind==='lecturers') row[0]='1';
@@ -1501,7 +1636,7 @@ function download(){
           return z.generateAsync({type:'blob', compression:'DEFLATE', mimeType:'application/hwp+zip'});
         }).then(function(blob){
           var base = isEdu ? '장애이해교육 결과보고서_' + (d.date || '') + (((d.attendees||[])[0]||{}).names ? '_' + String(d.attendees[0].names).split('\n')[0].slice(0,20) : '') : (d.title || autoTitle());
-          var name = base.replace(/[\\/:*?"<>|]/g,'_') + '.hwpx';
+          var name = base.replace(/\s*\n\s*/g,' ').replace(/[\\/:*?"<>|]/g,'_') + '.hwpx';
           var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
           document.body.appendChild(a); a.click(); a.remove();
           toast('내려받았어요: ' + name, 3000);
@@ -1624,7 +1759,7 @@ function pvLines(text){
 }
 function imgTag(id, cls){ return imgCache[id] ? '<img class="' + (cls||'') + '" src="data:image/jpeg;base64,' + imgCache[id].b64 + '">' : ''; }
 function previewHtml(d){
-  var isRes = d.type==='result', o = '<div class="pg"><div class="ttl">' + h(d.title || autoTitle()) + '</div><table class="main">';
+  var isRes = d.type==='result', o = '<div class="pg"><div class="ttl">' + h(d.title || autoTitle()).replace(/\n/g,'<br>') + '</div><table class="main">';
   o += '<tr><td class="lb">프로그램명</td><td colspan="3">' + h(d.programName) + '</td></tr>';
   o += '<tr><td class="lb">일 시</td><td>' + h(HwpxGen.dateText(d)) + '</td><td class="lb" style="width:11%">장 소</td><td>' + h(d.place).replace(/\n/g,'<br>') + '</td></tr>';
   o += '<tr><td class="lb">참 여 인 원</td><td>' + h(d.participants).replace(/\n/g,'<br>') + '</td><td class="lb">담 당 자</td><td>' + h(d.manager) + '</td></tr>';
@@ -1635,8 +1770,8 @@ function previewHtml(d){
     return pvTable(b);
   }).join('');
   o += '<tr><td class="lb">내용</td><td colspan="3" style="vertical-align:top">' + body + '</td></tr>';
-  var B = HwpxGen.budgetCalc(d.budget);
-  if (B.cats.length){
+  var B = HwpxGen.budgetCalc(d.budget), bNote = String(d.budgetNote||'').trim();
+  if (B.cats.length || bNote){
     o += '<tr><td class="lb">' + (isRes?'결산':'소요예산') + '</td><td colspan="3" style="padding:0"><table><tr><th style="width:18%;background:#F2F2F2">구분</th><th style="background:#F2F2F2">산출내역</th><th style="width:18%;background:#F2F2F2">금액</th></tr>';
     var amt = function(n){ return d.wonMark ? '₩' + HwpxGen.won(n).replace('원','') : HwpxGen.won(n); };
     B.cats.forEach(function(c, k){
@@ -1644,7 +1779,8 @@ function previewHtml(d){
       if (k === 0 || String(c.category||'').trim()){ rs = 1; while (k + rs < B.cats.length && !String(B.cats[k + rs].category||'').trim()) rs++; }
       o += '<tr>' + (rs ? '<td class="c" rowspan="' + rs + '">' + h(c.category) + '</td>' : '') + '<td class="r">' + c.items.map(function(it){ return '<b>' + h(it.name) + '</b> ' + HwpxGen.won(it.price).replace('원','') + '원×' + it.qty + h(it.unit||'') + '=' + HwpxGen.won(HwpxGen.itemAmount(it)); }).join('<br>') + '</td><td class="c">' + amt(c.total) + '</td></tr>';
     });
-    o += '<tr><th colspan="2" style="background:#F2F2F2">계</th><th>' + amt(B.total) + '</th></tr></table></td></tr>';
+    if (bNote) o += '<tr><td></td><td class="c">' + h(bNote).replace(/\n/g,'<br>') + '</td><td></td></tr>';
+    o += '<tr><th colspan="2" style="background:#F2F2F2">계</th><th>' + (B.cats.length ? amt(B.total) : '') + '</th></tr></table></td></tr>';
   }
   if (isRes){
     var ps = d.photos || [], cells = '';
