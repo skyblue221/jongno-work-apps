@@ -7,7 +7,7 @@
  *       서명이 모두 끝난 일지는 매달 봉사자별 PDF로 드라이브에 자동 보관
  ****************************************************************/
 
-const ACTIVITY_LOG_BUILD = '활동일지 v2.4 · 처음 오신 분 신청서';
+const ACTIVITY_LOG_BUILD = '활동일지 v2.5 · 확인 링크 복사';
 const CONTENT_SHEET_NAME = '활동내용 문구';
 const CONTENT_HEADERS = ['프로그램', '활동내용', '사용(Y/N)'];
 
@@ -28,6 +28,12 @@ const ADMIN_URL = 'https://script.google.com/a/macros/jpurme.org/s/AKfycbylVUGsu
 
 /* 알림 메일 보내는 날(매달). 13·28일 = 마감 전, 16·1일 = 마감 지난 일지 다시 알림 */
 const REMIND_DAYS = [13, 16, 28, 1];
+
+/** 담당자 화면 주소에 열 탭을 붙여요. go = staff(담당자 확인) / leader(팀장 확인) / dash(현황판) */
+function adminLink_(go) {
+  if (!ADMIN_URL) return '';
+  return ADMIN_URL + (ADMIN_URL.indexOf('?') >= 0 ? '&' : '?') + 'go=' + encodeURIComponent(go || 'staff');
+}
 
 const ORG_NAME = '종로장애인복지관';
 
@@ -375,7 +381,8 @@ function getAdminInit() {
     me: publicMe_(me),
     staffNames: staff.map(function (s) { return s.name; }),
     teams: Array.from(new Set(staff.map(function (s) { return s.team; }).filter(Boolean))),
-    period: currentPeriod_()
+    period: currentPeriod_(),
+    links: { staff: adminLink_('staff'), leader: adminLink_('leader') }
   };
 }
 
@@ -848,7 +855,15 @@ function getDashboard(from, to) {
     inputDone: inputDone,
     inputTodo: inputTodo,
     rejected: rejected,
-    byStaff: toList_(byStaff),
+    byStaff: toList_(byStaff).map(function (t) {
+      // 오늘 대직 중이면 링크는 대직자에게 보내야 해요
+      const today = todayText_();
+      const owner = staff.find(function (s) { return s.active && s.name === t.name; });
+      if (owner && owner.substitute && today >= (owner.subFrom || '0000-00-00') && today <= (owner.subTo || '9999-12-31')) {
+        t.substitute = owner.substitute;
+      }
+      return t;
+    }),
     byTeam: toList_(byTeam).map(function (t) {
       t.leaders = leaderNames_(staff, t.name);
       return t;
@@ -1487,7 +1502,7 @@ function sendReminders_(force) {
   const overdue = day === 16 || day === 1;
   const staff = readStaff_().filter(function (s) { return s.active; });
   const rows = readActivity_().filter(function (r) { return r.staffStatus !== '반려' && r.dateText && r.dateText <= today; });
-  const link = ADMIN_URL || '';
+  const link = adminLink_('dash');
   const sent = [];
 
   // 담당자: 확인 대기 (대직 기간이면 대직자에게)
@@ -1514,7 +1529,7 @@ function sendReminders_(force) {
     sendMail_(s.email,
       '[봉사일지] ' + (overdue ? '마감 지난 ' : '') + '확인 대기 ' + m.count + '건',
       name + ' 님, 확인을 기다리는 자원봉사 활동일지가 <b>' + m.count + '건</b> 있어요.<br>' +
-      '가장 오래된 일지: ' + m.oldest, link);
+      '가장 오래된 일지: ' + m.oldest, adminLink_('staff'));
     sent.push(name + ' ' + m.count);
   });
 
@@ -1525,7 +1540,7 @@ function sendReminders_(force) {
       sendMail_(s.email,
         '[봉사일지] 팀장 확인 대기 ' + m.count + '건',
         s.name + ' 님, 담당자 확인이 끝나고 팀장 확인을 기다리는 일지가 <b>' + m.count + '건</b> 있어요.<br>' +
-        '가장 오래된 일지: ' + m.oldest, link);
+        '가장 오래된 일지: ' + m.oldest, adminLink_('leader'));
       sent.push(s.name + '(팀장) ' + m.count);
     });
   });
