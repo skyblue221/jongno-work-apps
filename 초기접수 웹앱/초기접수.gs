@@ -375,7 +375,7 @@ function ikClean_(d) {
     address: ikText_(d.address, 200),
     disReg: disReg,
     disType: disReg === '장애등록' ? ikText_(d.disType, 30) : '',
-    disGrade: disReg === '장애등록' ? ikText_(d.disGrade, 10) : '',
+    disGrade: '',   // 장애 등급제가 없어져(2019) 더는 받지 않아요. 예전 기록은 시트에 그대로 있어요
     disLevel: disReg === '장애등록' ? ikPick_(d.disLevel, IK_DIS_LEVEL) : '',
     multi: multi,
     multiType: multi === '있음' ? ikText_(d.multiType, 40) : '',
@@ -440,7 +440,7 @@ function listIntakes_(who) {
     return {
       id: x.id, date: x.date, route: x.route, status: x.status, no: x.no, name: x.name,
       birth: x.birth, age: ikAge_(x.birth, x.date || today), phone: x.phone1 || x.phone2,
-      hope: x.hope, updated: x.updated, writer: x.writer, share: x.share
+      hope: x.hope, updated: x.updated, writer: x.writer, ready: !!(x.birth && x.c1), share: x.share
     };
   }).sort(function (a, b) { return (b.date + b.id) < (a.date + a.id) ? -1 : 1; });
 }
@@ -491,6 +491,7 @@ function saveIntake(data) {
       id: old ? old.id : nextIntakeId_(sheet),
       date: date,
       route: old ? old.route : '직접작성',
+      disGrade: old ? old.disGrade : '',   // 예전에 적은 급수는 지우지 않고 그대로 둬요
       status: status,
       created: old ? old.created : now + ' ' + me,
       updated: now,
@@ -502,6 +503,29 @@ function saveIntake(data) {
     range.setNumberFormat('@').setValues([intakeRowFrom_(x)]);
     if (x.share !== (old ? old.share : '')) refreshSharedEmails_(sheet);
     return { id: x.id, status: x.status, updated: x.updated, created: !old };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/** 접수상담번호만 넣기·고치기 (목록에서 바로). 다른 접수지에 이미 쓴 번호면 막아요 */
+function setIntakeNo(id, no) {
+  requireIntakeOwner_();
+  const v = ikText_(no, 40);
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const sheet = intakeSheet_();
+    const n = findIntakeRow_(sheet, id);
+    if (!n) throw new Error('접수지를 찾지 못했어요. 목록을 새로고침해 주세요.');
+    if (v) {
+      const dup = intakeRows_(sheet, false).find(function (x) { return x.rowNumber !== n && x.no && x.no.replace(/\s/g, '') === v.replace(/^'/, '').replace(/\s/g, ''); });
+      if (dup) throw new Error('접수상담번호 ' + v.replace(/^'/, '') + '은(는) 이미 ' + dup.name + '님에게 넣은 번호예요.');
+    }
+    const now = nowText_();
+    sheet.getRange(n, IK['접수상담번호']).setNumberFormat('@').setValue(v);
+    sheet.getRange(n, IK['최종수정']).setValue(now);
+    return { id: normalizeText_(id), no: v.replace(/^'/, ''), updated: now };
   } finally {
     lock.releaseLock();
   }
@@ -678,7 +702,7 @@ function buildIntakeHtml_(list) {
       '<td colspan="3" class="ph"><div class="p1">핸드폰1(본인) &nbsp;' + ikEsc_(x.phone1) + '</div><div>핸드폰2(보호자) &nbsp;' + ikEsc_(x.phone2) + '</div></td></tr>' +
       '<tr><th>주소</th><td colspan="5">' + ikEsc_(x.address) + '</td></tr>' +
       '<tr><th>장애여부</th><td class="two">' +
-        '<div>' + bx(x.disReg === '장애등록') + ' 장애등록(' + fill(x.disType, 14) + ' 장애 ' + fill(x.disGrade, 5) + ' 급)</div>' +
+        '<div>' + bx(x.disReg === '장애등록') + ' 장애등록(' + fill(x.disType ? x.disType + ' 장애' : '', 26) + ')</div>' +
         '<div>' + bx(x.disReg === '장애미등록') + ' 장애 미등록' + sp(10) + bx(x.disReg === '비장애') + ' 비장애</div></td>' +
       '<th>장애정도</th><td colspan="3" class="two"><div>' + bx(x.disLevel === '심한장애') + ' 장애의 정도가 심한 장애인</div>' +
         '<div>' + bx(x.disLevel === '심하지않은장애') + ' 장애의 정도가 심하지 않은 장애인</div></td></tr>' +
@@ -716,7 +740,7 @@ function buildIntakeHtml_(list) {
 
   return '<html><head><meta charset="utf-8"><title>초기접수지</title><style>' +
     '@page{size:A4;margin:10mm 11mm 8mm 11mm}' +
-    '@media screen{body{padding:16px;max-width:780px;margin:0 auto;background:#fff}.page{margin-bottom:36px}}' +
+    '@media screen{body{padding:16px;max-width:780px;margin:0 auto;background:#fff;overflow-x:auto}.page{margin-bottom:36px;min-width:700px}}' +   /* 좁은 화면은 옆으로 밀어 보기 */
     'body{font-family:"Noto Sans KR","Malgun Gothic",sans-serif;color:#000;margin:0;font-size:9.5pt}' +
     '*{-webkit-print-color-adjust:exact;print-color-adjust:exact}' +
     '.page{page-break-after:always}.page:last-child{page-break-after:auto}' +
