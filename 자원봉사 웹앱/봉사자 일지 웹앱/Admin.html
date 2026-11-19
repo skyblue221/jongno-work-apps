@@ -133,6 +133,8 @@
     button.b:hover:not(:disabled) { background: var(--primary-dark); }
     button.b.gray { background: #e7e9ec; color: var(--text); }
     button.b.soft { background: var(--soft); color: var(--primary-dark); }
+    button.b.soft:hover:not(:disabled) { background: #dfe8f7; }
+    button.b.gray:hover:not(:disabled) { background: #dadde1; }
     button.b.red { background: var(--err); }
     button.b.sm { min-height: 34px; padding: 6px 10px; font-size: 14px; }
     button.b:disabled { opacity: .5; cursor: not-allowed; }
@@ -587,6 +589,18 @@
     </div>
   </div>
 
+  <!-- 링크 복사 (자동 복사가 안 될 때) -->
+  <div id="copyBox" class="overlay" hidden onclick="if(event.target===this)this.hidden=true">
+    <div class="sheet">
+      <h2>링크 보내기</h2>
+      <p class="hint">자동 복사가 안 되는 브라우저예요. 아래 글이 모두 골라져 있으니 <b>Ctrl+C</b>(휴대폰은 길게 눌러 복사)로 복사해 메신저에 붙여 넣어 주세요.</p>
+      <textarea id="copyText" readonly style="min-height:140px"></textarea>
+      <div class="row" style="margin-top:10px;justify-content:flex-end">
+        <button class="b gray" onclick="document.getElementById('copyBox').hidden=true">닫기</button>
+      </div>
+    </div>
+  </div>
+
   <div id="msg" class="msg"></div>
 
   <script>
@@ -650,8 +664,23 @@
     }
 
     /* ---------- 시작 ---------- */
+    let GO = '';  // 링크로 들어왔을 때 열 탭 (staff / leader / dash)
+
+    function readGo() {
+      return new Promise(function (res) {
+        try {
+          google.script.url.getLocation(function (l) {
+            res(String((l && l.parameter && l.parameter.go) || '').toLowerCase());
+          });
+        } catch (e) { res(''); }
+      });
+    }
+
     window.addEventListener('load', function () {
-      run('getAdminInit').then(function (init) {
+      readGo().then(function (go) {
+        GO = go;
+        return run('getAdminInit');
+      }).then(function (init) {
         INIT = init;
         document.getElementById('appBuild').textContent=init.buildVersion||'서버 버전 확인 필요 · 담당자용 배포를 업데이트해 주세요.';
         ME = init.me;
@@ -702,6 +731,12 @@
       } else if (!ME.hasSignature) {
         showTab('me');
         toast('처음이시네요! 먼저 서명을 등록해 주세요.', 'info');
+      } else if (GO === 'leader' && (ME.isLeader || ME.isAdmin)) {
+        showTab('leader');
+      } else if (GO === 'dash' && ME.isAdmin) {
+        showTab('dash');
+      } else if (GO === 'staff') {
+        showTab('staff');
       } else {
         showTab(ME.isLeader && !(ME.programs || []).length ? 'leader' : 'staff');
       }
@@ -957,6 +992,7 @@
       box.innerHTML = '<div class="empty">불러오는 중...</div>';
       run('getDashboard', document.getElementById('dashFrom').value, document.getElementById('dashTo').value)
         .then(function (d) {
+          LINK_MSGS = [];
           const pendStaff = d.byStaff.reduce(function (s, x) { return s + x.count; }, 0);
           const pendLeader = d.byTeam.reduce(function (s, x) { return s + x.count; }, 0);
 
@@ -969,15 +1005,26 @@
             stat(d.rejected, '반려') +
             '</div>';
 
+          html += '<p class="hint" style="margin-top:14px">🔗 <b>링크 복사</b>를 누르면 안내 문구와 링크가 함께 복사돼요. 메신저에 붙여 보내면, 받은 분이 기관 계정으로 열었을 때 <b>확인할 일지 화면이 바로</b> 떠요.</p>';
           html += '<h3>담당자 확인 대기 <span class="hint" style="font-weight:400">· 줄을 누르면 일지 목록이 펼쳐져요</span></h3>' + (d.byStaff.length
-            ? groupTable(['담당자', '건수', '가장 오래된 활동일'], d.byStaff.map(function (x) {
-                return { cells: [x.name === '미배정' ? '<span class="chip err">미배정</span>' : esc(x.name), '<b>' + x.count + '</b>', esc(x.oldest)], items: x.items };
+            ? groupTable(['담당자', '건수', '가장 오래된 활동일', '확인 링크'], d.byStaff.map(function (x) {
+                const to = x.substitute || x.name;
+                return { cells: [
+                  (x.name === '미배정' ? '<span class="chip err">미배정</span>' : esc(x.name)) +
+                    (x.substitute ? ' <span class="chip blue">' + esc(x.substitute) + ' 대직 중</span>' : ''),
+                  '<b>' + x.count + '</b>', esc(x.oldest),
+                  x.name === '미배정' ? '<span class="hint" style="font-size:12px">먼저 배정해 주세요</span>'
+                    : linkBtn('staff', to, x.count, x.oldest)
+                ], items: x.items };
               }), 'staff')
             : '<div class="hint">없어요 👍</div>');
 
           html += '<h3>팀장 확인 대기</h3>' + (d.byTeam.length
-            ? groupTable(['팀', '팀장', '건수', '가장 오래된 활동일'], d.byTeam.map(function (x) {
-                return { cells: [esc(x.name), x.leaders === '팀장 미지정' ? '<span class="chip err">팀장 미지정</span>' : esc(x.leaders), '<b>' + x.count + '</b>', esc(x.oldest)], items: x.items };
+            ? groupTable(['팀', '팀장', '건수', '가장 오래된 활동일', '확인 링크'], d.byTeam.map(function (x) {
+                const noLeader = x.leaders === '팀장 미지정';
+                return { cells: [esc(x.name), noLeader ? '<span class="chip err">팀장 미지정</span>' : esc(x.leaders), '<b>' + x.count + '</b>', esc(x.oldest),
+                  noLeader ? '' : linkBtn('leader', x.leaders, x.count, x.oldest)
+                ], items: x.items };
               }), 'team')
             : '<div class="hint">없어요 👍</div>');
 
@@ -989,6 +1036,37 @@
 
           box.innerHTML = html;
         }).catch(function (e) { box.innerHTML = ''; fail(e); });
+    }
+
+    /* ---------- 확인 링크 복사 (메신저로 보내기) ---------- */
+    let LINK_MSGS = [];
+
+    function linkBtn(kind, name, count, oldest) {
+      const url = INIT && INIT.links ? INIT.links[kind] : '';
+      if (!url) return '';
+      const what = kind === 'leader' ? '팀장 확인을 기다리는 자원봉사 활동일지가' : '확인을 기다리는 자원봉사 활동일지가';
+      LINK_MSGS.push(
+        '[자원봉사 활동일지] ' + name + ' 님, ' + what + ' ' + count + '건 있어요. (가장 오래된 활동일 ' + md(oldest) + ')\n' +
+        '아래 링크를 누르면 바로 확인 화면이 열려요. 기관 구글 계정으로 로그인해 주세요.\n' + url
+      );
+      return '<button class="b soft sm" style="white-space:nowrap" onclick="event.stopPropagation();copyLinkMsg(' + (LINK_MSGS.length - 1) + ')">🔗 링크 복사</button>';
+    }
+
+    function copyLinkMsg(i) { copyText(LINK_MSGS[i]); }
+
+    function copyText(t) {
+      (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject())
+        .then(function () { toast('안내 문구와 링크를 복사했어요. 메신저에 붙여 넣어 보내 주세요.'); })
+        .catch(function () { showCopyBox(t); });
+    }
+
+    /** 복사가 막힌 브라우저용: 문구를 골라 둔 창을 띄워요 */
+    function showCopyBox(t) {
+      const box = document.getElementById('copyBox');
+      const ta = document.getElementById('copyText');
+      ta.value = t;
+      box.hidden = false;
+      setTimeout(function () { ta.focus(); ta.select(); }, 30);
     }
 
     function detailBtn(x) {

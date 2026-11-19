@@ -12,7 +12,8 @@ var TYPE_LABEL = { plan: '활동계획서', result: '결과보고서', edu: '장
 
 function doGet() {
   return HtmlService.createTemplateFromFile('Index').evaluate()
-    .append(include('Link'))   // 계획서 ↔ 결과보고 연결 기능
+    .append(include('Link'))     // 계획서 ↔ 결과보고 연결 기능
+    .append(include('Mobile'))   // 휴대폰 화면 다듬기 (예산 입력표)
     .setTitle('보고서 만들기')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1');
 }
