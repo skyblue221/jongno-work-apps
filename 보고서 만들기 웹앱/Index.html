@@ -178,6 +178,10 @@
   .pg .in th{background:#DCDCDC;font-weight:normal}
   .pg .in td,.pg .in th{border:1px solid #555}
   .pg .in{margin:6px 0 10px}
+  /* 안쪽 표는 칸 너비를 정한 비율 그대로 — 칸이 많아도(참여자 명단표 10칸 등) 종이 밖으로 나가지 않고, 긴 글자는 칸 안에서 줄을 바꿔요 */
+  .pg table.in{table-layout:fixed;width:100%}
+  .pg .in td,.pg .in th{overflow-wrap:anywhere;padding:4px 5px}
+  .pg td,.pg th{overflow-wrap:anywhere}
   .pg td,.pg th{position:relative;z-index:0}
   .pg svg.bg{position:absolute;left:0;top:0;width:100%;height:100%;z-index:-1;display:block}
   .pg .c{text-align:center}.pg .r{text-align:right}
