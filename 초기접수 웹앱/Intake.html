@@ -62,7 +62,7 @@
 
 <section id="viewIntake" hidden aria-labelledby="ikTitle">
 <div class="topbar"><button type="button" class="back" id="ikBack">← 찾기 화면으로</button></div>
-<header class="home-head" style="display:block"><p class="brand">연결노트</p><h1 id="ikTitle" tabindex="-1">초기접수지</h1><p class="intro">종이 초기접수지와 같은 칸으로 쓰고, 같은 모양으로 인쇄·PDF 저장해요. 이 화면과 기록은 담당자만 볼 수 있어요.</p></header>
+<header class="home-head" style="display:block"><p class="brand">연결노트</p><h1 id="ikTitle" tabindex="-1">초기접수지</h1><p class="intro" id="ikIntro">종이 초기접수지와 같은 칸으로 쓰고, 같은 모양으로 인쇄·PDF 저장해요. 이 화면과 기록은 담당자만 볼 수 있어요.</p></header>
 
 <div class="ik-tabs" role="tablist" aria-label="초기접수 메뉴">
 <button type="button" role="tab" class="ik-tab" data-ik="list" aria-controls="ikPanelList">접수 목록 <span class="ik-n" id="ikNewCount" hidden></span></button>
@@ -92,6 +92,7 @@
 <label class="ik-f"><span>접수일</span><input type="date" name="date"></label>
 <label class="ik-f"><span>접수상담번호</span><input type="text" name="no" maxlength="40" placeholder="전산 접수 후 적어도 돼요"></label>
 <label class="ik-f"><span>상태</span><select name="status"><option>작성중</option><option>접수완료</option><option>신청받음</option><option>보류</option></select></label>
+<label class="ik-f w2"><span>같이 볼 담당자 <small>(선택) 이 직원은 이 접수지만 채워진 양식으로 보고 인쇄할 수 있어요 · 수정은 못 해요</small></span><input type="text" name="share" maxlength="300" placeholder="name@jpurme.org (여러 명은 쉼표)" list="ikShareList"><datalist id="ikShareList"></datalist></label>
 <fieldset class="ik-f"><legend>1인 가구</legend><div class="ik-opts"><label><input type="radio" name="alone" value="예">예</label><label><input type="radio" name="alone" value="아니오">아니오</label></div></fieldset>
 </div></div>
 
@@ -175,9 +176,18 @@
 <form id="ikLinkForm" class="stack" style="margin-top:12px">
 <label for="ikLinkUrl">신청 링크 주소 <small>공개용 배포의 웹앱 주소 (아래 「처음 한 번 준비」 참고)</small><input id="ikLinkUrl" type="url" placeholder="https://script.google.com/a/macros/jpurme.org/s/…/exec"></label>
 <label for="ikLinkPhone">문의 전화 <small>신청 화면과 안내 문자에 나와요</small><input id="ikLinkPhone" type="tel" style="max-width:260px"></label>
-<label for="ikLinkStaff">초기접수를 같이 볼 직원 이메일 <small>비워 두면 min 계정만 · 쉼표로 구분</small><input id="ikLinkStaff" type="text" placeholder="name@jpurme.org"></label>
 <div class="row-end"><button type="submit" class="primary">저장</button></div>
 </form>
+</div>
+<div class="ik-sec"><h3>전체 보기 (수정 불가)</h3>
+<p class="hint">대직·인수인계·평가처럼 모든 접수지를 봐야 할 때만 기간을 정해 열어 주세요. 목록과 채워진 양식을 볼 수 있고, 쓰기·고치기·설정은 못 해요. 만료일이 지나면 자동으로 닫혀요. 담당자가 아닌 사람이 양식을 열면 비공개 시트 「열람기록」 탭에 남아요.</p>
+<form id="ikViewerForm" class="ik-grid">
+<label class="ik-f"><span>기관 이메일</span><input type="email" id="ikVwEmail" required placeholder="name@jpurme.org"></label>
+<label class="ik-f"><span>이름·역할</span><input type="text" id="ikVwName" maxlength="40" placeholder="예: 팀장 ○○○ (대직)"></label>
+<label class="ik-f"><span>만료일 <small>(필수)</small></span><input type="date" id="ikVwUntil" required></label>
+<div class="w3 row-end"><button type="submit" class="primary">전체 보기 주기</button></div>
+</form>
+<div id="ikViewerList" style="margin-top:12px"></div>
 </div>
 <div class="ik-sec"><h3>안내 문자</h3>
 <p class="hint">고칠 곳이 있으면 고친 뒤 복사해서 문자로 보내요.</p>
@@ -210,7 +220,7 @@ let boot=null,list=[],tab='list',editing=null,dirty=false,picked=new Set(),pv=nu
 async function openIntake(){
   showView('intake');setTab('list');
   g('ikListStatus').textContent='접수 목록을 불러오는 중이에요.';g('ikListBox').replaceChildren();
-  try{boot=await runServer('getIntakeBoot');list=boot.list||[];fillStatic();renderList();renderLink();g('ikListStatus').textContent='';}
+  try{boot=await runServer('getIntakeBoot');list=boot.list||[];applyRole();if(isOwner()){fillStatic();renderLink();}renderList();g('ikListStatus').textContent='';}
   catch(e){g('ikListStatus').textContent='';toast(errText(e),true);}
 }
 window.openIntake=openIntake;
@@ -233,12 +243,23 @@ function setTab(t){
 
 /* ── 목록 ── */
 function ageText(birth,on){if(!birth)return '';const b=birth.split('-').map(Number),t=(on||boot.today).split('-').map(Number);if(b.length<3||t.length<3)return '';const a=t[0]-b[0]-((t[1]<b[1]||(t[1]===b[1]&&t[2]<b[2]))?1:0);return a>=0?a+'세':'';}
+const isOwner=()=>!!boot&&boot.role==='owner';
+/* 담당자가 아니면: 목록과 채워진 양식 보기·인쇄만 */
+function applyRole(){
+  const own=isOwner();
+  document.querySelectorAll('.ik-tab[data-ik="edit"],.ik-tab[data-ik="link"]').forEach(b=>{b.hidden=!own;});
+  g('ikNew').hidden=!own;g('ikSearch').placeholder=own?'이름, 연락처, 접수상담번호':'이름, 접수상담번호';
+  g('ikIntro').textContent=own?'종이 초기접수지와 같은 칸으로 쓰고, 같은 모양으로 인쇄·PDF 저장해요. 이 화면과 기록은 담당자만 볼 수 있어요.'
+    :boot.role==='all'?'전체 보기(수정 불가) 권한이에요'+(boot.until?' · '+boot.until+'까지':'')+'. 이름을 누르면 채워진 양식이 열려요. 열어 본 기록은 담당자에게 남아요.'
+    :'담당자가 지정한 접수지만 보여요(수정 불가). 이름을 누르면 채워진 양식이 열려요. 열어 본 기록은 담당자에게 남아요.';
+}
 function renderList(){
   const n=list.filter(x=>x.status==='신청받음').length;g('ikNewCount').textContent=n;g('ikNewCount').hidden=!n;
   const q=tx(g('ikSearch').value).replace(/\s|-/g,'').toLowerCase(),f=g('ikFilter').value;
   const rows=list.filter(x=>(!f||x.status===f)&&(!q||[x.name,x.phone,x.no,x.id].join(' ').replace(/\s|-/g,'').toLowerCase().includes(q)));
   const box=g('ikListBox');
-  if(!list.length){box.innerHTML='<div class="ik-empty">아직 쓴 초기접수지가 없어요.<br><b>+ 새로 쓰기</b>로 시작하거나, 신청 링크를 보내 보세요.</div>';return;}
+  if(!list.length){box.innerHTML=isOwner()?'<div class="ik-empty">아직 쓴 초기접수지가 없어요.<br><b>+ 새로 쓰기</b>로 시작하거나, 신청 링크를 보내 보세요.</div>':'<div class="ik-empty">지금 볼 수 있는 접수지가 없어요.</div>';return;}
+  if(!isOwner()){box.innerHTML='<table class="ik-list"><thead><tr><th style="width:34px"><span class="sr">고르기</span></th><th>접수일</th><th>이름</th><th>상태</th></tr></thead><tbody>'+rows.map(x=>'<tr class="ik-row" data-id="'+esc(x.id)+'"><td><input type="checkbox" class="ik-chk" data-id="'+esc(x.id)+'" aria-label="'+esc(x.name)+' 고르기"'+(picked.has(x.id)?' checked':'')+' style="width:18px;min-height:18px"></td><td>'+esc(x.date)+(x.no?'<div class="ik-route">'+esc(x.no)+'</div>':'')+'</td><td><button type="button" class="ik-name" data-open="'+esc(x.id)+'">'+esc(x.name)+'</button></td><td><span class="ik-st s-'+esc(x.status)+'">'+esc(x.status)+'</span></td></tr>').join('')+'</tbody></table>';return;}
   if(!rows.length){box.innerHTML='<div class="ik-empty">조건에 맞는 접수지가 없어요.</div>';return;}
   box.innerHTML='<table class="ik-list"><thead><tr><th style="width:34px"><span class="sr">고르기</span></th><th>접수일</th><th>이름</th><th class="ik-hide-m">생년월일</th><th class="ik-hide-m">연락처</th><th class="ik-hide-m">희망 프로그램</th><th>상태</th></tr></thead><tbody>'+
     rows.map(x=>'<tr class="ik-row" data-id="'+esc(x.id)+'"><td><input type="checkbox" class="ik-chk" data-id="'+esc(x.id)+'" aria-label="'+esc(x.name)+' 고르기"'+(picked.has(x.id)?' checked':'')+' style="width:18px;min-height:18px"></td>'+
@@ -268,7 +289,8 @@ function openEditor(x){
   if(tab==='edit'&&dirty&&!confirm('저장하지 않은 내용이 있어요. 새로 열까요?'))return;
   dirty=false;editing=x||null;const f=F();f.reset();
   const v=x||{date:boot.today,status:'작성중',signDate:boot.today,writer:'본인',support:[],benefits:[]};
-  ['date','no','status','name','birth','phone1','phone2','address','disType','disGrade','multiType','aidText','supportEtc','hope','signDate','relation','memo'].forEach(k=>setVal(k,v[k]));
+  ['date','no','status','name','birth','phone1','phone2','address','disType','disGrade','multiType','aidText','supportEtc','hope','signDate','relation','memo','share'].forEach(k=>setVal(k,v[k]));
+  const dl=g('ikShareList');dl.replaceChildren();[...new Set(list.flatMap(r=>String(r.share||'').split(/\s*,\s*/)).filter(Boolean))].forEach(e=>{const o=document.createElement('option');o.value=e;dl.append(o);});
   ['alone','gender','disReg','disLevel','multi','aid','c1','c2','writer'].forEach(k=>{[...f.querySelectorAll('input[name="'+k+'"]')].forEach(el=>{el.checked=el.value===v[k];});});
   [...f.querySelectorAll('input[name="support"]')].forEach(el=>{el.checked=(v.support||[]).includes(el.value);});
   [...f.querySelectorAll('input[name="benefits"]')].forEach(el=>{el.checked=(v.benefits||[]).includes(el.value);});
@@ -287,7 +309,7 @@ function collect(){
     multi:radio('multi'),multiType:f.elements.multiType.value.replace(/장애$/,''),aid:radio('aid'),aidText:f.elements.aidText.value,
     support:checkedList('support'),benefits:checkedList('benefits'),supportEtc:f.elements.supportEtc.value,hope:f.elements.hope.value,
     c1:radio('c1'),c2:radio('c2'),ack1:f.elements.ack1.checked,ack2:f.elements.ack2.checked,signDate:f.elements.signDate.value,
-    writer:radio('writer')||'본인',relation:f.elements.relation.value,memo:f.elements.memo.value,
+    writer:radio('writer')||'본인',relation:f.elements.relation.value,memo:f.elements.memo.value,share:f.elements.share.value,
     sigSelf:pads[0].value(),sigProxy:pads[1].value()};
 }
 function setMsg(m,err){const el=g('ikEditMsg');el.textContent=m;el.classList.toggle('err',!!err);}
@@ -353,15 +375,25 @@ async function savePdf(){
 /* ── 신청 링크 ── */
 function applyUrl(){const u=tx(boot&&boot.link&&boot.link.url);if(!u)return '';return /[?&]page=apply/.test(u)?u:u+(u.includes('?')?'&':'?')+'page=apply';}
 function renderLink(){
-  const l=boot.link||{};g('ikLinkUrl').value=l.url||'';g('ikLinkPhone').value=l.phone||'';g('ikLinkStaff').value=l.staff||'';
+  const l=boot.link||{};g('ikLinkUrl').value=l.url||'';g('ikLinkPhone').value=l.phone||'';renderViewers();
   const u=applyUrl();
   g('ikLinkNow').innerHTML=u?'<div class="ik-link"><b>지금 신청 링크</b><br>'+esc(u)+'</div>':'<div class="ik-link" style="border-left-color:#a33128">아직 신청 링크가 없어요. 아래 「처음 한 번 준비」를 따라 주소를 넣어 주세요.</div>';
   g('ikOpenApply').hidden=!u;if(u)g('ikOpenApply').href=u;
   g('ikSms').value='[종로장애인복지관] 초기접수지 작성 안내\n\n안녕하세요. 종로장애인복지관입니다.\n복지관 이용을 위한 초기접수지를 아래 링크에서 휴대폰으로 작성하실 수 있어요.\n가족이나 보호자가 대신 작성하셔도 괜찮아요.\n\n▶ 작성하기: '+(u||'(신청 링크)')+'\n\n작성하시면 담당자가 확인하고 연락드릴게요.'+(l.phone?'\n궁금한 점은 '+l.phone+'으로 편하게 연락 주세요.':'')+'\n감사합니다.';
 }
+function renderViewers(){
+  const vs=(boot.link&&boot.link.viewers)||[],box=g('ikViewerList');
+  if(!g('ikVwUntil').value){const d=new Date();d.setDate(d.getDate()+7);g('ikVwUntil').value=d.toISOString().slice(0,10);}
+  box.innerHTML=vs.length?'<table class="ik-list"><thead><tr><th>이메일</th><th>이름·역할</th><th>만료일</th><th></th></tr></thead><tbody>'+vs.map(v=>'<tr><td>'+esc(v.email)+'</td><td>'+esc(v.name)+'</td><td>'+esc(v.until)+(v.expired?' <span class="ik-st s-보류">만료</span>':'')+'</td><td><button type="button" class="ik-vwdel" data-email="'+esc(v.email)+'" style="min-height:34px;padding:4px 10px;font-size:13px">빼기</button></td></tr>').join('')+'</tbody></table>':'<p class="hint" style="margin:0">지금 전체 보기 권한을 가진 사람이 없어요.</p>';
+}
+async function addViewer(e){
+  e.preventDefault();
+  try{boot.link=await runServer('saveIntakeViewer',{email:g('ikVwEmail').value,name:g('ikVwName').value,until:g('ikVwUntil').value});g('ikVwEmail').value='';g('ikVwName').value='';renderViewers();toast('전체 보기 권한을 줬어요.');}
+  catch(err){toast(errText(err),true);}
+}
 async function saveLink(e){
   e.preventDefault();
-  try{const r=await runServer('saveIntakeSettings',{url:g('ikLinkUrl').value,phone:g('ikLinkPhone').value,staff:g('ikLinkStaff').value});boot.link=r;renderLink();toast('저장했어요.');}
+  try{const r=await runServer('saveIntakeSettings',{url:g('ikLinkUrl').value,phone:g('ikLinkPhone').value});boot.link=r;renderLink();toast('저장했어요.');}
   catch(err){toast(errText(err),true);}
 }
 async function copySms(){const ta=g('ikSms');let ok=false;try{if(navigator.clipboard&&window.isSecureContext){await navigator.clipboard.writeText(ta.value);ok=true;}}catch(e){ok=false;}if(!ok){ta.focus();ta.select();try{ok=document.execCommand('copy');}catch(e){ok=false;}}toast(ok?'복사했어요. 문자에 붙여 넣으세요.':'글자를 길게 눌러 복사해 주세요.',!ok);}
@@ -381,6 +413,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   g('ikListBox').addEventListener('click',async e=>{
     const chk=e.target.closest('.ik-chk');if(chk){if(chk.checked)picked.add(chk.dataset.id);else picked.delete(chk.dataset.id);return;}
     const row=e.target.closest('[data-open]')||e.target.closest('tr.ik-row');if(!row)return;const id=row.dataset.open||row.dataset.id;
+    if(!isOwner()){preview([id]);return;}
     g('ikListStatus').textContent='여는 중이에요…';try{openEditor(await runServer('getIntake',id));}catch(err){toast(errText(err),true);}finally{g('ikListStatus').textContent='';}
   });
   g('ikPrintSel').addEventListener('click',()=>{const ids=list.filter(x=>picked.has(x.id)).map(x=>x.id);if(!ids.length){toast('목록 왼쪽 칸에서 출력할 접수지를 골라 주세요.',true);return;}preview(ids);});
@@ -395,7 +428,8 @@ document.addEventListener('DOMContentLoaded',()=>{
   g('ikCancel').addEventListener('click',()=>{if(setTab('list')){editing=null;g('ikTabEdit').textContent='새로 쓰기';}});
   g('ikPickQ').addEventListener('input',renderPick);
   g('ikPickList').addEventListener('click',e=>{const b=e.target.closest('[data-pi]');if(b)addHope(boot.programs[Number(b.dataset.pi)].name);});
-  g('ikLinkForm').addEventListener('submit',saveLink);g('ikCopySms').addEventListener('click',copySms);
+  g('ikLinkForm').addEventListener('submit',saveLink);g('ikViewerForm').addEventListener('submit',addViewer);
+  g('ikViewerList').addEventListener('click',async e=>{const b=e.target.closest('.ik-vwdel');if(!b)return;if(!confirm(b.dataset.email+' 의 전체 보기 권한을 뺄까요?'))return;b.disabled=true;try{boot.link=await runServer('removeIntakeViewer',b.dataset.email);renderViewers();toast('권한을 뺐어요.');}catch(err){toast(errText(err),true);b.disabled=false;}});g('ikCopySms').addEventListener('click',copySms);
   g('ikPvClose').addEventListener('click',()=>g('ikPreview').close());g('ikPvPrint').addEventListener('click',printFrame);g('ikPvPdf').addEventListener('click',savePdf);
   window.addEventListener('beforeunload',e=>{if(tab==='edit'&&dirty){e.preventDefault();e.returnValue='';}});
 });

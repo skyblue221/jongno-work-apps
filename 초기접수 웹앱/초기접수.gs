@@ -7,15 +7,20 @@
  *  개인정보 보관
  *  - 연결노트 시트(직원이 함께 보는 시트)가 아니라, 처음 쓸 때 min 드라이브에 따로 만드는
  *    「연결노트 초기접수 기록 (비공개)」 시트에만 저장해요. 그 파일은 공유하지 마세요.
- *  - 목록·내용을 보는 건 앱을 배포한 계정(min)과, 아래 「초기접수 담당 이메일」에 적은 계정만 돼요.
- *    관리자 PIN으로는 열리지 않아요.
+ *  - 권한 (관리자 PIN으로는 열리지 않아요)
+ *    · 담당자(min, 앱을 배포한 계정): 목록·쓰기·고치기·상태·설정 모두
+ *    · 같이 볼 담당자: 접수지마다 지정한 직원은 「그 건만」 채워진 양식으로 보고 인쇄 (수정 불가)
+ *    · 전체 보기(수정 불가): 대직·인수인계·평가 때만, 만료일이 지나면 자동으로 닫힘
+ *    · 담당자가 아닌 사람이 양식을 열면 「열람기록」 탭에 남아요
  *  - 삭제 기능은 없어요. 필요 없으면 「보류」로 두거나 비공개 시트에서 직접 지워 주세요.
  ****************************************************************/
 
 const INTAKE_PROP_FILE = 'INTAKE_SPREADSHEET_ID';     // 비공개 시트 ID (처음 쓸 때 자동으로 생김)
 const INTAKE_PROP_LINK = 'INTAKE_APPLY_URL';          // 신청 링크(공개용 배포 주소)
 const INTAKE_PROP_PHONE = 'INTAKE_CONTACT_PHONE';     // 신청 화면·안내 문자에 쓰는 문의 전화
-const INTAKE_PROP_STAFF = 'INTAKE_STAFF_EMAILS';      // min 말고 초기접수를 볼 수 있는 계정 (쉼표)
+const INTAKE_PROP_VIEWERS = 'INTAKE_FULL_VIEWERS';    // 전체 보기(수정 불가) [{email,name,until,date}]
+const INTAKE_PROP_SHARED = 'INTAKE_SHARED_EMAILS';    // 한 건이라도 지정된 직원 이메일 (첫 화면 버튼용)
+const INTAKE_LOG_SHEET = '열람기록';
 const INTAKE_SHEET = '초기접수';
 const INTAKE_ORG = '종로장애인복지관';
 
@@ -25,13 +30,13 @@ const INTAKE_HEADERS = [
   '장애여부', '장애유형', '장애급수', '장애정도', '중복장애', '중복장애유형', '보조기', '보조기내용',
   '공공부조', '수급종류', '공공부조기타', '희망프로그램',
   '동의1', '동의2', '안내확인1', '안내확인2', '서명일', '작성자', '대리인관계',
-  '메모', '처음작성', '최종수정',
+  '메모', '처음작성', '최종수정', '같이볼담당자',
   '본인서명', '대리인서명'           // 서명 그림(글자가 길어서 맨 뒤에 둬요)
 ];
 const IK = {};
 INTAKE_HEADERS.forEach(function (h, i) { IK[h] = i + 1; });
 const IK_COLS = INTAKE_HEADERS.length;
-const IK_LIST_COLS = IK['최종수정'];   // 목록은 서명 칸을 빼고 읽어요 (빠르게)
+const IK_LIST_COLS = IK['같이볼담당자'];   // 목록은 서명 칸을 빼고 읽어요 (빠르게)
 
 const IK_STATUS = ['신청받음', '작성중', '접수완료', '보류'];
 const IK_AGREE = '동의';
@@ -74,35 +79,94 @@ const INTAKE_LOGO = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAaQAAAA/CAYAA
  * 권한 · 설정
  * ============================================================ */
 
-function intakeStaffEmails_() {
-  return normalizeText_(PropertiesService.getScriptProperties().getProperty(INTAKE_PROP_STAFF))
-    .split(/[,;\s]+/).map(function (v) { return v.trim().toLowerCase(); }).filter(Boolean);
+function ikEmail_(v) { return normalizeText_(v).toLowerCase(); }
+function ikEmails_(v) {
+  const list = (Array.isArray(v) ? v : normalizeText_(v).split(/[,;\s]+/)).map(ikEmail_).filter(Boolean);
+  list.forEach(function (e) { if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)) throw new Error('이메일을 확인해 주세요: ' + e); });
+  return list.filter(function (e, i) { return list.indexOf(e) === i; });
 }
 
-/** 초기접수를 볼 수 있는 계정인가: 앱을 배포한 계정(min) + 초기접수 담당 이메일. PIN으로는 안 돼요 */
+/** 담당자(min): 앱을 배포한 계정 */
 function isIntakeOwner_(email) {
-  const target = normalizeText_(email).toLowerCase();
-  if (!target) return false;
-  const owner = normalizeText_(Session.getEffectiveUser().getEmail()).toLowerCase();
-  return target === owner || intakeStaffEmails_().indexOf(target) !== -1;
+  const target = ikEmail_(email);
+  return !!target && target === ikEmail_(Session.getEffectiveUser().getEmail());
+}
+
+/** 전체 보기(수정 불가) 목록 */
+function intakeViewers_() {
+  try { return JSON.parse(PropertiesService.getScriptProperties().getProperty(INTAKE_PROP_VIEWERS) || '[]'); } catch (e) { return []; }
+}
+function isFullViewer_(email) {
+  const target = ikEmail_(email), today = today_();
+  return !!target && intakeViewers_().some(function (v) { return v.email === target && (!v.until || today <= v.until); });
+}
+function sharedEmails_() {
+  return normalizeText_(PropertiesService.getScriptProperties().getProperty(INTAKE_PROP_SHARED)).split(',').filter(Boolean);
+}
+
+/** 이 계정이 초기접수 화면에서 하는 역할: owner / all / shared / '' (첫 화면 버튼은 시트를 읽지 않고 판단) */
+function intakeRole_(email) {
+  if (isIntakeOwner_(email)) return 'owner';
+  if (isFullViewer_(email)) return 'all';
+  if (sharedEmails_().indexOf(ikEmail_(email)) !== -1) return 'shared';
+  return '';
 }
 
 function requireIntakeOwner_() {
   const email = normalizeText_(Session.getActiveUser().getEmail());
-  if (!isIntakeOwner_(email)) throw new Error('초기접수지는 담당자 계정으로만 볼 수 있어요.');
+  if (!isIntakeOwner_(email)) throw new Error('이 기능은 초기접수 담당자만 쓸 수 있어요.');
   return email;
+}
+function requireIntakeViewer_() {
+  const email = ikEmail_(Session.getActiveUser().getEmail());
+  const role = intakeRole_(email);
+  if (!role) throw new Error('초기접수지를 볼 수 있는 권한이 없어요.');
+  return { email: email, role: role };
+}
+/** 이 사람이 이 접수지를 볼 수 있나 */
+function canSeeIntake_(who, x) {
+  return who.role === 'owner' || who.role === 'all' || ikEmails_(x.share).indexOf(who.email) !== -1;
+}
+
+/** 지정된 직원 이메일 모음을 다시 계산 (저장할 때마다) */
+function refreshSharedEmails_(sheet) {
+  const set = {};
+  intakeRows_(sheet, false).forEach(function (x) { ikEmails_(x.share).forEach(function (e) { set[e] = 1; }); });
+  PropertiesService.getScriptProperties().setProperty(INTAKE_PROP_SHARED, Object.keys(set).join(','));
 }
 
 function intakeLinkInfo_() {
-  const p = PropertiesService.getScriptProperties();
+  const p = PropertiesService.getScriptProperties(), today = today_();
   return {
     url: normalizeText_(p.getProperty(INTAKE_PROP_LINK)),
     phone: normalizeText_(p.getProperty(INTAKE_PROP_PHONE)),
-    staff: intakeStaffEmails_().join(', ')
+    viewers: intakeViewers_().map(function (v) { return Object.assign({}, v, { expired: !!v.until && today > v.until }); })
   };
 }
 
-/** 신청 링크 주소 · 문의 전화 · 담당 이메일 저장 (min만) */
+/** 전체 보기(수정 불가) 주기 · 빼기 (min만) */
+function saveIntakeViewer(o) {
+  requireIntakeOwner_();
+  const email = ikEmails_(o && o.email)[0];
+  if (!email) throw new Error('기관 이메일을 넣어 주세요.');
+  if (isIntakeOwner_(email)) throw new Error('담당자 본인은 넣지 않아도 돼요.');
+  const until = ikDate_(o.until, '만료일');
+  if (!until) throw new Error('전체 보기는 만료일을 꼭 정해 주세요. (대직·인수인계·평가 기간만)');
+  if (until < today_()) throw new Error('만료일이 이미 지났어요.');
+  const list = intakeViewers_().filter(function (v) { return v.email !== email; });
+  list.push({ email: email, name: ikText_(o.name, 40), until: until, date: today_() });
+  PropertiesService.getScriptProperties().setProperty(INTAKE_PROP_VIEWERS, JSON.stringify(list));
+  return intakeLinkInfo_();
+}
+function removeIntakeViewer(email) {
+  requireIntakeOwner_();
+  const target = ikEmail_(email);
+  PropertiesService.getScriptProperties().setProperty(INTAKE_PROP_VIEWERS,
+    JSON.stringify(intakeViewers_().filter(function (v) { return v.email !== target; })));
+  return intakeLinkInfo_();
+}
+
+/** 신청 링크 주소 · 문의 전화 저장 (min만) */
 function saveIntakeSettings(values) {
   requireIntakeOwner_();
   const v = values || {};
@@ -111,12 +175,9 @@ function saveIntakeSettings(values) {
     throw new Error('신청 링크는 배포 관리에서 복사한 웹앱 주소(https://script.google.com/…/exec)를 붙여 넣어 주세요.');
   }
   const phone = normalizeText_(v.phone).slice(0, 40);
-  const staff = normalizeText_(v.staff).split(/[,;\s]+/).map(function (x) { return x.trim().toLowerCase(); }).filter(Boolean);
-  staff.forEach(function (e) { if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)) throw new Error('담당 이메일을 확인해 주세요: ' + e); });
   const p = PropertiesService.getScriptProperties();
   p.setProperty(INTAKE_PROP_LINK, url);
   p.setProperty(INTAKE_PROP_PHONE, phone);
-  p.setProperty(INTAKE_PROP_STAFF, staff.join(','));
   return intakeLinkInfo_();
 }
 
@@ -184,7 +245,7 @@ function intakeFromRow_(r, rowNumber) {
     hope: g('희망프로그램'),
     c1: g('동의1'), c2: g('동의2'), ack1: g('안내확인1') === 'Y', ack2: g('안내확인2') === 'Y',
     signDate: g('서명일'), writer: g('작성자') || '본인', relation: g('대리인관계'),
-    memo: g('메모'), created: g('처음작성'), updated: g('최종수정'),
+    memo: g('메모'), created: g('처음작성'), updated: g('최종수정'), share: g('같이볼담당자'),
     sigSelf: g('본인서명'), sigProxy: g('대리인서명')
   };
 }
@@ -202,7 +263,7 @@ function intakeRowFrom_(x) {
   put('희망프로그램', x.hope);
   put('동의1', x.c1); put('동의2', x.c2); put('안내확인1', x.ack1 ? 'Y' : ''); put('안내확인2', x.ack2 ? 'Y' : '');
   put('서명일', x.signDate); put('작성자', x.writer); put('대리인관계', x.relation);
-  put('메모', x.memo); put('처음작성', x.created); put('최종수정', x.updated);
+  put('메모', x.memo); put('처음작성', x.created); put('최종수정', x.updated); put('같이볼담당자', x.share);
   put('본인서명', x.sigSelf); put('대리인서명', x.sigProxy);
   return row;
 }
@@ -321,7 +382,13 @@ function ikClean_(d) {
 
 /** 초기접수 화면을 열 때 한 번: 목록 + 설정 + 프로그램 이름(희망 프로그램 고르기용) */
 function getIntakeBoot() {
-  const me = requireIntakeOwner_();
+  const who = requireIntakeViewer_();
+  if (who.role !== 'owner') {
+    // 같이 볼 담당자 · 전체 보기: 목록(이름·날짜·상태)과 양식 보기만
+    return { role: who.role, me: who.email, list: listIntakes_(who), today: today_(),
+      until: who.role === 'all' ? (intakeViewers_().find(function (v) { return v.email === who.email; }) || {}).until : '' };
+  }
+  const me = who.email;
   let programs = [];
   try {
     const year = programYearInfo_().selectedYear;
@@ -330,8 +397,9 @@ function getIntakeBoot() {
       .map(function (p) { return { name: p.name, status: p.recruitStatus, team: p.team, target: p.target }; });
   } catch (e) { programs = []; }
   return {
+    role: 'owner',
     me: me,
-    list: listIntakes_(),
+    list: listIntakes_(who),
     link: intakeLinkInfo_(),
     fileUrl: intakeBook_().getUrl(),
     programs: programs,
@@ -341,15 +409,17 @@ function getIntakeBoot() {
   };
 }
 
-function listIntakes() { requireIntakeOwner_(); return listIntakes_(); }
+function listIntakes() { return listIntakes_(requireIntakeViewer_()); }
 
-function listIntakes_() {
+/** 목록: 담당자는 전체 칸, 그 밖의 사람은 볼 수 있는 건의 이름·날짜·상태만 */
+function listIntakes_(who) {
   const today = today_();
-  return intakeRows_(intakeSheet_(), false).map(function (x) {
+  return intakeRows_(intakeSheet_(), false).filter(function (x) { return canSeeIntake_(who, x); }).map(function (x) {
+    if (who.role !== 'owner') return { id: x.id, date: x.date, route: x.route, status: x.status, no: x.no, name: x.name };
     return {
       id: x.id, date: x.date, route: x.route, status: x.status, no: x.no, name: x.name,
       birth: x.birth, age: ikAge_(x.birth, x.date || today), phone: x.phone1 || x.phone2,
-      hope: x.hope, updated: x.updated, writer: x.writer
+      hope: x.hope, updated: x.updated, writer: x.writer, share: x.share
     };
   }).sort(function (a, b) { return (b.date + b.id) < (a.date + a.id) ? -1 : 1; });
 }
@@ -396,6 +466,7 @@ function saveIntake(data) {
       }
     }
     const x = Object.assign({}, v, {
+      share: ikEmails_(d.share).filter(function (e) { return !isIntakeOwner_(e); }).join(', '),
       id: old ? old.id : nextIntakeId_(sheet),
       date: date,
       route: old ? old.route : '직접작성',
@@ -408,6 +479,7 @@ function saveIntake(data) {
     if (!n) n = Math.max(sheet.getLastRow(), 1) + 1;
     const range = sheet.getRange(n, 1, 1, IK_COLS);
     range.setNumberFormat('@').setValues([intakeRowFrom_(x)]);
+    if (x.share !== (old ? old.share : '')) refreshSharedEmails_(sheet);
     return { id: x.id, status: x.status, updated: x.updated, created: !old };
   } finally {
     lock.releaseLock();
@@ -438,28 +510,41 @@ function setIntakeStatus(id, status, memo) {
 
 /** 인쇄 미리보기용 HTML (여러 장 가능) */
 function makeIntakePrint(ids, blank) {
-  requireIntakeOwner_();
-  const list = blank ? [ikBlank_()] : pickIntakes_(ids);
+  const who = requireIntakeViewer_();
+  const list = blank ? [ikBlank_()] : pickIntakes_(ids, who, '보기');
   return { html: buildIntakeHtml_(list), fileName: intakeFileName_(list, blank) };
 }
 
 /** [PDF 저장]을 누를 때만 변환 */
 function makeIntakePdfFile(ids, blank) {
-  requireIntakeOwner_();
-  const list = blank ? [ikBlank_()] : pickIntakes_(ids);
+  const who = requireIntakeViewer_();
+  const list = blank ? [ikBlank_()] : pickIntakes_(ids, who, 'PDF 저장');
   const pdf = Utilities.newBlob(buildIntakeHtml_(list), 'text/html', 'intake.html')
     .getAs('application/pdf').setName(intakeFileName_(list, blank));
   return { fileName: pdf.getName(), base64: Utilities.base64Encode(pdf.getBytes()) };
 }
 
-function pickIntakes_(ids) {
+function pickIntakes_(ids, who, action) {
   const want = (Array.isArray(ids) ? ids : [ids]).map(normalizeText_).filter(Boolean);
   if (!want.length) throw new Error('출력할 접수지를 골라 주세요.');
   if (want.length > 30) throw new Error('한 번에 30장까지 출력할 수 있어요.');
   const all = intakeRows_(intakeSheet_(), true);
   const list = want.map(function (id) { return all.find(function (x) { return x.id === id; }); }).filter(Boolean);
   if (!list.length) throw new Error('접수지를 찾지 못했어요.');
+  if (list.some(function (x) { return !canSeeIntake_(who, x); })) throw new Error('볼 수 있는 권한이 없는 접수지가 있어요.');
+  if (who.role !== 'owner') logIntakeView_(who, list, action);
   return list;
+}
+
+/** 담당자가 아닌 사람이 양식을 열거나 저장하면 비공개 시트 「열람기록」 탭에 남겨요 */
+function logIntakeView_(who, list, action) {
+  try {
+    const book = intakeBook_();
+    let sh = book.getSheetByName(INTAKE_LOG_SHEET);
+    if (!sh) { sh = book.insertSheet(INTAKE_LOG_SHEET); sh.appendRow(['일시', '보는 사람', '권한', '한 일', '접수ID', '이름']); sh.setFrozenRows(1); }
+    sh.appendRow([nowText_(), who.email, who.role === 'all' ? '전체 보기' : '같이 볼 담당자', action,
+      list.map(function (x) { return x.id; }).join(', '), ikText_(list.map(function (x) { return x.name; }).join(', '), 500)]);
+  } catch (e) { /* 기록 실패로 보기를 막지는 않아요 */ }
 }
 
 function intakeFileName_(list, blank) {
