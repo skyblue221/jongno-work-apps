@@ -84,7 +84,7 @@ dialog::backdrop{background:rgba(20,24,22,.45)}
 </head>
 <body><main>
 <section id="viewFinder" aria-labelledby="homeTitle">
-<div class="home-head"><div><p class="brand" id="orgLine">직원용 복지정보 안내</p><h1 id="homeTitle" tabindex="-1">연결노트</h1><p class="intro" id="subtitle">필요한 정보를 찾고, 다음 연결을 준비합니다.</p></div><div style="display:flex;gap:8px;flex-wrap:wrap"><? if (intakeOwner) { ?><button id="goIntake" type="button" class="manage-link">초기접수지</button><? } ?><button id="goAdmin" type="button" class="manage-link">정보 관리</button></div></div>
+<div class="home-head"><div><p class="brand" id="orgLine">직원용 복지정보 안내</p><h1 id="homeTitle" tabindex="-1">연결노트</h1><p class="intro" id="subtitle">필요한 정보를 찾고, 다음 연결을 준비합니다.</p></div><div style="display:flex;gap:8px;flex-wrap:wrap"><? if (intakeRole) { ?><button id="goIntake" type="button" class="manage-link">초기접수지</button><? } ?><button id="goAdmin" type="button" class="manage-link">정보 관리</button></div></div>
 <div class="tabs" role="tablist" aria-label="찾을 자료"><button type="button" role="tab" id="tab-internal" class="tab" data-mode="internal" aria-controls="finderPanel">복지관 프로그램 <span class="tab-count" id="count-internal"></span></button><button type="button" role="tab" id="tab-external" class="tab" data-mode="external" aria-controls="finderPanel">복지정보 <span class="tab-count" id="count-external"></span></button></div>
 <div class="year-row" style="display:flex;gap:8px;align-items:center;margin:0 0 10px"><label for="yearSel" class="hint" style="font-weight:700">운영연도</label><select id="yearSel" style="width:auto"></select><span class="hint">복지관 프로그램만 연도별로 나뉘어요</span></div>
 <div id="finderPanel" role="tabpanel"><p class="intro" id="finderIntro" style="margin:0 0 14px"></p>
@@ -154,7 +154,7 @@ dialog::backdrop{background:rgba(20,24,22,.45)}
 <dialog id="pinDialog" aria-labelledby="pinTitle"><form method="dialog" class="dlg" id="pinForm"><h2 id="pinTitle">관리자 PIN</h2><p class="sub">직원 계정이 확인되지 않아 PIN으로 확인해요. 이 화면을 닫기 전까지는 다시 묻지 않아요.</p><label for="pinInput" style="display:grid;gap:6px">PIN<input id="pinInput" type="password" inputmode="numeric" autocomplete="off"></label><p id="pinError" class="form-error" hidden></p><div class="dlg-foot"><button type="button" id="pinCancel">취소</button><button type="submit" class="primary">확인</button></div></form></dialog>
 <dialog id="editDialog" aria-labelledby="editTitle"><form class="dlg" id="editForm" novalidate><h2 id="editTitle">수정</h2><p class="sub" id="editSub"></p><div class="form-grid" id="editFields"></div><p id="editError" class="form-error" hidden></p><div class="dlg-foot"><button type="button" id="editCancel">취소</button><button type="submit" class="primary" id="editSave">시트에 저장</button></div></form></dialog>
 <dialog id="copyDialog" aria-labelledby="copyTitle"><div class="dlg"><h2 id="copyTitle">안내 문구</h2><p class="sub">문자나 메신저로 보낼 수 있게 정리했어요. 필요한 부분을 고친 뒤 복사하세요.</p><label for="copyText" class="sr">안내 문구</label><textarea id="copyText" rows="12"></textarea><p id="copyMsg" class="hint" role="status" aria-live="polite" style="margin:10px 0 0"></p><div class="dlg-foot"><button type="button" id="copyClose">닫기</button><button type="button" class="primary" id="copyBtn">복사하기</button></div></div></dialog>
-<? if (intakeOwner) { ?><?!= include('Intake') ?><? } ?>
+<? if (intakeRole) { ?><?!= include('Intake') ?><? } ?>
 <div id="toast" role="status" aria-live="polite" hidden></div>
 </main>
 <script>
@@ -205,7 +205,7 @@ function checkText(r){const c=checkInfo(r);if(c.state==='none')return '프로그
 /* ── 공통 ── */
 function runServer(name,...args){return new Promise((resolve,reject)=>{google.script.run.withSuccessHandler(resolve).withFailureHandler(e=>reject(e&&e.message?e:new Error(String(e))))[name](...args);});}
 async function call(name,...args){try{return await runServer(name,adminPin,...args);}catch(error){const msg=text(error.message||error);if(msg.includes('PIN')){adminPin='';}throw error;}}
-function errText(e){return text(e&&e.message?e.message:e);}
+function errText(e){return text(e&&e.message?e.message:e).replace(/^(Error|Exception|오류):\s*/,'');}
 function toast(message,isError){const t=$('toast');t.textContent=message;t.classList.toggle('err',!!isError);t.hidden=false;clearTimeout(toast.timer);toast.timer=setTimeout(()=>{t.hidden=true;},isError?7000:3500);}
 function askPin(){return new Promise(resolve=>{const d=$('pinDialog');$('pinInput').value='';$('pinError').hidden=true;let settled=false;const done=v=>{if(settled)return;settled=true;$('pinForm').onsubmit=null;$('pinCancel').onclick=null;d.onclose=null;resolve(v);};$('pinForm').onsubmit=e=>{e.preventDefault();const v=text($('pinInput').value);if(!v){$('pinError').textContent='PIN을 입력해주세요.';$('pinError').hidden=false;return;}adminPin=v;done(v);d.close();};$('pinCancel').onclick=()=>d.close();d.onclose=()=>done('');d.showModal();$('pinInput').focus();});}
 function option(value,label,selectedValue){const o=document.createElement('option');o.value=value;o.textContent=label==null?value:label;o.selected=value===selectedValue;return o;}

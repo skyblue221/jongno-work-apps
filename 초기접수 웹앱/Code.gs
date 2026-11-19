@@ -157,7 +157,7 @@ function doGet(e) {
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
   }
   const t = HtmlService.createTemplateFromFile('Index');
-  t.intakeOwner = isIntakeOwner_(email);
+  t.intakeRole = intakeRole_(email);   // 초기접수지 버튼: 담당자·전체 보기·지정된 직원에게만
   return t.evaluate()
     .setTitle('연결노트')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
