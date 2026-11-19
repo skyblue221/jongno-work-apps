@@ -205,7 +205,7 @@ function checkText(r){const c=checkInfo(r);if(c.state==='none')return '프로그
 /* ── 공통 ── */
 function runServer(name,...args){return new Promise((resolve,reject)=>{google.script.run.withSuccessHandler(resolve).withFailureHandler(e=>reject(e&&e.message?e:new Error(String(e))))[name](...args);});}
 async function call(name,...args){try{return await runServer(name,adminPin,...args);}catch(error){const msg=text(error.message||error);if(msg.includes('PIN')){adminPin='';}throw error;}}
-function errText(e){return text(e&&e.message?e.message:e);}
+function errText(e){return text(e&&e.message?e.message:e).replace(/^(Error|Exception|오류):\s*/,'');}
 function toast(message,isError){const t=$('toast');t.textContent=message;t.classList.toggle('err',!!isError);t.hidden=false;clearTimeout(toast.timer);toast.timer=setTimeout(()=>{t.hidden=true;},isError?7000:3500);}
 function askPin(){return new Promise(resolve=>{const d=$('pinDialog');$('pinInput').value='';$('pinError').hidden=true;let settled=false;const done=v=>{if(settled)return;settled=true;$('pinForm').onsubmit=null;$('pinCancel').onclick=null;d.onclose=null;resolve(v);};$('pinForm').onsubmit=e=>{e.preventDefault();const v=text($('pinInput').value);if(!v){$('pinError').textContent='PIN을 입력해주세요.';$('pinError').hidden=false;return;}adminPin=v;done(v);d.close();};$('pinCancel').onclick=()=>d.close();d.onclose=()=>done('');d.showModal();$('pinInput').focus();});}
 function option(value,label,selectedValue){const o=document.createElement('option');o.value=value;o.textContent=label==null?value:label;o.selected=value===selectedValue;return o;}

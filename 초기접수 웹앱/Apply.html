@@ -237,7 +237,7 @@ form.addEventListener('submit',e=>{
     $('donePhone').textContent=PAGE.phone?' 궁금한 점은 '+PAGE.phone+'으로 연락 주세요.':'';
     window.scrollTo(0,0);$('done').focus();
   }).withFailureHandler(err=>{
-    b.disabled=false;b.textContent='신청서 보내기';showErr((err&&err.message)||'보내지 못했어요. 잠시 뒤 다시 해 주세요.','');
+    b.disabled=false;b.textContent='신청서 보내기';showErr(String((err&&err.message)||'보내지 못했어요. 잠시 뒤 다시 해 주세요.').replace(/^(Error|Exception|오류):\s*/,''),'');
   }).submitIntakeApplication(d);
 });
 

@@ -211,11 +211,32 @@ function intakeBook_() {
   }
 }
 
+/** 예전 버전(11-18)으로 만든 시트에는 「같이볼담당자」 칸이 없어요 → 서명 칸 앞에 한 칸 끼워 넣어요 (자료는 그대로) */
+function upgradeIntakeSheet_(sheet, head) {
+  const col = IK['같이볼담당자'];
+  const old = INTAKE_HEADERS.filter(function (h) { return h !== '같이볼담당자'; });
+  if (old.some(function (h, i) { return head[i] !== h; })) return false;
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    if (sheet.getRange(1, col).getDisplayValue() === '같이볼담당자') return true;   // 그 사이 다른 요청이 고쳤어요
+    sheet.insertColumnBefore(col);
+    sheet.getRange(1, col).setValue('같이볼담당자').setFontWeight('bold');
+    sheet.getRange(1, col, sheet.getMaxRows(), 1).setNumberFormat('@');
+    return true;
+  } finally {
+    lock.releaseLock();
+  }
+}
+
 function intakeSheet_() {
   const book = intakeBook_();
   const sheet = book.getSheetByName(INTAKE_SHEET);
   if (!sheet) throw new Error('초기접수 기록 시트에 「' + INTAKE_SHEET + '」 탭이 없어요. 탭 이름을 바꾸지 말아 주세요.');
-  const head = sheet.getRange(1, 1, 1, IK_COLS).getDisplayValues()[0];
+  let head = sheet.getRange(1, 1, 1, IK_COLS).getDisplayValues()[0];
+  if (INTAKE_HEADERS.some(function (h, i) { return head[i] !== h; }) && upgradeIntakeSheet_(sheet, head)) {
+    head = sheet.getRange(1, 1, 1, IK_COLS).getDisplayValues()[0];
+  }
   if (INTAKE_HEADERS.some(function (h, i) { return head[i] !== h; })) {
     throw new Error('초기접수 기록 시트 첫 행이 예상과 달라요. 칸 순서를 바꾸지 말아 주세요.');
   }
