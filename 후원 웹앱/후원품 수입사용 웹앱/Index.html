@@ -214,7 +214,7 @@ function showPhotos(src,name){
     img.onload=ok;
     // 먼저 보는 사람 계정으로 바로 열어 보고, 권한이 없으면 앱이 대신 가져옴
     img.onerror=viaServer;
-    img.src=cache[id]||`https://drive.google.com/thumbnail?id=${encodeURIComponent(id)}&sz=w1200`;
+    img.src=cache[id]||('https:'+'\/\/drive.google.com/thumbnail?id='+encodeURIComponent(id)+'&sz=w1200');
     $('#phX').onclick=close;
     if($('#phPrev')){ $('#phPrev').onclick=()=>{ at=(at+ids.length-1)%ids.length; draw(); }; $('#phNext').onclick=()=>{ at=(at+1)%ids.length; draw(); }; }
   };
