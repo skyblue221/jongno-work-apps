@@ -1090,7 +1090,6 @@ function vWhy_(l, v) {
   if (!nm_(v.kind)) r.push('관리대장 상품권 종류가 비어 있음'); else if (!vNameOk_(l, v)) r.push('품명과 상품권 종류가 안 맞음');
   return r;
 }
-function vMatch_(l, v) { return vScore_(l, v) >= 0; }
 /** 묶음마다 보유 상품권. universe: 짝을 겨룰 전체 물품 (안 주면 lots끼리만). anyStatus: 지급완료 등도 포함 */
 function lotVouchers_(lots, all, universe, anyStatus) {
   all = all || vouchers_();
@@ -1709,7 +1708,6 @@ function cellWriter_(sh,auto){
 function ensureRecordColumn_(key){const sh=sheet_(key),m=map_(key);if(!sh||!m)return;const head=sh.getRange(m.headerRow,1,1,sh.getLastColumn()).getDisplayValues()[0],hits=head.map((v,i)=>str_(v)==='앱기록ID'?i+1:0).filter(Boolean);if(hits.length>1)throw Error('앱기록ID 열이 중복됐어요.');let col=hits[0];if(!col){col=sh.getLastColumn()+1;if(sh.getMaxColumns()<col)sh.insertColumnsAfter(sh.getMaxColumns(),col-sh.getMaxColumns());sh.getRange(m.headerRow,col).setValue('앱기록ID');}if(m.cols.recordId!==col){m.cols.recordId=col;props_().setProperty('MAP_'+key,JSON.stringify(m));}}
 function appendDist_(id,rows){appendRows_('DIST',rows.map(o=>Object.assign({},o,{recordId:id})));}
 function incomingDate_(r){const match=str_(r.note).match(/\(입고\s+(\d{4}-\d{2}-\d{2})\)/);return match?match[1]:ymd_(r.inDate);}
-function sameSignedQuantities_(a,b,keys){return keys.every(k=>num_(a&&a[k])===num_(b&&b[k]));}
 function sameSerials_(a,b){return JSON.stringify((a||[]).slice().sort())===JSON.stringify((b||[]).slice().sort());}
 function receiptVersion_(r){return hash_(JSON.stringify(r.slice(0,8).concat([r[9]])));}
 function expectedDistRows_(no){
@@ -1720,19 +1718,25 @@ function expectedDistRows_(no){
  ownRows_('HOME').forEach(x=>{if(x.r[6]!=='확인')return;const items=JSON.parse(x.r[5]||'[]');if(!items.length)return;const number=distNo_(ymd_(x.r[1]),items);if(number!==no)return;items.forEach(it=>all.push({id:x.r[0],name:it.name,person:x.r[2],qty:num_(it.qty),inDate:it.inDate,date:ymd_(x.r[1])}));});
  return all.filter(r=>r.qty>0);
 }
+/** 기록 번호 칸 채우기: 한 칸씩 쓰지 않고, 이어진 줄은 묶어서 한 번에 씀 */
+function writeRecordIds_(sh,col,bindings){
+ const list=bindings.slice().sort((a,b)=>a.row-b.row);let i=0;
+ while(i<list.length){let n=1;while(i+n<list.length&&list[i+n].row===list[i].row+n)n++;
+  sh.getRange(list[i].row,col,n,1).setValues(list.slice(i,i+n).map(b=>[b.id]));i+=n;}
+}
 function linkLegacyDist_(id,no){
  ensureRecordColumn_('DIST');const m=mapOrThrow_('DIST'),sh=sheet_('DIST'),allRows=readSheet_('DIST');if(allRows.some(r=>str_(r.recordId)===id))return;const rows=allRows.filter(r=>str_(r.no)===no),expected=expectedDistRows_(no),used=new Set(),bindings=[];
  for(const it of expected){const hit=rows.find(r=>!used.has(r._row)&&(!str_(r.recordId)||str_(r.recordId)===it.id)&&str_(r.name)===it.name&&str_(r.person)===it.person&&num_(r.qty)===it.qty&&(!incomingDate_(r)||!it.inDate||incomingDate_(r)===it.inDate)&&(!ymd_(r.date)||ymd_(r.date)===it.date));
   if(!hit)throw Error('예전 배분 기록과 수령증 수량이 맞지 않아 자동 연결을 중단했어요. 「'+no+'」 기록을 대조해주세요.');used.add(hit._row);if(!str_(hit.recordId))bindings.push({row:hit._row,id:it.id});}
  // 예상 밖의 같은 조합은 임의 삭제하지 않습니다.
- bindings.forEach(b=>sh.getRange(b.row,m.cols.recordId).setValue(b.id));
+ writeRecordIds_(sh,m.cols.recordId,bindings);
  const mine=expected.filter(it=>it.id===id);if(!mine.length&&rows.some(r=>str_(r.recordId)===id))return;
 }
 function linkLegacyDisposal_(id){
  ensureRecordColumn_('DISP');const m=mapOrThrow_('DISP'),sh=sheet_('DISP'),rows=readSheet_('DISP'),used=new Set(),bindings=[];
  const target=findDlog_(id),date=ymd_(target.r[1]);
  ownRows_('DLOG').filter(x=>ymd_(x.r[1])===date).forEach(x=>JSON.parse(x.r[2]||'[]').forEach(it=>{if(!(num_(it.qty)>0))return;const hit=rows.find(r=>!used.has(r._row)&&(!str_(r.recordId)||str_(r.recordId)===x.r[0])&&str_(r.name)===it.name&&num_(r.qty)===num_(it.qty)&&(!m.cols.date||ymd_(r.date)===date)&&(!m.cols.inDate||ymd_(r.inDate)===it.inDate));if(!hit)throw Error('예전 폐기 기록과 앱 기록이 맞지 않아 연결을 중단했어요. '+date+' 기록을 대조해주세요.');used.add(hit._row);if(!str_(hit.recordId))bindings.push({row:hit._row,id:x.r[0]});}));
- bindings.forEach(b=>sh.getRange(b.row,m.cols.recordId).setValue(b.id));
+ writeRecordIds_(sh,m.cols.recordId,bindings);
 }
 
 /** Keep table fills explicit for the server HTML-to-PDF converter. */
