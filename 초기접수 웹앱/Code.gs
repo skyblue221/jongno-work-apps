@@ -77,7 +77,9 @@ const PROGRAM_EDITABLE_HEADERS = [
 ];
 
 const PROGRAM_RECRUIT_STATUSES = ['모집중', '대기', '모집예정', '상시', '확인필요', '마감', '종료'];
-const DEFAULT_ADMIN_PIN = '7051';
+// 예전 기본 PIN은 공개 저장소에 적혀 있어서 더는 쓰지 않아요. 새 PIN으로 다시 고르지 못하게만 막아요.
+// (PIN을 정하기 전에는 PIN으로 들어갈 수 없고, 기관 계정으로 접속해 「설정」에서 정해야 해요)
+const RETIRED_ADMIN_PIN = '7051';
 
 const PROGRAM_STANDARD_CRITERIA = [
   ['상담목적', '프로그램/사업 문의', '복지관 프로그램, 사업, 모임, 교육, 활동에 대한 문의·신청·대기', 'O', 1, '복지관에서 운영하는 프로그램, 사업, 교육, 모임 등에 참여하거나 신청하려는 경우', '프로그램 신청, 사업 문의, 대기 등록'],
@@ -743,7 +745,8 @@ function verifyAdminPin_(pin) {
   const cache = CacheService.getScriptCache();
   const fails = Number(cache.get('pinFails') || 0);
   if (fails >= 5) throw new Error('PIN을 여러 번 틀려서 15분 동안 잠겼어요. 직원 계정으로 접속하거나 잠시 뒤에 다시 해주세요.');
-  const savedPin = PropertiesService.getScriptProperties().getProperty('ADMIN_PIN') || DEFAULT_ADMIN_PIN;
+  const savedPin = PropertiesService.getScriptProperties().getProperty('ADMIN_PIN');
+  if (!savedPin) throw new Error('관리자 PIN이 아직 정해지지 않았어요. 기관 계정으로 접속해서 「설정」에서 PIN을 먼저 정해주세요.');
   if (normalizeText_(pin) !== normalizeText_(savedPin)) {
     cache.put('pinFails', String(fails + 1), 900);
     throw new Error('관리자 PIN이 맞지 않습니다.');
@@ -1119,7 +1122,7 @@ function setAdminPin(adminPin, newPin) {
   const user = requireAdmin_(adminPin);
   const pin = normalizeText_(newPin);
   if (!/^\d{4,8}$/.test(pin)) throw new Error('PIN은 숫자 4~8자리로 입력해주세요.');
-  if (pin === DEFAULT_ADMIN_PIN) throw new Error('처음 정해진 기본 PIN과 다른 숫자로 정해주세요.');
+  if (pin === RETIRED_ADMIN_PIN) throw new Error('예전 기본 PIN과 다른 숫자로 정해주세요.');
   PropertiesService.getScriptProperties().setProperty('ADMIN_PIN', pin);
   logChanges_(user, SHEETS.settings, '', '설정', [{ header: '관리자 PIN', before: '', after: '변경됨' }]);
   return { ok: true };
