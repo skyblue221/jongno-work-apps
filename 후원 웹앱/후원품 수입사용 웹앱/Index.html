@@ -215,9 +215,14 @@ function showPhotos(src,name){
     // 먼저 보는 사람 계정으로 바로 열어 보고, 권한이 없으면 앱이 대신 가져옴
     img.onerror=viaServer;
     img.src=cache[id]||`https://drive.google.com/thumbnail?id=${encodeURIComponent(id)}&sz=w1200`;
-    $('#phX').onclick=()=>{ m.style.display='none'; box.innerHTML=''; };
+    $('#phX').onclick=close;
     if($('#phPrev')){ $('#phPrev').onclick=()=>{ at=(at+ids.length-1)%ids.length; draw(); }; $('#phNext').onclick=()=>{ at=(at+1)%ids.length; draw(); }; }
   };
+  // 사진 창만: 바깥을 누르거나 Esc를 누르면 닫힘 (서명 창은 실수로 닫히지 않게 그대로 둠)
+  const onKey=e=>{ if(e.key==='Escape') close(); };
+  function close(){ m.style.display='none'; box.innerHTML=''; m.onclick=null; document.removeEventListener('keydown',onKey); }
+  m.onclick=e=>{ if(e.target===m) close(); };
+  document.addEventListener('keydown',onKey);
   m.style.display='flex'; draw();
 }
 const lotOf = k => S.stock.find(l=>l.key===k);
