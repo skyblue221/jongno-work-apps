@@ -1223,8 +1223,12 @@ function linkRegisteredVolunteers_(rows) {
     const rowBirth = r.birthText.replace(/\./g, '-');
     if (v.birth && rowBirth && v.birth !== rowBirth) return; // 다른 사람일 수 있음
 
-    sheet.getRange(r.rowNumber, C.REGISTRATION_TYPE).setValue('등록봉사자');
-    if (!r.org && v.org) sheet.getRange(r.rowNumber, C.ORGANIZATION).setValue(v.org);
+    if (!r.org && v.org && C.ORGANIZATION === C.REGISTRATION_TYPE + 1) {
+      sheet.getRange(r.rowNumber, C.REGISTRATION_TYPE, 1, 2).setValues([['등록봉사자', v.org]]);   // 붙어 있는 두 칸은 한 번에
+    } else {
+      sheet.getRange(r.rowNumber, C.REGISTRATION_TYPE).setValue('등록봉사자');
+      if (!r.org && v.org) sheet.getRange(r.rowNumber, C.ORGANIZATION).setValue(v.org);
+    }
     if (sheet.getMaxColumns() >= C.PERF_ID && v.id) {
       sheet.getRange(r.rowNumber, C.PERF_SYSTEM, 1, 2).setValues([[v.system, v.id]]);
     }
