@@ -472,13 +472,11 @@ var HwpxGen = (function () {
       rows = picGrid(images, a.images || [], tw, attCols(a), 58000);
       if (String(a.text || '').trim()) rows.push(lines(a.text, tw, P.line, P.dash, P.sub));
       if (!rows.length) rows.push(para(P.line, '', tw));
-      var th = 2600, total = th, trs = '';
-      rows.forEach(function (b, k) {
-        var h = b.h + CELL_VPAD + 400; total += h;
-        var bf = rows.length === 1 ? 19 : k === 0 ? BF_CONTENT_FIRST : k === rows.length - 1 ? BF_CONTENT_LAST : BF_CONTENT_MID;
-        trs += '<hp:tr>' + cell({ r: k + 1, c: 0, w: FULL_W, h: h, bf: bf, valign: 'TOP', body: b.x }) + '</hp:tr>';
-      });
-      var tbl = tblOpen(nid(), rows.length + 1, 1, FULL_W, total, 2, 0, true) +
+      // 그림·설명 글을 한 칸에 모두 넣어요. 칸을 여러 줄로 나누면 본문 표용 테두리(오른쪽 굵은 검은 선)가 섞여 들어갔어요.
+      // 칸 안 내용은 쪽 경계에서 이어지므로(PAGE_BREAK = CELL) 그림이 많아도 다음 쪽으로 넘어가요.
+      var th = 2600, ch = rows.reduce(function (s, b) { return s + b.h; }, 0) + CELL_VPAD + 400, total = th + ch;
+      var trs = '<hp:tr>' + cell({ r: 1, c: 0, w: FULL_W, h: ch, bf: 19, valign: 'TOP', body: rows.map(function (b) { return b.x; }).join('') }) + '</hp:tr>';
+      var tbl = tblOpen(nid(), 2, 1, FULL_W, total, 2, 0, true) +
         '<hp:tr>' + cell({ r: 0, c: 0, w: FULL_W, h: th, bf: 24, body: para(P.center, a.title || '첨부', tw, C.bold).x }) + '</hp:tr>' + trs + '</hp:tbl>';
       return pOpen(P.heading, true) + '<hp:run charPrIDRef="5">' + tbl + '<hp:t/></hp:run></hp:p>';
     }).join('');

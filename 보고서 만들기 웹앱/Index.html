@@ -523,7 +523,7 @@
     <div class="card" id="photoCard">
       <h2>활동사진 <small>2장씩 나란히 들어가요 · 사진 파일을 이 칸에 끌어다 놓아도 돼요</small></h2>
       <div class="thumbs" id="photos"></div>
-      <label class="upl">＋ 사진 올리기<input type="file" accept="image/*" multiple onchange="uploadTo(this, doc.photos, renderPhotos)"></label>
+      <label class="upl">＋ 사진 올리기<input type="file" accept="image/*" multiple onchange="uploadTo(this, doc.photos, renderPhotos, '활동사진')"></label>
     </div>
 
     <div class="card">
@@ -1392,7 +1392,7 @@ function tableEditor(b, rerender, opt){
     var x = [];
     if (!people){
       var file = el('input', {type:'file', accept:'image/*', multiple:'multiple', style:'display:none'});
-      file.addEventListener('change', function(){ if (!b.rowPics[ri]) b.rowPics[ri] = []; uploadTo(file, b.rowPics[ri], rerender); });
+      file.addEventListener('change', function(){ if (!b.rowPics[ri]) b.rowPics[ri] = []; uploadTo(file, b.rowPics[ri], rerender, '표사진'); });
       x.push(el('label', {class:'sm ghost picbtn', title:'이 행에 사진 넣기 (글 아래에 들어가요)'}, [document.createTextNode('📷'), file]));
     }
     x.push(el('button', {class:'sm ghost rowbtn', title:'줄 넣기·옮기기·복사', on:{click:function(e){ e.stopPropagation(); rowMenu(b, ri, e.currentTarget, rerender); }}, text:'⋮'}));
@@ -1682,7 +1682,10 @@ function shrink(file, cb){
   };
   fr.readAsDataURL(file);
 }
-function uploadTo(input, list, rerender){
+/* 드라이브 「보고서 만들기_사진」 안에 보고서마다 폴더를 만들어 넣어요 (예: 「마을이음캠페인 · 활동계획서」).
+   파일 이름 앞에는 어느 칸 사진인지 붙여요 (활동사진_ · 첨부_카드뉴스_ · 표사진_) */
+function imgFolderName(){ return (baseName(doc.programName).trim() || '프로그램명 없음') + ' · ' + typeName(doc.type); }
+function uploadTo(input, list, rerender, tag){
   var files = Array.prototype.slice.call(input.files); input.value = '';
   if (!files.length) return;
   var left = files.length; toast('사진 올리는 중… (' + left + '장)', 60000);
@@ -1693,7 +1696,7 @@ function uploadTo(input, list, rerender){
         imgCache[id] = r; list.push({fileId: id, w: r.w, h: r.h, name: f.name});
         markDirty(); rerender();
         if (--left===0) toast('사진을 올렸어요.');
-      }).withFailureHandler(function(e){ fail(e); --left; }).saveImage(r.b64, f.name);
+      }).withFailureHandler(function(e){ fail(e); --left; }).saveImage(r.b64, (tag ? tag + '_' : '') + f.name, imgFolderName());
       toast('사진 올리는 중… (' + left + '장 남음)', 60000);
     });
   });
@@ -1759,7 +1762,7 @@ function renderAtts(){
     t.addEventListener('input', function(){ a.title = t.value; markDirty(); });
     var th = el('div', {class:'thumbs'}); thumbs(th, a.images, renderAtts);
     var file = el('input', {type:'file', accept:'image/*', multiple:'multiple'});
-    file.addEventListener('change', function(){ uploadTo(file, a.images, renderAtts); });
+    file.addEventListener('change', function(){ uploadTo(file, a.images, renderAtts, '첨부_' + (String(a.title||'').trim() || (i+1))); });
     box.appendChild(el('div', {class:'att'}, [
       el('div', {class:'bh', style:'display:flex;gap:6px;align-items:center;margin-bottom:6px'}, [el('b',{text:'첨부 ' + (i+1)}), el('span',{style:'flex:1'}),
         el('button', {class:'sm ghost', on:{click:function(){ if(i>0){ var x=doc.attachments[i]; doc.attachments[i]=doc.attachments[i-1]; doc.attachments[i-1]=x; markDirty(); renderAtts(); } }}, text:'▲'}),

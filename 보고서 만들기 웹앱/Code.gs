@@ -131,9 +131,24 @@ function imgFolder_() {
   props.setProperty('IMG_FOLDER', f.getId());
   return f;
 }
-function saveImage(b64, name) {
+/** folderName: 보고서마다 따로 넣을 폴더 이름 (예: 「마을이음캠페인 · 활동계획서」). 없으면 예전처럼 사진 폴더에 바로 */
+function saveImage(b64, name, folderName) {
   var blob = Utilities.newBlob(Utilities.base64Decode(b64), 'image/jpeg', (name || 'photo').replace(/\.[^.]+$/, '') + '.jpg');
-  return imgFolder_().createFile(blob).getId();
+  var folder = imgFolder_();
+  var sub = String(folderName || '').replace(/[\\\/:*?"<>|\r\n]+/g, ' ').trim().slice(0, 80);
+  if (sub) folder = subFolder_(folder, sub);
+  return folder.createFile(blob).getId();
+}
+/** 같은 이름 폴더가 있으면 그 폴더, 없으면 새로 (사진 여러 장을 한꺼번에 올려도 폴더가 하나만 생기게 잠금) */
+function subFolder_(parent, name) {
+  var lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    var it = parent.getFoldersByName(name);
+    return it.hasNext() ? it.next() : parent.createFolder(name);
+  } finally {
+    lock.releaseLock();
+  }
 }
 /** 입력 화면용 작은 그림 (드라이브 썸네일). 없으면 null → 화면에서 원본을 받아요 */
 function getThumb(id) {
