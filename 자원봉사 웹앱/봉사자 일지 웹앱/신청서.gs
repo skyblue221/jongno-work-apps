@@ -297,7 +297,7 @@ function holdApplication(rowNumber, id, memo) {
 function makeApplicationPrint(ids) {
   requireAdmin_();
   const apps = pickApplications_(ids);
-  return { html: buildApplicationHtml_(apps), count: apps.length, fileName: applicationFileName_(apps) };
+  return { html: buildApplicationHtml_(apps, 'print'), count: apps.length, fileName: applicationFileName_(apps) };
 }
 
 /** [PDF 저장]을 누를 때만 변환 */
@@ -474,8 +474,9 @@ function formatPhone_(digits) {
 }
 
 
-/** 종이 「자원봉사활동 신청서」와 같은 모양 (A4 한 장에 한 명) */
-function buildApplicationHtml_(apps) {
+/** 종이 「자원봉사활동 신청서」와 같은 모양 (A4 한 장에 한 명)
+ *  mode 'print' = 화면에서 바로 인쇄: 컴퓨터 글꼴에 따라 조금 커질 수 있어서 간격을 덜 늘려요 (PDF 저장은 한 장을 더 꽉 채워요) */
+function buildApplicationHtml_(apps, mode) {
   const box = function (on) { return '<span class="bx' + (on ? ' on' : '') + '">' + (on ? '■' : '') + '</span>'; };
   const yn = function (v) {
     return '<tr><td class="lab">동의함</td><td class="c">' + box(v === AGREE) + '</td>' +
@@ -560,5 +561,7 @@ function buildApplicationHtml_(apps) {
     'td.who{font-weight:bold}td.nm{min-width:28mm}td.im{width:38mm;text-align:center}td.in{font-weight:bold}' +
     '.sig{max-height:11mm;max-width:36mm}' +
     '.foot{margin-top:3mm;overflow:hidden}.foot .pr{float:left;font-size:7pt;color:#777;padding-top:6px}.foot .logo{float:right;height:20px}' +
+    (mode === 'print' ? 'table.t th,table.t td{height:7.5mm}table.yn td,table.kid td,table.kid th{height:6.5mm}table.kid{margin-top:3mm}' +
+      '.law{margin:4mm 0 1mm}.q{margin:2mm 0 1mm}.date{margin:4mm 0 2mm}' : '') +
     '</style></head><body>' + pages.join('') + '</body></html>';
 }
