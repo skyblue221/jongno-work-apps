@@ -713,7 +713,7 @@ $('awardHistorySearch').addEventListener('input',renderAwards);
 /* ── 대시보드 홈 ── */
 let homeRequest=0,smsPeople=[],smsChecked=new Set();
 const fmtNum=n=>Number(n||0).toLocaleString(undefined,{maximumFractionDigits:1});
-const periodText=p=>`${p.m}월 ${p.from}~${p.to}일분`;
+
 async function renderHome(){
  const request=++homeRequest,year=Number($('year').value);
  $('syncBox').textContent='불러오는 중입니다.';$('reportCards').innerHTML='';$('recognitionStats').textContent='불러오는 중입니다.';

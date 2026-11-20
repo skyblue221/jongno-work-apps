@@ -18,11 +18,6 @@ const FIELDS={
 };
 function ss_(){const s=SpreadsheetApp.getActiveSpreadsheet();if(!s)throw Error('구글 시트에 연결된 Apps Script에서 실행해 주세요.');return s;}
 function onOpen(){SpreadsheetApp.getUi().createMenu('자원봉사 관리').addItem('시트대시보드 만들기 / 새로고침','refreshSheetDashboard').addItem('전체데이터 새로고침','refreshAllDataSheet').addToUi();}
-function movePeopleStatusToB_impl_(){return withLock_(()=>{
- assertPeopleSchema_();const sh=tab_('PEOPLE'),headers=sh.getRange(1,1,1,sh.getLastColumn()).getDisplayValues()[0],col=headers.indexOf('상태')+1;
- if(col===2){ss_().toast('상태는 이미 B열입니다.');return;}
- backupSheet_(sh,'PEOPLE');sh.moveColumns(sh.getRange(1,col,sh.getMaxRows(),1),2);sh.setFrozenColumns(3);ss_().toast('상태를 B열로 옮겼습니다. 기존 데이터는 유지됩니다.');
-},['PEOPLE']);}
 function setup_impl_(){
  const ss=ss_();
  Object.keys(TABS).forEach(k=>{let sh=ss.getSheetByName(k);if(!sh) sh=ss.insertSheet(k);if(sh.getLastRow()===0){sh.getRange(1,1,1,TABS[k].length).setValues([TABS[k]]);sh.setFrozenRows(1);sh.getRange(1,1,1,TABS[k].length).setFontWeight('bold').setBackground('#143c48').setFontColor('#ffffff');sh.autoResizeColumns(1,TABS[k].length);}});
@@ -47,7 +42,9 @@ function fillPeopleIds_(sh,start,end){
  if(idCol<0||nameCol<0)throw Error('PEOPLE에 ID와 이름 열이 필요합니다.');
  let added=0;
  const values=sh.getRange(start,1,end-start+1,sh.getLastColumn()).getValues();
- values.forEach((row,i)=>{if(String(row[nameCol]||'').trim()&&!row[idCol]){sh.getRange(start+i,idCol+1).setValue(Utilities.getUuid());added++;}});
+ const changed={};
+ values.forEach((row,i)=>{if(String(row[nameCol]||'').trim()&&!row[idCol]){changed[i]=Utilities.getUuid();added++;}});
+ writeColumnChanges_(sh,start,idCol+1,changed);   // 한 칸씩 쓰지 않고 이어진 칸은 한 번에 씀
  return added;
 }
 function assignMissingPeopleIds_impl_(){return withLock_(()=>{const sh=tab_('PEOPLE');return sh.getLastRow()<2?0:fillPeopleIds_(sh,2,sh.getLastRow());},['PEOPLE']);}
@@ -56,20 +53,29 @@ function fillPeopleAges_(sh,start,end){
  const birthCol=headers.indexOf('생년월일'),ageCol=headers.indexOf('연령'),nameCol=headers.indexOf('이름');
  if(birthCol<0||ageCol<0||nameCol<0)throw Error('PEOPLE에 이름·생년월일·연령 열이 필요합니다.');
  const rows=sh.getRange(start,1,end-start+1,sh.getLastColumn()).getValues();let updated=0,invalid=0;
+ const changed={};
  rows.forEach((r,i)=>{
   let age='';
   if(String(r[nameCol]||'').trim()&&r[birthCol]){
    try{const birth=birth_(serialize_(r[birthCol]));age=age_(birth);if(age<0)throw Error('미래 생년월일');}catch(e){age='';invalid++;}
   }
-  if(r[ageCol]!==age){sh.getRange(start+i,ageCol+1).setValue(age);updated++;}
+  if(r[ageCol]!==age){changed[i]=age;updated++;}
  });
+ writeColumnChanges_(sh,start,ageCol+1,changed);   // 해가 바뀌어 여러 명이 바뀌어도 몇 번만에 씀
  return {updated,invalid};
+}
+/** 한 열에서 바뀐 칸만 씀. 바뀐 칸이 이어져 있으면 묶어서 한 번에 (바뀌지 않은 칸은 건드리지 않음) */
+function writeColumnChanges_(sh,start,col,changed){
+ const idx=Object.keys(changed).map(Number).sort((a,b)=>a-b);let i=0;
+ while(i<idx.length){let n=1;while(i+n<idx.length&&idx[i+n]===idx[i]+n)n++;
+  sh.getRange(start+idx[i],col,n,1).setValues(idx.slice(i,i+n).map(k=>[changed[k]]));i+=n;}
 }
 function refreshPeopleAges_impl_(){return withLock_(()=>{const sh=tab_('PEOPLE');return sh.getLastRow()<2?{updated:0,invalid:0}:fillPeopleAges_(sh,2,sh.getLastRow());},['PEOPLE']);}
 function append_(key,values){tab_(key).appendRow(values);}
 /** tabs: 이 저장이 바꾸는 탭 (그 탭만 다시 읽게 함). 안 주면 전부 */
 function withLock_(fn,tabs){const lock=LockService.getDocumentLock();lock.waitLock(15000);try{return fn();}finally{invalidateReadCache_(tabs);lock.releaseLock();}}
-function personExists_(id){return records_('PEOPLE').some(p=>p.id===id);}
+/* 봉사자 확인: 임시 저장된 명단으로 먼저 보고, 없을 때만 시트를 새로 읽어요 (방금 등록한 분도 놓치지 않게) */
+function personExists_(id){return tabRecords_('PEOPLE').some(p=>p.id===id)||records_('PEOPLE').some(p=>p.id===id);}
 function uniquePhone_(phone,excludeId,people){const digits=String(phone).replace(/\D/g,'');if(!digits)return false;return (people||records_('PEOPLE')).some(p=>p.id!==excludeId&&String(p.phone).replace(/\D/g,'')===digits);}
 function upsertPerson_impl_(p){return withLock_(()=>{assertPeopleSchema_();
  if(!p||!clean_(p.name,80))throw Error('이름을 입력해 주세요.');
@@ -81,7 +87,12 @@ function upsertPerson_impl_(p){return withLock_(()=>{assertPeopleSchema_();
  if(dup.length && !p.confirmDuplicate) throw Error('중복 의심 봉사자: '+dup.map(x=>x.name+' ('+x.reason+')').join(', ')+'. 기존 명단에서 먼저 확인하세요.');
  if(i<0&&uniquePhone_(p.phone,id,exists)&&!p.confirmDuplicate)throw Error('같은 연락처의 봉사자가 이미 있습니다. 명단을 먼저 확인해 주세요.');
  const headers=sh.getRange(1,1,1,sh.getLastColumn()).getDisplayValues()[0],idCol=headers.indexOf('ID');
- if(i>=0){const values=sh.getDataRange().getValues(),physical=values.findIndex((r,n)=>n>0&&r[idCol]===id);sh.getRange(physical+1,1,1,headers.length).setValues([personValuesForHeaders_(headers,row,values[physical])]);}else sh.appendRow(personValuesForHeaders_(headers,row));
+ if(i>=0){
+  // 고칠 줄만 찾음: 시트 전체 대신 ID 칸만 읽고, 그 한 줄만 읽어서 씀
+  const ids=sh.getRange(2,idCol+1,Math.max(sh.getLastRow()-1,1),1).getValues(),at=ids.findIndex(r=>r[0]===id);
+  if(at<0)throw Error('봉사자 줄을 찾지 못했습니다. 새로고침해 주세요.');
+  const target=sh.getRange(at+2,1,1,headers.length);target.setValues([personValuesForHeaders_(headers,row,target.getValues()[0])]);
+ }else sh.appendRow(personValuesForHeaders_(headers,row));
  return {id};
 },['PEOPLE']);}
 function addActivity_impl_(a){return withLock_(()=>{
@@ -166,36 +177,6 @@ function installWarmTrigger(){
  Logger.log('4시간마다 미리 읽어 두기를 켰어요.');
 }
 function safeRecords_(key){return ss_().getSheetByName(key)?records_(key):[];}
-/** 입수 가능한 과거 자료 범위가 불완전하면 '신규 확인 필요'로 집계합니다. */
-function statsForYear_impl_(year,all){
- const a=all.activity,people=all.people,y=String(year),personYears={};
- a.forEach(function(r) {
-   if (!r.date) return;
-   var personId = String(r.personId);
-   if (!personYears[personId]) {
-     personYears[personId] = new Set();
-   }
-   personYears[personId].add(String(r.date).slice(0, 4));
- });
- const activeIds=new Set(a.filter(r=>String(r.date).startsWith(y)).map(r=>r.personId));
- const prevIds=new Set(a.filter(r=>String(r.date).startsWith(String(year-1))).map(r=>r.personId));
- const firstThisYear=[...activeIds].filter(id=>Math.min(...(personYears[id]||[]))===Number(year));
- const repeat=[...activeIds].filter(id=>prevIds.has(id));
- const returnees=[...activeIds].filter(id=>!prevIds.has(id)&&[...(personYears[id]||[])].some(yr=>Number(yr)<year));
- const rows=a.filter(r=>String(r.date).startsWith(y));
- return {year,real:activeIds.size,prior:prevIds.size,change:activeIds.size-prevIds.size,firstRecorded:firstThisYear.length,retained:repeat.length,returned:returnees.length,totalCount:rows.reduce((s,r)=>s+Number(r.count||0),0),totalHours:rows.reduce((s,r)=>s+Number(r.hours||0),0),registered:people.length,activeStatus:people.filter(p=>p.status==='활동 중').length};
-}
-
-/** 사용자가 명시적으로 실행하는 백업·초기화: 원본 시트 삭제하지 않음. */
-function migratePeopleV2_impl_(){
- const ss=ss_(),sh=tab_('PEOPLE'),expected=TABS.PEOPLE;
- if(sh.getLastRow()>0){
-  const name='People_backup_'+Utilities.formatDate(new Date(),Session.getScriptTimeZone(),'yyyyMMdd_HHmmss');
-  const backup=sh.copyTo(ss);backup.setName(name);
- }
- sh.clearContents();sh.getRange(1,1,1,expected.length).setValues([expected]);sh.setFrozenRows(1);
- return 'People 18열 설정 완료. 기존 People은 People_backup_... 탭에 보관되었습니다.';
-}
 function assertPeopleSchema_(){
  const sh=tab_('PEOPLE'),expected=TABS.PEOPLE;
  const got=sh.getRange(1,1,1,sh.getLastColumn()).getDisplayValues()[0].map(x=>String(x).trim());
@@ -222,7 +203,6 @@ function duplicates_(people,p){
   return reason?{id:x.id,name:x.name,reason:reason}:null;
  }).filter(Boolean);
 }
-function checkPersonDuplicate_impl_(p){assertPeopleSchema_();return duplicates_(records_('PEOPLE'),p);}
 /** CSV를 브라우저에서 파싱한 후 검토하고 가져온다. 기존 인물은 자동 덮어쓰지 않는다. */
 function importPeople_impl_(rows){return withLock_(()=>{
  assertPeopleSchema_();if(!Array.isArray(rows)||rows.length>3000)throw Error('한 번에 최대 3,000명까지 가져올 수 있습니다.');
@@ -274,7 +254,6 @@ function mergeJinwooRecords_(existing,incoming){
  return {rows:Array.from(map.values()),inserted,updated};
 }
 
-function getJinwooYearStats_impl_(year){return jinwooYearStats_(tabRecords_('JINWOO'),Number(year));}
 function jinwooYearStats_(rows,year){
  if(!Number.isInteger(year)||year<1900||year>2200)throw Error('기준연도를 확인해 주세요.');
  const names=list=>new Set(list.map(r=>String(r.volunteerName||'').trim()).filter(Boolean));
@@ -571,7 +550,6 @@ function refreshAllDataSheet_impl_(){return withLock_(()=>{
  ss.setActiveSheet(sh);ss.toast('전체데이터 '+safeRows.length+'행 갱신 완료'+(view.orphanAwards||view.orphanContacts?' / 명단에 없는 ID: 포상 '+view.orphanAwards+'건, 연락 '+view.orphanContacts+'건 확인 필요':''));
  return {rows:safeRows.length,year};
 });}
-function openAllDataSheet_impl_(){const sh=ss_().getSheetByName(ALL_DATA_SHEET);if(!sh)return refreshAllDataSheet();ss_().setActiveSheet(sh);}
 const SHEET_DASHBOARD='시트대시보드';
 const SHEET_DASHBOARD_TITLE='자원봉사 집계 대시보드';
 function sheetDashboardFormulas_(end,headers){
@@ -775,7 +753,7 @@ function setSmsPin_impl_(o){return withLock_(()=>{
  const last=sh.getLastRow(),ids=last>1?sh.getRange(2,1,last-1,1).getValues().map(r=>String(r[0]).trim()):[];
  const rows=[];ids.forEach((v,i)=>{if(v===id)rows.push(i+2);});
  if(o.pinned){if(!rows.length)sh.appendRow([id,today_()]);}
- else rows.reverse().forEach(r=>sh.deleteRow(r));
+ else deleteRowsGrouped_(sh,rows);
  return {personId:id,pinned:!!o.pinned};
 },['EXTRA']);}
 function halfPeriod_(d){const [y,m,day]=d.split('-').map(Number),end=new Date(y,m,0).getDate();return day<=15?{y,m,from:1,to:15}:{y,m,from:16,to:end};}
@@ -907,9 +885,7 @@ function scrub_(v){
  return v;
 }
 function forViewer_(result){return role_()==='viewer'?scrub_(result):result;}   // 숫자만 보기: 연락처·생년월일 숨김
-function getMyRole(){return requireRole_();}
 // 수정·가져오기: min만
-function movePeopleStatusToB(){requireOwner_();return movePeopleStatusToB_impl_();}
 function setup(){requireOwner_();return setup_impl_();}
 function assignMissingPeopleIds(){requireOwner_();return assignMissingPeopleIds_impl_();}
 function refreshPeopleAges(){requireOwner_();return refreshPeopleAges_impl_();}
@@ -917,17 +893,19 @@ function upsertPerson(p){requireOwner_();return upsertPerson_impl_(p);}
 function addActivity(a){requireOwner_();return addActivity_impl_(a);}
 function addAward(a){requireOwner_();return addAward_impl_(a);}
 function addContact(c){requireOwner_();return addContact_impl_(c);}
-function migratePeopleV2(){requireOwner_();return migratePeopleV2_impl_();}
-function checkPersonDuplicate(p){requireOwner_();return checkPersonDuplicate_impl_(p);}
 function importPeople(rows){requireOwner_();return importPeople_impl_(rows);}
 function importJinwooFromRawSheet(n){requireOwner_();return importJinwooFromRawSheet_impl_(n);}
 function organizeUnusedSheets(){requireOwner_();return organizeUnusedSheets_impl_();}
 function previewHistoryImport(o){requireOwner_();return previewHistoryImport_impl_(o);}
 function importHistory(o){requireOwner_();return importHistory_impl_(o);}
 function refreshAllDataSheet(){requireOwner_();return refreshAllDataSheet_impl_();}
-function openAllDataSheet(){requireOwner_();return openAllDataSheet_impl_();}
 function refreshSheetDashboard(){requireOwner_();return refreshSheetDashboard_impl_();}
 function updateAwardStatus(a){requireOwner_();return updateAwardStatus_impl_(a);}
+/** 여러 줄 지우기: 붙어 있는 줄은 묶어서 한 번에, 아래 줄부터 지움 (줄 번호가 안 밀리게) */
+function deleteRowsGrouped_(sh,rows){
+ const list=Array.from(new Set(rows)).sort((a,b)=>b-a);let i=0;
+ while(i<list.length){let top=list[i],n=1;while(i+n<list.length&&list[i+n]===top-1){top--;n++;}sh.deleteRows(top,n);i+=n;}
+}
 /* ── 인정·포상 기록 지우기 ──
    지운 줄은 「삭제된 포상기록」 탭에 그대로 옮겨 두어요(되살릴 때 그 줄을 AWARDS에 다시 붙여넣으면 됨). */
 const AWARD_TRASH='삭제된 포상기록';
@@ -941,7 +919,7 @@ function removeAwardRows_(pick){
  if(!trash){trash=ss.insertSheet(AWARD_TRASH);trash.getRange(1,1,1,head.length+1).setValues([head.concat(['지운 날'])]).setFontWeight('bold');trash.setFrozenRows(1);}
  const today=today_();
  trash.getRange(trash.getLastRow()+1,1,rows.length,head.length+1).setValues(rows.map(n=>values[n-1].concat([today])));
- rows.reverse().forEach(n=>sh.deleteRow(n));   // 아래 줄부터 지워야 줄 번호가 안 밀림
+ deleteRowsGrouped_(sh,rows);
  return rows.length;
 }
 function deleteAward_impl_(id){return withLock_(()=>{
@@ -961,11 +939,9 @@ function deleteThankAwards_impl_(o){return withLock_(()=>{
 function deleteAward(id){requireOwner_();return deleteAward_impl_(id);}
 function deleteThankAwards(o){requireOwner_();return deleteThankAwards_impl_(o);}
 function setSmsPin(o){requireOwner_();return setSmsPin_impl_(o);}
-function statsForYear(y,all){requireOwner_();return statsForYear_impl_(y,all);}
 function getAll(){requireOwner_();return allData_();}
 // 조회: min과 권한 받은 분 (숫자만 보기 → 이름·연락처 숨김 / 전체 보기 → 모두 보기)
 function getAppData(y){const r=requireRole_(),d=forViewer_(getAppData_impl_(y));if(r==='viewer'){d.people=[];d.awards=[];}d.role=r;return d;}
-function getJinwooYearStats(y){requireRole_();return getJinwooYearStats_impl_(y);}
 function getJinwooSummary(){requireRole_();return getJinwooSummary_impl_();}
 function getDashboardStats(y){requireRole_();return forViewer_(getDashboardStats_impl_(y));}
 function getPersonDetail(id){requireRead_();return getPersonDetail_impl_(id);}
