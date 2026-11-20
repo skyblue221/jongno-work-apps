@@ -162,6 +162,9 @@
   .pg.edu .nw{white-space:nowrap}
   .pg.edu .th2{background:#E3DCC1;font-weight:700;text-align:center}
   .pg.edu .in th{background:#E5E5E5;font-weight:700}
+  /* 장애이해교육: 한글 틀처럼 안쪽 선도 검은 가는 선, 안쪽 표는 굵은 틀 없이 */
+  .pg.edu td,.pg.edu th{border-color:#000}
+  .pg.edu table.in,.pg.edu table.in tr:first-child th{border:1px solid #000}
   .pg .pfoot{text-align:center;font-weight:700;font-size:20px;margin-top:28px;letter-spacing:1px}
   .pg .eduttl{font-size:22px;font-weight:700;text-align:center;padding:10px}
   /* 미리보기 */
@@ -172,11 +175,18 @@
   .pg{-webkit-print-color-adjust:exact;print-color-adjust:exact;background:#fff;padding:48px 40px;margin-bottom:20px;box-shadow:0 2px 12px rgba(0,0,0,.2);color:#000;font-family:"Nanum Gothic","NanumGothic","Malgun Gothic",sans-serif;font-size:13px;line-height:1.55}
   .pg .ttl{border:2px solid #000;text-align:center;font-size:20px;font-weight:700;padding:8px;margin:0 30px 14px}
   .pg table{width:100%;border-collapse:collapse}
-  .pg td,.pg th{border:1px solid #999;padding:5px 8px;vertical-align:middle}
+  /* 표 선: 한글 파일(틀의 테두리 설정)과 같게 — 바깥 검은 굵은 선, 안쪽 연한 회색 가는 선 */
+  .pg td,.pg th{border:1px solid #BBB;padding:5px 8px;vertical-align:middle}
   .pg .main{border:2px solid #000}
+  /* 첨부 자료 표: 한글 파일과 같은 색 — 계획서·결과보고서는 연한 회색 선, 장애이해교육은 검은 가는 선 */
+  .pg .main.att,.pg .main.att td{border:1px solid #BBB}
+  .pg.edu .main.att,.pg.edu .main.att td{border:1px solid #000}
   .pg .lb{background:#F2F2F2;font-weight:700;text-align:center;white-space:nowrap;width:17%}
   .pg .in th{background:#DCDCDC;font-weight:normal}
-  .pg .in td,.pg .in th{border:1px solid #555}
+  /* 안쪽 표(일정표·업무분장 등): 한글 파일처럼 칸 사이는 검은 가는 선, 바깥 틀은 진회색 굵은 선(양옆 2px · 위아래와 제목 줄 아래 3px) */
+  .pg .in td,.pg .in th{border:1px solid #000}
+  .pg table.in{border-left:2px solid #5D5D5D;border-right:2px solid #5D5D5D;border-top:3px solid #5D5D5D;border-bottom:3px solid #5D5D5D}
+  .pg table.in tr:first-child th{border-top:3px solid #5D5D5D;border-bottom:3px solid #5D5D5D}
   .pg .in{margin:6px 0 10px}
   /* 안쪽 표는 칸 너비를 정한 비율 그대로 — 칸이 많아도(참여자 명단표 10칸 등) 종이 밖으로 나가지 않고, 긴 글자는 칸 안에서 줄을 바꿔요 */
   .pg table.in{table-layout:fixed;width:100%}
@@ -188,6 +198,26 @@
   .pg .ln{margin:0}.pg .dash{padding-left:14px;text-indent:-10px}.pg .sub{padding-left:24px;text-indent:-10px}
   .pg .ph img{max-width:100%;max-height:260px;display:block;margin:auto}
   .pg .attimg{max-width:100%;display:block;margin:6px auto}
+  /* ===== 표 선 (2026-11-20) — 한글 파일과 같은 굵기·색 =====
+     한글 틀의 선은 안쪽 0.1~0.12mm · 바깥 0.4mm인데, 크롬은 테두리(border)를 0.26mm보다 가늘게 못 그려서 2배 넘게 굵었어요.
+     그래서 테두리는 없애고 칸마다 오른쪽·아래 선을 그림자(box-shadow)로 그려요. 그림자는 가는 굵기 그대로 인쇄돼요.
+     표 바깥 선은 표 둘레에 그림자로. 굵기·색은 한글 틀(header.xml)의 테두리 설정 값 그대로예요.
+     (실행계획서·사업결과보고서 표는 칸마다 굵기가 따로 정해져 있어서 예전 방식 그대로: .xpg) */
+  .pg:not(.xpg) table,.pg:not(.xpg) td,.pg:not(.xpg) th{border:0!important}
+  .pg:not(.xpg) td::after,.pg:not(.xpg) th::after{content:'';position:absolute;left:0;top:0;right:0;bottom:0;pointer-events:none;z-index:1;box-shadow:inset -0.12mm -0.12mm 0 0 #BBB}
+  .pg:not(.xpg) table.main{box-shadow:0 0 0 0.4mm #000;width:calc(100% - 0.8mm);margin-left:0.4mm;margin-right:0.4mm}   /* 바깥 선이 종이 여백에 걸려 양옆만 잘리지 않게 0.4mm 안쪽으로 */
+  .pg:not(.xpg) table.in td::after,.pg:not(.xpg) table.in th::after{box-shadow:inset -0.1mm -0.1mm 0 0 #000}
+  .pg:not(.xpg) table.in tr:first-child th::after{box-shadow:inset -0.1mm 0 0 0 #000,inset 0 -0.7mm 0 0 #5D5D5D}
+  .pg:not(.xpg) table.in{box-shadow:0 0 0 0.5mm #5D5D5D,0 -0.2mm 0 0.5mm #5D5D5D,0 0.2mm 0 0.5mm #5D5D5D}
+  .pg:not(.xpg) table.main.att{box-shadow:0 0 0 0.12mm #BBB}
+  .pg.edu td::after,.pg.edu th::after{box-shadow:inset -0.12mm -0.12mm 0 0 #000}
+  .pg.edu table.in{box-shadow:0 0 0 0.12mm #000}
+  .pg.edu table.in tr:first-child th::after{box-shadow:inset -0.12mm -0.12mm 0 0 #000}
+  .pg.edu table.main.att{box-shadow:0 0 0 0.12mm #000}
+  .pg .ttl{border:0;box-shadow:inset 0 0 0 0.4mm #000}
+  .pg .attgrid{display:grid;gap:3mm;margin:6px 0}.pg .attgrid.k2{grid-template-columns:1fr 1fr}.pg .attgrid.k3{grid-template-columns:1fr 1fr 1fr}
+  .pg .attgrid>div{display:flex;align-items:center;justify-content:center;break-inside:avoid;page-break-inside:avoid}
+  .pg .attgrid img{max-width:100%;display:block}.pg .attgrid.k2 img{max-height:110mm}.pg .attgrid.k3 img{max-height:80mm}
   /* ===== 화면 다듬기 (2026-11) · 먹색 + 자주 · 입력 화면만 바뀌고 미리보기·인쇄 양식(.pg)은 그대로 · 이 블록만 지우면 예전 모양 ===== */
   :root{--bg:#f6f4ef;--card:#fff;--ink:#1f2421;--sub:#5b625e;--line:#d6d2c8;--main:#2a2d2c;--main2:#eeebe4;--acc:#7a2f55;--acc2:#f5ebf0;--warn:#a8322a;--warn2:#fbefed}
   body{font-family:"Noto Sans KR","Pretendard","Apple SD Gothic Neo","Malgun Gothic",sans-serif;word-break:keep-all}
@@ -520,7 +550,7 @@
     <div class="card" id="photoCard">
       <h2>활동사진 <small>2장씩 나란히 들어가요 · 사진 파일을 이 칸에 끌어다 놓아도 돼요</small></h2>
       <div class="thumbs" id="photos"></div>
-      <label class="upl">＋ 사진 올리기<input type="file" accept="image/*" multiple onchange="uploadTo(this, doc.photos, renderPhotos)"></label>
+      <label class="upl">＋ 사진 올리기<input type="file" accept="image/*" multiple onchange="uploadTo(this, doc.photos, renderPhotos, '활동사진')"></label>
     </div>
 
     <div class="card">
@@ -950,8 +980,8 @@ function pvAtts(d){
   var o = '';
   (d.attachments||[]).forEach(function(a){
     if (!a.title && !a.text && !(a.images||[]).length) return;
-    o += '<div class="pg"><table class="main"><tr><td class="lb" style="width:auto">' + h(a.title || '첨부') + '</td></tr><tr><td>' +
-      (a.images||[]).map(function(im){ return imgTag(im.fileId, 'attimg'); }).join('') + pvLines(a.text) + '</td></tr></table></div>';
+    o += '<div class="pg"><table class="main att"><tr><td class="lb" style="width:auto">' + h(a.title || '첨부') + '</td></tr><tr><td>' +
+      attImgs(a) + pvLines(a.text) + '</td></tr></table></div>';
   });
   return o;
 }
@@ -1067,7 +1097,7 @@ function previewExecHtml(d){
     }));
     if (pl.length) block('사진자료', pl, 0, 3);
   }
-  var o = '<div class="pg"><div class="ttl2">' + h(d.title || S.defaultTitle(d)).replace(/\n/g,'<br>') + '</div><table class="main x6" style="table-layout:fixed"><colgroup>';
+  var o = '<div class="pg xpg"><div class="ttl2">' + h(d.title || S.defaultTitle(d)).replace(/\n/g,'<br>') + '</div><table class="main x6" style="table-layout:fixed"><colgroup>';
   for (var c = 0; c < 100; c++) o += '<col style="width:1%">';
   var PX = {1:'1px', 2:'1.5px', 3:'2px'};
   o += '</colgroup>' + rows.map(function(r, ri){
@@ -1389,7 +1419,7 @@ function tableEditor(b, rerender, opt){
     var x = [];
     if (!people){
       var file = el('input', {type:'file', accept:'image/*', multiple:'multiple', style:'display:none'});
-      file.addEventListener('change', function(){ if (!b.rowPics[ri]) b.rowPics[ri] = []; uploadTo(file, b.rowPics[ri], rerender); });
+      file.addEventListener('change', function(){ if (!b.rowPics[ri]) b.rowPics[ri] = []; uploadTo(file, b.rowPics[ri], rerender, '표사진'); });
       x.push(el('label', {class:'sm ghost picbtn', title:'이 행에 사진 넣기 (글 아래에 들어가요)'}, [document.createTextNode('📷'), file]));
     }
     x.push(el('button', {class:'sm ghost rowbtn', title:'줄 넣기·옮기기·복사', on:{click:function(e){ e.stopPropagation(); rowMenu(b, ri, e.currentTarget, rerender); }}, text:'⋮'}));
@@ -1679,7 +1709,10 @@ function shrink(file, cb){
   };
   fr.readAsDataURL(file);
 }
-function uploadTo(input, list, rerender){
+/* 드라이브 「보고서 만들기_사진」 안에 보고서마다 폴더를 만들어 넣어요 (예: 「마을이음캠페인 · 활동계획서」).
+   파일 이름 앞에는 어느 칸 사진인지 붙여요 (활동사진_ · 첨부_카드뉴스_ · 표사진_) */
+function imgFolderName(){ return (baseName(doc.programName).trim() || '프로그램명 없음') + ' · ' + typeName(doc.type); }
+function uploadTo(input, list, rerender, tag){
   var files = Array.prototype.slice.call(input.files); input.value = '';
   if (!files.length) return;
   var left = files.length; toast('사진 올리는 중… (' + left + '장)', 60000);
@@ -1690,7 +1723,7 @@ function uploadTo(input, list, rerender){
         imgCache[id] = r; list.push({fileId: id, w: r.w, h: r.h, name: f.name});
         markDirty(); rerender();
         if (--left===0) toast('사진을 올렸어요.');
-      }).withFailureHandler(function(e){ fail(e); --left; }).saveImage(r.b64, f.name);
+      }).withFailureHandler(function(e){ fail(e); --left; }).saveImage(r.b64, (tag ? tag + '_' : '') + f.name, imgFolderName());
       toast('사진 올리는 중… (' + left + '장 남음)', 60000);
     });
   });
@@ -1742,6 +1775,13 @@ function renderPhotos(){ thumbs(document.getElementById('photos'), doc.photos, r
 
 /* ── 첨부 자료 ── */
 function addAtt(){ doc.attachments.push({title:'', text:'', images:[]}); markDirty(); renderAtts(); }
+function attColsPicker(a){
+  var sel = el('select', {style:'width:auto;margin-left:6px'});
+  [['0','자동 (1장은 크게, 여러 장은 나눠서)'],['1','1장씩 (크게)'],['2','2장씩'],['3','3장씩']].forEach(function(o){ var op = el('option', {text:o[1]}); op.value = o[0]; sel.appendChild(op); });
+  sel.value = String(Number(a.cols)||0);
+  sel.addEventListener('change', function(){ a.cols = Number(sel.value); markDirty(); });
+  return el('label', {style:'display:block;margin:6px 0'}, [document.createTextNode('그림 배치: 한 줄에'), sel]);
+}
 function renderAtts(){
   var box = document.getElementById('atts'); box.innerHTML = '';
   doc.attachments.forEach(function(a, i){
@@ -1749,13 +1789,14 @@ function renderAtts(){
     t.addEventListener('input', function(){ a.title = t.value; markDirty(); });
     var th = el('div', {class:'thumbs'}); thumbs(th, a.images, renderAtts);
     var file = el('input', {type:'file', accept:'image/*', multiple:'multiple'});
-    file.addEventListener('change', function(){ uploadTo(file, a.images, renderAtts); });
+    file.addEventListener('change', function(){ uploadTo(file, a.images, renderAtts, '첨부_' + (String(a.title||'').trim() || (i+1))); });
     box.appendChild(el('div', {class:'att'}, [
       el('div', {class:'bh', style:'display:flex;gap:6px;align-items:center;margin-bottom:6px'}, [el('b',{text:'첨부 ' + (i+1)}), el('span',{style:'flex:1'}),
         el('button', {class:'sm ghost', on:{click:function(){ if(i>0){ var x=doc.attachments[i]; doc.attachments[i]=doc.attachments[i-1]; doc.attachments[i-1]=x; markDirty(); renderAtts(); } }}, text:'▲'}),
         el('button', {class:'sm ghost del', on:{click:function(){ if(confirm('이 첨부 자료를 뺄까요?')){ doc.attachments.splice(i,1); markDirty(); renderAtts(); } }}, text:'✕'})]),
       t, th,
       el('label', {class:'upl'}, [document.createTextNode('＋ 그림 올리기 (끌어다 놓아도 돼요)'), file]),
+      attColsPicker(a),
       el('label', {text:'설명 글 (없어도 돼요)'}), ta(a.text, function(v){ a.text = v; }, 2)
     ]));
   });
@@ -1771,6 +1812,12 @@ function pvLines(text){
     if ((m = ln.match(/^\s*[*•·]\s+(.*)$/))) return '<p class="ln sub">• ' + rich(m[1]) + '</p>';
     return '<p class="ln">' + (rich(ln) || '&nbsp;') + '</p>';
   }).join('');
+}
+/* 첨부 그림: 한 장이면 크게, 여러 장이면 한 줄에 1~3장씩 (첨부마다 고를 수 있어요) */
+function attImgs(a){
+  var list = (a.images||[]).filter(function(im){ return imgCache[im.fileId]; }), k = HwpxGen.attCols(a);
+  if (k <= 1) return list.map(function(im){ return imgTag(im.fileId, 'attimg'); }).join('');
+  return '<div class="attgrid k' + k + '">' + list.map(function(im){ return '<div>' + imgTag(im.fileId) + '</div>'; }).join('') + '</div>';
 }
 function imgTag(id, cls){ return imgCache[id] ? '<img class="' + (cls||'') + '" src="data:image/jpeg;base64,' + imgCache[id].b64 + '">' : ''; }
 function previewHtml(d){
@@ -1807,8 +1854,8 @@ function previewHtml(d){
   o += '</table></div>';
   (d.attachments||[]).forEach(function(a){
     if (!a.title && !a.text && !(a.images||[]).length) return;
-    o += '<div class="pg"><table class="main"><tr><td class="lb" style="width:auto">' + h(a.title || '첨부') + '</td></tr><tr><td>' +
-      (a.images||[]).map(function(im){ return imgTag(im.fileId, 'attimg'); }).join('') + pvLines(a.text) + '</td></tr></table></div>';
+    o += '<div class="pg"><table class="main att"><tr><td class="lb" style="width:auto">' + h(a.title || '첨부') + '</td></tr><tr><td>' +
+      attImgs(a) + pvLines(a.text) + '</td></tr></table></div>';
   });
   return o;
 }
@@ -1836,8 +1883,8 @@ function previewEduHtml(d){
   o += '</table><div class="pfoot">종로장애인복지관</div></div>';
   (d.attachments||[]).forEach(function(a){
     if (!a.title && !a.text && !(a.images||[]).length) return;
-    o += '<div class="pg"><table class="main"><tr><td class="lb" style="width:auto">' + h(a.title || '첨부') + '</td></tr><tr><td>' +
-      (a.images||[]).map(function(im){ return imgTag(im.fileId, 'attimg'); }).join('') + pvLines(a.text) + '</td></tr></table><div class="pfoot">종로장애인복지관</div></div>';
+    o += '<div class="pg edu"><table class="main att"><tr><td class="lb" style="width:auto">' + h(a.title || '첨부') + '</td></tr><tr><td>' +
+      attImgs(a) + pvLines(a.text) + '</td></tr></table><div class="pfoot">종로장애인복지관</div></div>';
   });
   return o + '<div class="pfoot-print" style="display:none">종로장애인복지관</div>';
 }
@@ -1875,7 +1922,7 @@ function printReport(){
   var head = Array.prototype.map.call(document.querySelectorAll('style, link[rel=stylesheet]'), function(n){ return n.outerHTML; }).join('');
   w.document.open();
   w.document.write('<!DOCTYPE html><html lang="ko"><head><meta charset="utf-8"><title>' + h(name) + '</title>' + head +
-    '<style>body{margin:0;background:#888}#pvWrap{display:block!important;position:static;background:#888}@media print{body{background:#fff}}</style></head><body>' +
+    '<style>body{margin:0;background:#888}#pvWrap{display:block!important;position:static;background:#888}@media print{body,#pvWrap{background:#fff!important}}</style></head><body>' +
     '<div id="pvWrap"><div id="pv">' + document.getElementById('pv').innerHTML + '</div></div></body></html>');
   w.document.close();
   w.onafterprint = function(){ w.close(); };
