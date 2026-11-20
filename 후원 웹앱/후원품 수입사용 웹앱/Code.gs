@@ -459,6 +459,37 @@ function stock_(compare) {
 const wIn_ = l => l.inDate;
 function stockMap_() { const o = {}; stock_().forEach(l => { o[l.key] = l; }); return o; }
 function stockCached_() { return cached_('stock', () => stock_(false)); }
+/* ───────── 후원품 사진 미리보기 ─────────
+   후원물품등록 「사진」 칸에 적힌 드라이브 파일만 열어 줌 (다른 드라이브 파일은 막음).
+   보는 사람에게 드라이브 권한이 없을 때 앱(배포한 관리자 계정)이 대신 가져옴. */
+function photoAllowed_(id) {
+  const c = CacheService.getScriptCache(), key = 'photoIds:' + cacheStamp_();
+  let list = c.get(key);
+  if (!list) {
+    const ids = [];
+    readSheet_('REG', ['photo']).forEach(r => String(r.photo || '').replace(/(?:[?&]id=|\/d\/)([\w-]{20,})/g, (m, x) => { ids.push(x); return m; }));
+    list = ids.join(',');
+    if (list.length < 90000) c.put(key, list, 600);
+  }
+  return (',' + list + ',').indexOf(',' + id + ',') >= 0;
+}
+function getPhoto(id) {
+  needOrg_();
+  id = String(id || '').replace(/[^\w-]/g, '');
+  if (!id || !photoAllowed_(id)) throw new Error('후원물품등록에 있는 사진만 볼 수 있어요.');
+  const tok = ScriptApp.getOAuthToken(), auth = { headers: { Authorization: 'Bearer ' + tok }, muteHttpExceptions: true };
+  try { // 작게 줄인 사진(빠름)
+    const meta = JSON.parse(UrlFetchApp.fetch('https://www.googleapis.com/drive/v3/files/' + id + '?fields=thumbnailLink&supportsAllDrives=true', auth).getContentText());
+    if (meta.thumbnailLink) {
+      const r = UrlFetchApp.fetch(meta.thumbnailLink.replace(/=s\d+$/, '=s1200'), auth);
+      if (r.getResponseCode() === 200) { const b = r.getBlob(); return 'data:' + (b.getContentType() || 'image/jpeg') + ';base64,' + Utilities.base64Encode(b.getBytes()); }
+    }
+  } catch (e) {}
+  const b = DriveApp.getFileById(id).getBlob();
+  if (!/^image\//.test(b.getContentType() || '')) throw new Error('사진 파일이 아니에요. 「드라이브에서 열기」를 눌러 주세요.');
+  if (b.getBytes().length > 8e6) throw new Error('사진이 너무 커서 앱에서 열 수 없어요. 「드라이브에서 열기」를 눌러 주세요.');
+  return 'data:' + b.getContentType() + ';base64,' + Utilities.base64Encode(b.getBytes());
+}
 function getStock(all, fresh) {
   needOrg_();
   if (!setupDone_()) return [];

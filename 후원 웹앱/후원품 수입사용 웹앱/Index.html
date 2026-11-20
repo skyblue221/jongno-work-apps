@@ -183,7 +183,7 @@ function picker(el, sel, onChange, single){
     const q=(el.querySelector('.pq')||{}).value||'';
     const list=S.stock.filter(l=>!q||l.name.includes(q)||(l.donor||'').includes(q));
     el.querySelector('.lots').innerHTML = list.length? list.map(l=>{ const d=daysTo(l.expiry);
-      return `\x3cdiv class="lot ${sel.includes(l.key)?'on':''}" data-k="${esc(l.key)}">\x3cspan>\x3cb>${esc(l.name)}\x3c/b>${purposeTag(l)}\x3cbr>\x3cspan class="muted">${esc(l.inDate)} 입고${l.donor?' · '+esc(l.donor):''}${l.expiry?` · \x3cspan class="${d!=null&&d<=30?'exp':''}">유통 ${esc(l.expiry)}\x3c/span>`:''}\x3c/span>\x3c/span>\x3cspan>남은 \x3cb>${l.remain}\x3c/b>${esc(l.unit||'')}\x3c/span>\x3c/div>`;}).join('')
+      return `\x3cdiv class="lot ${sel.includes(l.key)?'on':''}" data-k="${esc(l.key)}">\x3cspan>\x3cb>${esc(l.name)}\x3c/b>${purposeTag(l)}${photoBtn(l)}\x3cbr>\x3cspan class="muted">${esc(l.inDate)} 입고${l.donor?' · '+esc(l.donor):''}${l.expiry?` · \x3cspan class="${d!=null&&d<=30?'exp':''}">유통 ${esc(l.expiry)}\x3c/span>`:''}\x3c/span>\x3c/span>\x3cspan>남은 \x3cb>${l.remain}\x3c/b>${esc(l.unit||'')}\x3c/span>\x3c/div>`;}).join('')
       : '\x3cp class="muted">남은 물품이 없어요.\x3c/p>';
     const P=sel.map(lotOf).filter(l=>l&&l.purpose);
     el.querySelector('.pp').innerHTML=P.length?`\x3cdiv class="note warn" style="margin:8px 0 0">\x3cb>사용목적이 정해진 물품이에요.\x3c/b> 받는 곳이 목적에 맞는지 확인해 주세요.\x3cbr>${P.map(l=>`· ${esc(l.name)} → \x3cb>${esc(l.purpose)}\x3c/b>`).join('\x3cbr>')}\x3c/div>`:'';
@@ -191,10 +191,34 @@ function picker(el, sel, onChange, single){
   el.innerHTML = `\x3cinput class="pq" placeholder="품명이나 후원처로 찾기">\x3cdiv class="lots">\x3c/div>\x3cdiv class="pp">\x3c/div>\x3cdiv class="btns">\x3ca class="btn line sm" href="https://docs.google.com/forms/d/e/1FAIpQLSdFv6PF9OE8ac1YFcNvo2Q-MVCW1wAA5lnunsR5EDa6tuQZww/viewform" target="_blank" rel="noopener noreferrer">목록에 없는 후원품 등록\x3c/a>\x3cbutton type="button" class="btn sub sm pickerRefresh">등록 후 새로고침\x3c/button>\x3c/div>\x3cp class="muted" style="margin-top:6px">등록을 마친 뒤 새로고침해주세요. 연결된 등록 시트에 반영되고 재고가 남은 물품이 목록에 표시돼요.\x3c/p>`;
   el.querySelector('.pickerRefresh').onclick=e=>act(e.target,async()=>{await refreshStock(true);for(let i=sel.length-1;i>=0;i--)if(!S.stock.some(l=>l.key===sel[i]))sel.splice(i,1);draw();if(onChange)onChange();toast('물품 목록을 새로 불러왔어요.');},'불러오는 중...');
   el.querySelector('.pq').oninput=draw;
-  el.querySelector('.lots').onclick=e=>{ const d=e.target.closest('.lot'); if(!d) return; const k=d.dataset.k, i=sel.indexOf(k);
+  el.querySelector('.lots').onclick=e=>{ const ph=e.target.closest('[data-ph]'); if(ph){ e.stopPropagation(); showPhotos(ph.dataset.ph,ph.dataset.pn); return; } const d=e.target.closest('.lot'); if(!d) return; const k=d.dataset.k, i=sel.indexOf(k);
     if(single){ sel.splice(0,sel.length); if(i<0) sel.push(k); } else if(i>=0) sel.splice(i,1); else sel.push(k);
     draw(); onChange&&onChange(); };
   draw();
+}
+/* ── 후원품 사진 (후원물품등록 「사진」 칸의 드라이브 링크) ── 누를 때 한 장씩만 불러옴 */
+function photoIds(s){ const out=[]; String(s||'').replace(/(?:[?&]id=|\/d\/)([\w-]{20,})/g,(m,id)=>{ if(out.indexOf(id)<0) out.push(id); return m; }); return out; }
+const photoBtn=l=>{ const n=photoIds(l&&l.photo).length; return n?` \x3cbutton type="button" class="btn line sm" data-ph="${esc(l.photo)}" data-pn="${esc(l.name)}" style="padding:3px 8px">📷 사진${n>1?' '+n:''}\x3c/button>`:''; };
+function showPhotos(src,name){
+  const ids=photoIds(src); if(!ids.length) return;
+  const m=$('#modal'), box=$('#modalBox'); let at=0; const cache={};
+  const draw=()=>{ const id=ids[at];
+    box.innerHTML=`\x3ch2 style="margin:0 0 8px;font-size:17px">📷 ${esc(name||'후원품 사진')}${ids.length>1?` \x3cspan class="muted">(${at+1}/${ids.length})\x3c/span>`:''}\x3c/h2>
+    \x3cdiv style="height:min(60vh,520px);display:flex;align-items:center;justify-content:center;background:#f4f6f8">\x3cimg id="phImg" alt="${esc(name||'')} 사진" style="max-width:100%;max-height:100%;display:none">\x3cspan id="phMsg" class="muted">사진을 불러오는 중이에요...\x3c/span>\x3c/div>
+    \x3cdiv class="btns">${ids.length>1?'\x3cbutton class="btn line" id="phPrev">← 이전\x3c/button>\x3cbutton class="btn line" id="phNext">다음 →\x3c/button>':''}\x3ca class="btn line" href="https://drive.google.com/file/d/${encodeURIComponent(id)}/view" target="_blank" rel="noopener">드라이브에서 열기\x3c/a>\x3cspan style="flex:1">\x3c/span>\x3cbutton class="btn" id="phX">닫기\x3c/button>\x3c/div>`;
+    const img=$('#phImg'), msg=$('#phMsg');
+    const ok=()=>{ img.style.display='block'; msg.style.display='none'; };
+    const viaServer=()=>{ if(cache[id]){ img.onerror=null; img.src=cache[id]; return; }
+      run('getPhoto',id).then(u=>{ cache[id]=u; if(ids[at]!==id||!$('#phImg')) return; img.onerror=()=>{ msg.textContent='사진을 열 수 없어요. 「드라이브에서 열기」를 눌러 주세요.'; }; img.src=u; })
+        .catch(e=>{ if(ids[at]===id&&$('#phMsg')) msg.textContent=String(e); }); };
+    img.onload=ok;
+    // 먼저 보는 사람 계정으로 바로 열어 보고, 권한이 없으면 앱이 대신 가져옴
+    img.onerror=viaServer;
+    img.src=cache[id]||`https://drive.google.com/thumbnail?id=${encodeURIComponent(id)}&sz=w1200`;
+    $('#phX').onclick=()=>{ m.style.display='none'; box.innerHTML=''; };
+    if($('#phPrev')){ $('#phPrev').onclick=()=>{ at=(at+ids.length-1)%ids.length; draw(); }; $('#phNext').onclick=()=>{ at=(at+1)%ids.length; draw(); }; }
+  };
+  m.style.display='flex'; draw();
 }
 const lotOf = k => S.stock.find(l=>l.key===k);
 /* 수량 한 번에 채우기: 품목마다 숫자 칸 하나 + 「한 사람당 채우기」·「전체를 나누기」 (팀 배분·가정 배분·빈 수령증) */
@@ -1056,8 +1080,8 @@ async function stockView(){
   const draw=()=>{ const q=($('#kq')||{}).value||'';
     const L=list.filter(l=>!q||l.name.includes(q)||(l.donor||'').includes(q));
     $('#kList').innerHTML=L.length?L.map(l=>{ const d=daysTo(l.expiry);
-      return `\x3cdiv class="lot" style="cursor:default">\x3cspan>\x3cb>${esc(l.name)}\x3c/b>${purposeTag(l)}\x3cbr>\x3cspan class="muted">${esc(l.inDate)} 입고${l.donor?' · '+esc(l.donor):''}${l.expiry?` · \x3cspan class="${d!=null&&d<=30?'exp':''}">유통 ${esc(l.expiry)}${d!=null&&d<0?' (지남)':d!=null&&d<=30?` (${d}일 남음)`:''}\x3c/span>`:''}\x3c/span>
-      ${(S.boot.admin||S.boot.viewer)?`\x3cbr>\x3cspan class="muted">입고 ${l.inQty} · 나감 ${l.out} · 폐기 ${l.disp}${l.pending?` · 확인 대기 ${l.pending}`:''}\x3c/span>`:''}${l.photo&&/^https?:/.test(l.photo)?` \x3ca href="${esc(l.photo)}" target="_blank" class="muted">사진\x3c/a>`:''}\x3c/span>
+      return `\x3cdiv class="lot" style="cursor:default">\x3cspan>\x3cb>${esc(l.name)}\x3c/b>${purposeTag(l)}${photoBtn(l)}\x3cbr>\x3cspan class="muted">${esc(l.inDate)} 입고${l.donor?' · '+esc(l.donor):''}${l.expiry?` · \x3cspan class="${d!=null&&d<=30?'exp':''}">유통 ${esc(l.expiry)}${d!=null&&d<0?' (지남)':d!=null&&d<=30?` (${d}일 남음)`:''}\x3c/span>`:''}\x3c/span>
+      ${(S.boot.admin||S.boot.viewer)?`\x3cbr>\x3cspan class="muted">입고 ${l.inQty} · 나감 ${l.out} · 폐기 ${l.disp}${l.pending?` · 확인 대기 ${l.pending}`:''}\x3c/span>`:''}\x3c/span>
       \x3cspan style="white-space:nowrap">남은 \x3cb>${l.remain}\x3c/b>${esc(l.unit||'')}\x3c/span>\x3c/div>`;}).join(''):'\x3cp class="muted">없어요.\x3c/p>'; };
   let check='';
   if((S.boot.admin||S.boot.viewer)){ const full=await run('getStock',true);
@@ -1066,6 +1090,7 @@ async function stockView(){
   $('#main').innerHTML=expiryCard()+check+`\x3cdiv class="card">\x3ch2>재고 \x3cbutton class="btn line sm" id="kFresh" style="float:right">↻ 최신으로\x3c/button>\x3c/h2>\x3cinput id="kq" placeholder="품명이나 후원처로 찾기">
   ${(S.boot.admin||S.boot.viewer)?'\x3clabel style="display:flex;gap:8px;align-items:center;color:var(--ink)">\x3cinput type="checkbox" id="kAll" style="width:auto"> 다 나간 물품도 보기\x3c/label>':''}\x3cdiv id="kList">\x3c/div>\x3cp style="margin-top:12px">\x3ca href="https://docs.google.com/forms/d/e/1FAIpQLSdFv6PF9OE8ac1YFcNvo2Q-MVCW1wAA5lnunsR5EDa6tuQZww/viewform" target="_blank" rel="noopener noreferrer">목록에 없는 후원품 등록 ↗\x3c/a>\x3c/p>\x3c/div>`;
   $('#kq').oninput=draw;
+  $('#kList').onclick=e=>{ const ph=e.target.closest('[data-ph]'); if(ph) showPhotos(ph.dataset.ph,ph.dataset.pn); };
   $('#kFresh').onclick=e=>act(e.target, async()=>{ S.stock=await run('getStock',false,true); list=all?await run('getStock',true):S.stock; buildNav(); draw(); toast('시트를 다시 읽었어요.'); }, '읽는 중...');
   $('#kAll')&&($('#kAll').onchange=async e=>{ all=e.target.checked; $('#kList').innerHTML='\x3cp class="muted">불러오는 중...\x3c/p>'; list=all?await run('getStock',true):S.stock; draw(); });
   draw();
