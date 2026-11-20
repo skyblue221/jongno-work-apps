@@ -290,12 +290,15 @@ function orgHtml(o){
   \x3cp style="text-align:center;font-size:16pt;font-weight:bold">${esc(S.boot.org)}장 귀하\x3c/p>\x3c/div>`;
 }
 /* 출력 여백: 사방 15mm (예전 10mm는 종이 끝에 너무 붙어 보였어요). 쓸 수 있는 넓이·높이 = A4에서 여백 30mm를 뺀 크기 */
-function fitPage(html, landscape){
+function fitPage(html, landscape, forPrint){
   const W=landscape?1009:680, H=landscape?680:1009, m=document.createElement('div');
   m.style.cssText=`position:absolute;left:-99999px;top:0;width:${W}px;visibility:hidden`;
   m.innerHTML=html; document.body.appendChild(m);
   const z=Math.min(1, W/Math.max(m.scrollWidth,1), H/Math.max(m.scrollHeight,1)); m.remove();
-  return `\x3cstyle>@page{size:A4 ${landscape?'landscape':'portrait'};margin:15mm}\x3c/style>\x3cdiv style="zoom:${z.toFixed(3)}">${html}\x3c/div>`;
+  const pg=`\x3cstyle>@page{size:A4 ${landscape?'landscape':'portrait'};margin:15mm}\x3c/style>`;
+  // 인쇄: 줄여야 할 때 zoom 대신 transform으로 줄여요. zoom은 표 선 굵기가 줄마다 들쭉날쭉해졌어요 (드라이브 PDF 보관용은 예전 zoom 그대로)
+  if(forPrint&&z<0.999) return pg+`\x3cdiv style="height:${H-4}px;overflow:hidden">\x3cdiv style="width:${(W/z).toFixed(1)}px;transform:scale(${z.toFixed(4)});transform-origin:0 0">${html}\x3c/div>\x3c/div>`;
+  return pg+`\x3cdiv style="zoom:${z.toFixed(3)}">${html}\x3c/div>`;
 }
 function rgbHex(c){ const m=String(c).match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?/); if(!m||m[4]==='0') return ''; return '#'+[m[1],m[2],m[3]].map(x=>(+x).toString(16).padStart(2,'0')).join(''); }
 function htmlModel(html, landscape){
@@ -321,7 +324,24 @@ function toExcel(btn, html, name, landscape){
   }, '엑셀 만드는 중...');
 }
 const xlsBtn=id=>`\x3cbutton class="btn line" id="${id}">엑셀로 받기\x3c/button>`;
-function printHtml(html, landscape){ $('#printArea').innerHTML=fitPage(html, landscape); setTimeout(()=>window.print(),150); }
+/* PDF 파일 이름 = 인쇄 창 제목. 웹앱은 구글 틀 안에서 돌아가서 이 화면 제목을 바꿔도 안 들어가요.
+   그래서 제목을 붙인 새 창에 양식을 옮겨 그 창에서 인쇄해요 (새 창이 막히면 예전처럼 이 화면에서 인쇄) */
+function docName(kind, date, items){
+  const ns=(items||[]).map(it=>String(it&&it.name||'').trim()).filter(Boolean);
+  return [kind, date||'', ns.length?ns[0]+(ns.length>1?` 외 ${ns.length-1}종`:''):''].filter(Boolean).join('_').replace(/[\\/:*?"\x3c>|]/g,' ');
+}
+function printHtml(html, landscape, name){
+  const body=fitPage(html, landscape, true);
+  let w=null; try{ w=window.open('','_blank'); }catch(e){}
+  if(!w){ $('#printArea').innerHTML=body; setTimeout(()=>window.print(),150); return; }
+  w.document.open();
+  w.document.write('\x3c!DOCTYPE html>\x3chtml lang="ko">\x3chead>\x3cmeta charset="utf-8">\x3ctitle>'+esc(name||'후원품 나눔도우미')+'\x3c/title>'+
+    '\x3cstyle>body{margin:0;background:#fff}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}\x3c/style>\x3c/head>\x3cbody>'+body+'\x3c/body>\x3c/html>');
+  w.document.close();
+  w.onafterprint=()=>w.close();
+  const go=()=>{ w.focus(); w.print(); };
+  if(w.document.readyState==='complete') setTimeout(go,400); else w.onload=()=>setTimeout(go,200);
+}
 
 
 
@@ -496,7 +516,7 @@ async function signView(id, data){
     \x3cdiv class="card">\x3ch2>수령증 미리보기\x3c/h2>\x3cdiv class="preview">${html()}\x3c/div>
     \x3cdiv class="btns">\x3cbutton class="btn line" id="sPrint">인쇄 / PDF\x3c/button>${xlsBtn('sXls')}${(S.boot.admin||(r.type==='상품권'&&S.boot.vouch))&&!RECEIPT_ID?`\x3cbutton class="btn line" id="sEdit">내용 수정\x3c/button>`:''}${S.boot.admin?`\x3cbutton class="btn sub" id="sLink">서명 링크 복사\x3c/button>` : ''}${!left?'\x3cbutton class="btn sub" id="sPdf">드라이브에 PDF 저장\x3c/button>':''}\x3c/div>\x3c/div>`;
     $('#sBack')&&($('#sBack').onclick=()=>go(r.type==='상품권'?'vouch':'sign'));
-    $('#sPrint').onclick=()=>printHtml(html(),true);
+    $('#sPrint').onclick=()=>printHtml(html(),true,docName('수령증',r.date,r.items));
     $('#sXls').onclick=e=>toExcel(e.target,html(),'수령증_'+r.no,true);
     $('#sLink')&&($('#sLink').onclick=()=>copyText(S.boot.url+'?r='+r.id));
     $('#sEdit')&&($('#sEdit').onclick=()=>r.type==='상품권'?editVouch(r):editTeam(r));
@@ -659,7 +679,7 @@ function freeView(){
   if($('#fOne')) $('#fOne').onclick=()=>{ F.rows.push({name:'',addr:'',qty:{}}); drawRows(); };
   if($('#fFam')) $('#fFam').onclick=()=>famPick('이용인 명단에서 고르기',L=>{ L.forEach(f=>F.rows.push({name:f.name,addr:F.idType==='생년월일'?f.birth:f.addr,qty:{}})); drawRows(); });
   const ready=()=>{ if(!F.items.some(it=>it.name.trim())){ toast('물품 이름을 넣어 주세요.'); return false; } if(!F.rows.some(r=>r.name)){ toast('받는 사람을 넣어 주세요.'); return false; } return true; };
-  $('#fPrint').onclick=()=>{ if(ready()) printHtml(html(),true); };
+  $('#fPrint').onclick=()=>{ if(ready()) printHtml(html(),true,docName('수령증',F.date,F.items)); };
   $('#fXls').onclick=e=>{ if(ready()) toExcel(e.target,html(),'수령증_'+F.date,true); };
   $('#fClear').onclick=()=>{ if(confirm('입력한 물품과 명단을 모두 지울까요?')){ S.free=null; freeView(); } };
 }
@@ -703,7 +723,7 @@ function homeView(){
     items:L.map(l=>({name:l.name,inDate:l.inDate,donor:l.donor,purpose:l.purpose||'',inQty:l.inQty,give:total(l.key),remainAfter:(H.before&&H.before[l.key]!=null?H.before[l.key]:l.remain)-total(l.key)})),
     rows:H.rows.filter(r=>r.name).map(r=>{ ri++; const n=(vn[ri]||[]).join(', '); return {name:r.name,team:'',addr:r.addr,idType:H.idType,date:H.dateMode==='fill'?H.date:(r.sig?S.boot.today:''),sigUrl:r.sig,note:n,noteSmall:!!n,qty:L.map(l=>qOf(r,l.key))}; }) }); };
   $('#hXls').onclick=e=>{if(!checkHome())return; if(!H.sel.length||!H.rows.some(r=>r.name)) return toast('물품과 명단을 넣어 주세요.'); toExcel(e.target,html(),'가정배분수령증_'+H.date,true); };
-  $('#hPrint').onclick=()=>{if(!checkHome())return; if(!H.sel.length||!H.rows.some(r=>r.name)) return toast('물품과 명단을 넣어 주세요.'); printHtml(html(),true); };
+  $('#hPrint').onclick=()=>{if(!checkHome())return; if(!H.sel.length||!H.rows.some(r=>r.name)) return toast('물품과 명단을 넣어 주세요.'); printHtml(html(),true,docName('가정배분수령증',H.date,lots())); };
   $('#hLater').onclick=e=>act(e.target, async()=>{
     checkInputQuantities(H.rows);if(H.sent) throw '이미 요청했어요.'; if(!H.manager) throw '사례 담당자 이름을 골라 주세요.';
     const people=H.rows.filter(r=>r.name); if(!H.sel.length||!people.length) throw '물품과 명단을 넣어 주세요.';
@@ -766,13 +786,13 @@ async function homeSignOpen(id){
     \x3cdiv class="btns">\x3clabel style="display:flex;gap:8px;align-items:center;color:var(--ink);margin:0;flex:1 0 100%">\x3cinput type="checkbox" id="hsFill" style="width:auto" ${r.dateMode==='fill'?'checked':''}> 수령일을 배분일(${esc(r.date)})로 채우기 \x3cspan class="muted">(끄면 서명한 날짜)\x3c/span>\x3c/label>\x3cbutton class="btn line" id="hsEdit">수량·명단 수정\x3c/button>\x3cbutton class="btn line" id="hsPrint">인쇄 / PDF\x3c/button>\x3cbutton class="btn line" id="hsXls">엑셀로 받기\x3c/button>\x3cbutton class="btn" id="hsDone">서명 마치기 (수령증 보관)\x3c/button>\x3c/div>
     \x3cp class="muted">서명 마치기를 누르면 수령증 PDF가 보관되고 임시 명단 파일은 휴지통으로 보내요.\x3c/p>\x3c/div>`;
     $('#hsBack').onclick=()=>go('hsign');
-    $('#hsPrint').onclick=()=>printHtml(html(),true);
+    $('#hsPrint').onclick=()=>printHtml(html(),true,docName('가정배분수령증',r.date,r.items));
     $('#hsXls').onclick=e=>toExcel(e.target,html(),'가정배분수령증_'+r.date+'_'+r.manager,true);
     $('#hsEdit').onclick=()=>editHome();
     $('#hsReload').onclick=e=>act(e.target,async()=>{ r=await run('getHomeSign',r.id); draw(); toast('새로 불러왔어요.'); },'불러오는 중...');
     $('#hsFill').onchange=e=>{ r.dateMode=e.target.checked?'fill':'blank'; draw(); };
     $('#hsDone').onclick=e=>{ if(left&&!confirm(`아직 ${left}명이 서명하지 않았어요. 빈칸으로 두고 마칠까요?`)) return;
-      act(e.target, async()=>{ const h=html(); await run('finishHome',r.id,fitPage(h,true)); bumpCount('hsign',-1); printHtml(h,true); toast('수령증을 보관했어요. 인쇄 창이 열려요.',3500); setTimeout(()=>go('hsign'),1500); }, '보관 중...'); };
+      act(e.target, async()=>{ const h=html(); await run('finishHome',r.id,fitPage(h,true)); bumpCount('hsign',-1); printHtml(h,true,docName('가정배분수령증',r.date,r.items)); toast('수령증을 보관했어요. 인쇄 창이 열려요.',3500); setTimeout(()=>go('hsign'),1500); }, '보관 중...'); };
   };
   const editHome=()=>{
     const E=r.people.map((p,i)=>({i,name:p.name,addr:p.addr,idType:p.idType||'주소',qty:Object.assign({},p.qty),signed:!!p.sigUrl,ov:p.vs||{},vs:JSON.parse(JSON.stringify(p.vs||{}))}));
@@ -916,7 +936,7 @@ async function vouchView(){
     \x3ctable style="width:100%;border-collapse:collapse">\x3ctr>${['연번','일련번호','종류','면액','입고일','입고처','지정내용','실물 확인'].map(t=>`\x3cth style="${c}background:#eee">${t}\x3c/th>`).join('')}\x3c/tr>
     ${rows.map((v,i)=>`\x3ctr>\x3ctd style="${c}text-align:center">${i+1}\x3c/td>\x3ctd style="${c}">${esc(v.serial)}\x3c/td>\x3ctd style="${c}">${esc(v.kind)}\x3c/td>\x3ctd style="${c}text-align:right">${won(v.face)}\x3c/td>\x3ctd style="${c}">${esc(v.inDate)}\x3c/td>\x3ctd style="${c}">${esc(v.src)}\x3c/td>\x3ctd style="${c}">${esc(v.target)}\x3c/td>\x3ctd style="${c}">\x3c/td>\x3c/tr>`).join('')}\x3c/table>
     \x3cp style="text-align:right;margin-top:20px">점검자 : &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; (인)\x3c/p>\x3c/div>`); };
-  $('#vCheck').onclick=()=>printHtml(checkHtml(),false);
+  $('#vCheck').onclick=()=>printHtml(checkHtml(),false,'상품권점검표_'+S.boot.today);
   $('#vCheckX').onclick=e=>toExcel(e.target,checkHtml(),'상품권점검표_'+S.boot.today,false);
   const matchHtml=c=>!c.ready?'':`\x3cdiv style="margin-top:10px;border-top:1px solid var(--line);padding-top:10px">
     \x3cp class="muted">관리대장에서 아직 「보유」인 상품권 \x3cb>${c.heldTotal}\x3c/b>장 중 \x3cb>${c.matchedTotal}\x3c/b>장이 수입 물품과 짝지어졌어요. (입고일 앞뒤 ${c.days}일 안에서 짝지음)\x3c/p>
@@ -1004,7 +1024,7 @@ function showOrg(r){
   const html=orgHtml(r);
   $('#main').innerHTML=`\x3cbutton class="btn line sm" id="oBack">← 유관기관\x3c/button>\x3cdiv class="card">\x3ch2>인수증\x3c/h2>\x3cp class="note">배분 기록에 들어갔어요. 출력하거나 PDF로 저장해서 기관에 보내고, 직인 받은 걸 돌려받으면 \x3cb>회수 완료\x3c/b>를 눌러 주세요.\x3c/p>
   \x3cdiv class="preview">${html}\x3c/div>\x3cdiv class="btns">\x3cbutton class="btn" id="oPrint">인쇄 / PDF\x3c/button>${xlsBtn('oXls')}\x3cbutton class="btn line" id="oEdit">내용 수정\x3c/button>\x3cbutton class="btn sub" id="oPdf">드라이브에 PDF 저장\x3c/button>\x3c/div>\x3cdiv id="oLink">\x3c/div>\x3c/div>`;
-  $('#oBack').onclick=()=>orgView(); $('#oPrint').onclick=()=>printHtml(html); $('#oXls').onclick=e=>toExcel(e.target,html,'인수증_'+r.no,false); $('#oEdit').onclick=()=>editOrg(r);
+  $('#oBack').onclick=()=>orgView(); $('#oPrint').onclick=()=>printHtml(html,false,docName('인수증',r.date,r.items)); $('#oXls').onclick=e=>toExcel(e.target,html,'인수증_'+r.no,false); $('#oEdit').onclick=()=>editOrg(r);
   $('#oPdf').onclick=e=>act(e.target,async()=>{ const u=await run('saveReceiptPdf',r.id,fitPage(html,false),r.version); $('#oLink').innerHTML=`\x3cp class="note">저장했어요. \x3ca href="${esc(u)}" target="_blank">드라이브에서 열기\x3c/a> (메일에 첨부할 때 써요)\x3c/p>`; },'저장 중...');
 }
 
@@ -1058,7 +1078,7 @@ function showDisp(d){
   const html=dispHtml(d);
   $('#main').innerHTML=`\x3cbutton class="btn line sm" id="dBack">← 폐기\x3c/button>\x3cdiv class="card">\x3ch2>폐기 물품 사진\x3c/h2>
   \x3cdiv class="preview">${html}\x3c/div>\x3cdiv class="btns">\x3cbutton class="btn" id="dPrint">인쇄 / PDF\x3c/button>${xlsBtn('dXls')}\x3cbutton class="btn line" id="dEdit">내용 수정\x3c/button>\x3c/div>\x3c/div>`;
-  $('#dBack').onclick=()=>go('disp'); $('#dPrint').onclick=()=>printHtml(html,false); $('#dXls').onclick=e=>toExcel(e.target,html,'폐기물품사진_'+d.date,false); $('#dEdit').onclick=()=>editDisp(d);
+  $('#dBack').onclick=()=>go('disp'); $('#dPrint').onclick=()=>printHtml(html,false,docName('폐기물품',d.date,d.items)); $('#dXls').onclick=e=>toExcel(e.target,html,'폐기물품사진_'+d.date,false); $('#dEdit').onclick=()=>editDisp(d);
 }
 function editDisp(d){
   const E={date:d.date, reason:d.reason, qty:Object.fromEntries(d.items.map(i=>[i.key,i.qty])), photo:null};
