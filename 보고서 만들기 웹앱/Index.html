@@ -174,6 +174,9 @@
   .pg table{width:100%;border-collapse:collapse}
   .pg td,.pg th{border:1px solid #999;padding:5px 8px;vertical-align:middle}
   .pg .main{border:2px solid #000}
+  /* 첨부 자료 표: 한글 파일과 같은 색 — 계획서·결과보고서는 연한 회색 선, 장애이해교육은 검은 가는 선 */
+  .pg .main.att,.pg .main.att td{border:1px solid #BBB}
+  .pg.edu .main.att,.pg.edu .main.att td{border:1px solid #000}
   .pg .lb{background:#F2F2F2;font-weight:700;text-align:center;white-space:nowrap;width:17%}
   .pg .in th{background:#DCDCDC;font-weight:normal}
   .pg .in td,.pg .in th{border:1px solid #555}
@@ -953,7 +956,7 @@ function pvAtts(d){
   var o = '';
   (d.attachments||[]).forEach(function(a){
     if (!a.title && !a.text && !(a.images||[]).length) return;
-    o += '<div class="pg"><table class="main"><tr><td class="lb" style="width:auto">' + h(a.title || '첨부') + '</td></tr><tr><td>' +
+    o += '<div class="pg"><table class="main att"><tr><td class="lb" style="width:auto">' + h(a.title || '첨부') + '</td></tr><tr><td>' +
       attImgs(a) + pvLines(a.text) + '</td></tr></table></div>';
   });
   return o;
@@ -1827,7 +1830,7 @@ function previewHtml(d){
   o += '</table></div>';
   (d.attachments||[]).forEach(function(a){
     if (!a.title && !a.text && !(a.images||[]).length) return;
-    o += '<div class="pg"><table class="main"><tr><td class="lb" style="width:auto">' + h(a.title || '첨부') + '</td></tr><tr><td>' +
+    o += '<div class="pg"><table class="main att"><tr><td class="lb" style="width:auto">' + h(a.title || '첨부') + '</td></tr><tr><td>' +
       attImgs(a) + pvLines(a.text) + '</td></tr></table></div>';
   });
   return o;
@@ -1856,7 +1859,7 @@ function previewEduHtml(d){
   o += '</table><div class="pfoot">종로장애인복지관</div></div>';
   (d.attachments||[]).forEach(function(a){
     if (!a.title && !a.text && !(a.images||[]).length) return;
-    o += '<div class="pg"><table class="main"><tr><td class="lb" style="width:auto">' + h(a.title || '첨부') + '</td></tr><tr><td>' +
+    o += '<div class="pg edu"><table class="main att"><tr><td class="lb" style="width:auto">' + h(a.title || '첨부') + '</td></tr><tr><td>' +
       attImgs(a) + pvLines(a.text) + '</td></tr></table><div class="pfoot">종로장애인복지관</div></div>';
   });
   return o + '<div class="pfoot-print" style="display:none">종로장애인복지관</div>';
