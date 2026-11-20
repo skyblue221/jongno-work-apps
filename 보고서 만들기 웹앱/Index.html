@@ -198,6 +198,23 @@
   .pg .ln{margin:0}.pg .dash{padding-left:14px;text-indent:-10px}.pg .sub{padding-left:24px;text-indent:-10px}
   .pg .ph img{max-width:100%;max-height:260px;display:block;margin:auto}
   .pg .attimg{max-width:100%;display:block;margin:6px auto}
+  /* ===== 표 선 (2026-11-20) — 한글 파일과 같은 굵기·색 =====
+     한글 틀의 선은 안쪽 0.1~0.12mm · 바깥 0.4mm인데, 크롬은 테두리(border)를 0.26mm보다 가늘게 못 그려서 2배 넘게 굵었어요.
+     그래서 테두리는 없애고 칸마다 오른쪽·아래 선을 그림자(box-shadow)로 그려요. 그림자는 가는 굵기 그대로 인쇄돼요.
+     표 바깥 선은 표 둘레에 그림자로. 굵기·색은 한글 틀(header.xml)의 테두리 설정 값 그대로예요.
+     (실행계획서·사업결과보고서 표는 칸마다 굵기가 따로 정해져 있어서 예전 방식 그대로: .xpg) */
+  .pg:not(.xpg) table,.pg:not(.xpg) td,.pg:not(.xpg) th{border:0!important}
+  .pg:not(.xpg) td::after,.pg:not(.xpg) th::after{content:'';position:absolute;left:0;top:0;right:0;bottom:0;pointer-events:none;z-index:1;box-shadow:inset -0.12mm -0.12mm 0 0 #BBB}
+  .pg:not(.xpg) table.main{box-shadow:0 0 0 0.4mm #000;width:calc(100% - 0.8mm);margin-left:0.4mm;margin-right:0.4mm}   /* 바깥 선이 종이 여백에 걸려 양옆만 잘리지 않게 0.4mm 안쪽으로 */
+  .pg:not(.xpg) table.in td::after,.pg:not(.xpg) table.in th::after{box-shadow:inset -0.1mm -0.1mm 0 0 #000}
+  .pg:not(.xpg) table.in tr:first-child th::after{box-shadow:inset -0.1mm 0 0 0 #000,inset 0 -0.7mm 0 0 #5D5D5D}
+  .pg:not(.xpg) table.in{box-shadow:0 0 0 0.5mm #5D5D5D,0 -0.2mm 0 0.5mm #5D5D5D,0 0.2mm 0 0.5mm #5D5D5D}
+  .pg:not(.xpg) table.main.att{box-shadow:0 0 0 0.12mm #BBB}
+  .pg.edu td::after,.pg.edu th::after{box-shadow:inset -0.12mm -0.12mm 0 0 #000}
+  .pg.edu table.in{box-shadow:0 0 0 0.12mm #000}
+  .pg.edu table.in tr:first-child th::after{box-shadow:inset -0.12mm -0.12mm 0 0 #000}
+  .pg.edu table.main.att{box-shadow:0 0 0 0.12mm #000}
+  .pg .ttl{border:0;box-shadow:inset 0 0 0 0.4mm #000}
   .pg .attgrid{display:grid;gap:3mm;margin:6px 0}.pg .attgrid.k2{grid-template-columns:1fr 1fr}.pg .attgrid.k3{grid-template-columns:1fr 1fr 1fr}
   .pg .attgrid>div{display:flex;align-items:center;justify-content:center;break-inside:avoid;page-break-inside:avoid}
   .pg .attgrid img{max-width:100%;display:block}.pg .attgrid.k2 img{max-height:110mm}.pg .attgrid.k3 img{max-height:80mm}
@@ -1080,7 +1097,7 @@ function previewExecHtml(d){
     }));
     if (pl.length) block('사진자료', pl, 0, 3);
   }
-  var o = '<div class="pg"><div class="ttl2">' + h(d.title || S.defaultTitle(d)).replace(/\n/g,'<br>') + '</div><table class="main x6" style="table-layout:fixed"><colgroup>';
+  var o = '<div class="pg xpg"><div class="ttl2">' + h(d.title || S.defaultTitle(d)).replace(/\n/g,'<br>') + '</div><table class="main x6" style="table-layout:fixed"><colgroup>';
   for (var c = 0; c < 100; c++) o += '<col style="width:1%">';
   var PX = {1:'1px', 2:'1.5px', 3:'2px'};
   o += '</colgroup>' + rows.map(function(r, ri){
