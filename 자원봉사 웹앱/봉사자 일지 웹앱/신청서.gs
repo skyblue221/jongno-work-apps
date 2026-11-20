@@ -476,7 +476,7 @@ function formatPhone_(digits) {
 
 /** 종이 「자원봉사활동 신청서」와 같은 모양 (A4 한 장에 한 명) */
 function buildApplicationHtml_(apps) {
-  const box = function (on) { return '<span class="bx' + (on ? ' on' : '') + '">' + (on ? 'V' : '') + '</span>'; };
+  const box = function (on) { return '<span class="bx' + (on ? ' on' : '') + '">' + (on ? '■' : '') + '</span>'; };
   const yn = function (v) {
     return '<tr><td class="lab">동의함</td><td class="c">' + box(v === AGREE) + '</td>' +
       '<td class="lab">동의하지않음</td><td class="c">' + box(v === DISAGREE) + '</td></tr>';
@@ -553,7 +553,8 @@ function buildApplicationHtml_(apps) {
     '.law{font-size:7.5pt;line-height:1.4;margin:4mm 0 1mm}' +
     '.q{font-weight:bold;font-size:8.5pt;margin:2mm 0 1mm}' +
     'table.yn td{height:6mm}table.kid{margin-top:3mm}table.kid td,table.kid th{height:6mm;font-size:8.5pt}' +
-    '.bx{display:inline-block;width:11px;height:11px;line-height:11px;border:1.3px solid #000;font-size:8px;font-weight:bold;text-align:center}' +
+    '.bx{display:inline-block;width:11px;height:11px;line-height:10px;border:1.3px solid #000;font-size:12px;text-align:center;overflow:hidden;font-family:"Malgun Gothic","Noto Sans KR",sans-serif}' +
+    '.bx.on{background:#000;-webkit-print-color-adjust:exact;print-color-adjust:exact}' +
     '.date{text-align:center;font-weight:bold;font-size:11pt;margin:4mm 0 2mm}' +
     'table.sign{margin-left:auto;border-collapse:collapse}table.sign td{padding:0 6px;height:12mm;vertical-align:middle;font-size:10.5pt}' +
     'td.who{font-weight:bold}td.nm{min-width:28mm}td.im{width:38mm;text-align:center}td.in{font-weight:bold}' +
