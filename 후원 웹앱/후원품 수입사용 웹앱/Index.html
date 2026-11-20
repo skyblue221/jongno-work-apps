@@ -146,7 +146,6 @@ function toast(t,ms){ const el=$('#toast'); el.textContent=t; el.style.display='
 function busy(btn,on,txt){ if(!btn) return; if(on){btn._t=btn.textContent;btn.disabled=true;btn.textContent=txt||'처리 중...';} else {btn.disabled=false;btn.textContent=btn._t||btn.textContent;} }
 async function act(btn,fn,txt){if(btn&&btn.disabled)return;busy(btn,true,txt);const previous=CALL_BUTTON;try{CALL_BUTTON=btn;let result;try{result=fn();}finally{CALL_BUTTON=previous;}const done=await result;if(btn)btn._requests=null;return done;}catch(e){alert(e&&e.message?e.message:e);}finally{CALL_BUTTON=previous;busy(btn,false);}}
 function copyText(t){ (navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(()=>toast('링크를 복사했어요. 메신저로 보내 주세요.')).catch(()=>prompt('아래 링크를 길게 눌러 복사해 주세요.',t)); }
-function lotLabel(l){ return `${l.name} · ${l.inDate||'입고일 없음'} 입고`; }
 function koDate(d){ const m=String(d||'').match(/^(\d{4})-(\d{2})-(\d{2})/); return m?`${m[1]}년 ${+m[2]}월 ${+m[3]}일`:''; }
 function daysTo(d){ const m=String(d||'').match(/^(\d{4})-(\d{2})-(\d{2})$/); if(!m) return null; return Math.floor((new Date(+m[1],m[2]-1,+m[3]) - new Date(new Date().toDateString()))/864e5); }
 
@@ -343,7 +342,6 @@ async function famPick(title, onPick){
   $('#fo').onclick=()=>{ if(!sel.size) return toast('한 사람 이상 골라 주세요.'); onPick([...sel].map(i=>L[i])); m.style.display='none'; box.innerHTML=''; };
   draw();
 }
-function smsHref(phone,msg){ return `sms:${phone}${/iPhone|iPad|iPod/.test(navigator.userAgent)?'&':'?'}body=${encodeURIComponent(msg)}`; }
 /** 서명 저장: 빈 공간을 잘라내고(여백 조금) 저장해서 수령증 칸에 크게·진하게 보이게 */
 function sigCrop(cv){
   const W=cv.width,H=cv.height,d=cv.getContext('2d').getImageData(0,0,W,H).data;
