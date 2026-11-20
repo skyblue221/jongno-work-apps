@@ -162,6 +162,9 @@
   .pg.edu .nw{white-space:nowrap}
   .pg.edu .th2{background:#E3DCC1;font-weight:700;text-align:center}
   .pg.edu .in th{background:#E5E5E5;font-weight:700}
+  /* 장애이해교육: 한글 틀처럼 안쪽 선도 검은 가는 선, 안쪽 표는 굵은 틀 없이 */
+  .pg.edu td,.pg.edu th{border-color:#000}
+  .pg.edu table.in,.pg.edu table.in tr:first-child th{border:1px solid #000}
   .pg .pfoot{text-align:center;font-weight:700;font-size:20px;margin-top:28px;letter-spacing:1px}
   .pg .eduttl{font-size:22px;font-weight:700;text-align:center;padding:10px}
   /* 미리보기 */
@@ -172,14 +175,18 @@
   .pg{-webkit-print-color-adjust:exact;print-color-adjust:exact;background:#fff;padding:48px 40px;margin-bottom:20px;box-shadow:0 2px 12px rgba(0,0,0,.2);color:#000;font-family:"Nanum Gothic","NanumGothic","Malgun Gothic",sans-serif;font-size:13px;line-height:1.55}
   .pg .ttl{border:2px solid #000;text-align:center;font-size:20px;font-weight:700;padding:8px;margin:0 30px 14px}
   .pg table{width:100%;border-collapse:collapse}
-  .pg td,.pg th{border:1px solid #999;padding:5px 8px;vertical-align:middle}
+  /* 표 선: 한글 파일(틀의 테두리 설정)과 같게 — 바깥 검은 굵은 선, 안쪽 연한 회색 가는 선 */
+  .pg td,.pg th{border:1px solid #BBB;padding:5px 8px;vertical-align:middle}
   .pg .main{border:2px solid #000}
   /* 첨부 자료 표: 한글 파일과 같은 색 — 계획서·결과보고서는 연한 회색 선, 장애이해교육은 검은 가는 선 */
   .pg .main.att,.pg .main.att td{border:1px solid #BBB}
   .pg.edu .main.att,.pg.edu .main.att td{border:1px solid #000}
   .pg .lb{background:#F2F2F2;font-weight:700;text-align:center;white-space:nowrap;width:17%}
   .pg .in th{background:#DCDCDC;font-weight:normal}
-  .pg .in td,.pg .in th{border:1px solid #555}
+  /* 안쪽 표(일정표·업무분장 등): 한글 파일처럼 칸 사이는 검은 가는 선, 바깥 틀은 진회색 굵은 선(양옆 2px · 위아래와 제목 줄 아래 3px) */
+  .pg .in td,.pg .in th{border:1px solid #000}
+  .pg table.in{border-left:2px solid #5D5D5D;border-right:2px solid #5D5D5D;border-top:3px solid #5D5D5D;border-bottom:3px solid #5D5D5D}
+  .pg table.in tr:first-child th{border-top:3px solid #5D5D5D;border-bottom:3px solid #5D5D5D}
   .pg .in{margin:6px 0 10px}
   /* 안쪽 표는 칸 너비를 정한 비율 그대로 — 칸이 많아도(참여자 명단표 10칸 등) 종이 밖으로 나가지 않고, 긴 글자는 칸 안에서 줄을 바꿔요 */
   .pg table.in{table-layout:fixed;width:100%}
