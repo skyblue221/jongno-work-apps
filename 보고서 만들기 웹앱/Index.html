@@ -188,6 +188,9 @@
   .pg .ln{margin:0}.pg .dash{padding-left:14px;text-indent:-10px}.pg .sub{padding-left:24px;text-indent:-10px}
   .pg .ph img{max-width:100%;max-height:260px;display:block;margin:auto}
   .pg .attimg{max-width:100%;display:block;margin:6px auto}
+  .pg .attgrid{display:grid;gap:3mm;margin:6px 0}.pg .attgrid.k2{grid-template-columns:1fr 1fr}.pg .attgrid.k3{grid-template-columns:1fr 1fr 1fr}
+  .pg .attgrid>div{display:flex;align-items:center;justify-content:center;break-inside:avoid;page-break-inside:avoid}
+  .pg .attgrid img{max-width:100%;display:block}.pg .attgrid.k2 img{max-height:110mm}.pg .attgrid.k3 img{max-height:80mm}
   /* ===== 화면 다듬기 (2026-11) · 먹색 + 자주 · 입력 화면만 바뀌고 미리보기·인쇄 양식(.pg)은 그대로 · 이 블록만 지우면 예전 모양 ===== */
   :root{--bg:#f6f4ef;--card:#fff;--ink:#1f2421;--sub:#5b625e;--line:#d6d2c8;--main:#2a2d2c;--main2:#eeebe4;--acc:#7a2f55;--acc2:#f5ebf0;--warn:#a8322a;--warn2:#fbefed}
   body{font-family:"Noto Sans KR","Pretendard","Apple SD Gothic Neo","Malgun Gothic",sans-serif;word-break:keep-all}
@@ -951,7 +954,7 @@ function pvAtts(d){
   (d.attachments||[]).forEach(function(a){
     if (!a.title && !a.text && !(a.images||[]).length) return;
     o += '<div class="pg"><table class="main"><tr><td class="lb" style="width:auto">' + h(a.title || '첨부') + '</td></tr><tr><td>' +
-      (a.images||[]).map(function(im){ return imgTag(im.fileId, 'attimg'); }).join('') + pvLines(a.text) + '</td></tr></table></div>';
+      attImgs(a) + pvLines(a.text) + '</td></tr></table></div>';
   });
   return o;
 }
@@ -1742,6 +1745,13 @@ function renderPhotos(){ thumbs(document.getElementById('photos'), doc.photos, r
 
 /* ── 첨부 자료 ── */
 function addAtt(){ doc.attachments.push({title:'', text:'', images:[]}); markDirty(); renderAtts(); }
+function attColsPicker(a){
+  var sel = el('select', {style:'width:auto;margin-left:6px'});
+  [['0','자동 (1장은 크게, 여러 장은 나눠서)'],['1','1장씩 (크게)'],['2','2장씩'],['3','3장씩']].forEach(function(o){ var op = el('option', {text:o[1]}); op.value = o[0]; sel.appendChild(op); });
+  sel.value = String(Number(a.cols)||0);
+  sel.addEventListener('change', function(){ a.cols = Number(sel.value); markDirty(); });
+  return el('label', {style:'display:block;margin:6px 0'}, [document.createTextNode('그림 배치: 한 줄에'), sel]);
+}
 function renderAtts(){
   var box = document.getElementById('atts'); box.innerHTML = '';
   doc.attachments.forEach(function(a, i){
@@ -1756,6 +1766,7 @@ function renderAtts(){
         el('button', {class:'sm ghost del', on:{click:function(){ if(confirm('이 첨부 자료를 뺄까요?')){ doc.attachments.splice(i,1); markDirty(); renderAtts(); } }}, text:'✕'})]),
       t, th,
       el('label', {class:'upl'}, [document.createTextNode('＋ 그림 올리기 (끌어다 놓아도 돼요)'), file]),
+      attColsPicker(a),
       el('label', {text:'설명 글 (없어도 돼요)'}), ta(a.text, function(v){ a.text = v; }, 2)
     ]));
   });
@@ -1771,6 +1782,12 @@ function pvLines(text){
     if ((m = ln.match(/^\s*[*•·]\s+(.*)$/))) return '<p class="ln sub">• ' + rich(m[1]) + '</p>';
     return '<p class="ln">' + (rich(ln) || '&nbsp;') + '</p>';
   }).join('');
+}
+/* 첨부 그림: 한 장이면 크게, 여러 장이면 한 줄에 1~3장씩 (첨부마다 고를 수 있어요) */
+function attImgs(a){
+  var list = (a.images||[]).filter(function(im){ return imgCache[im.fileId]; }), k = HwpxGen.attCols(a);
+  if (k <= 1) return list.map(function(im){ return imgTag(im.fileId, 'attimg'); }).join('');
+  return '<div class="attgrid k' + k + '">' + list.map(function(im){ return '<div>' + imgTag(im.fileId) + '</div>'; }).join('') + '</div>';
 }
 function imgTag(id, cls){ return imgCache[id] ? '<img class="' + (cls||'') + '" src="data:image/jpeg;base64,' + imgCache[id].b64 + '">' : ''; }
 function previewHtml(d){
@@ -1808,7 +1825,7 @@ function previewHtml(d){
   (d.attachments||[]).forEach(function(a){
     if (!a.title && !a.text && !(a.images||[]).length) return;
     o += '<div class="pg"><table class="main"><tr><td class="lb" style="width:auto">' + h(a.title || '첨부') + '</td></tr><tr><td>' +
-      (a.images||[]).map(function(im){ return imgTag(im.fileId, 'attimg'); }).join('') + pvLines(a.text) + '</td></tr></table></div>';
+      attImgs(a) + pvLines(a.text) + '</td></tr></table></div>';
   });
   return o;
 }
@@ -1837,7 +1854,7 @@ function previewEduHtml(d){
   (d.attachments||[]).forEach(function(a){
     if (!a.title && !a.text && !(a.images||[]).length) return;
     o += '<div class="pg"><table class="main"><tr><td class="lb" style="width:auto">' + h(a.title || '첨부') + '</td></tr><tr><td>' +
-      (a.images||[]).map(function(im){ return imgTag(im.fileId, 'attimg'); }).join('') + pvLines(a.text) + '</td></tr></table><div class="pfoot">종로장애인복지관</div></div>';
+      attImgs(a) + pvLines(a.text) + '</td></tr></table><div class="pfoot">종로장애인복지관</div></div>';
   });
   return o + '<div class="pfoot-print" style="display:none">종로장애인복지관</div>';
 }
