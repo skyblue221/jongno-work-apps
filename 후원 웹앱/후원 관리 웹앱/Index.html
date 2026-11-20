@@ -4,8 +4,6 @@
 <base target="_top">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap">
 <style>
   /* 후원 업무 도우미 — 대표 색: 벽돌색 */
@@ -136,7 +134,7 @@ dialog,.prevBox{border-radius:2px;border-color:var(--line);border-top:3px solid 
   @media(max-width:520px){header{padding:20px 16px 12px}button{padding:9px 11px}th,td{padding:7px}nav button{padding:10px 8px 8px}}
 </style>
 </head>
-<body>
+<body data-role="<?= role ?>">
 <header>
   <h1>후원 업무 도우미</h1>
   <small>내려받은 파일을 올리면 보고용 숫자와 서식이 나와요</small> <span id="roleBadge" class="pill" hidden style="background:#fff3d6;color:#6b4a00;font-weight:700">정기후원 이체결과 보기 전용</span>
@@ -441,7 +439,6 @@ function show(id){document.querySelectorAll('main section').forEach(s=>s.hidden=
 document.querySelectorAll('nav button[data-tab]').forEach(b=>b.onclick=()=>{clearTimeout(noticeTimer);$('message').textContent='';show(b.dataset.tab);});
 async function copyText(text){try{await navigator.clipboard.writeText(text);return true;}catch(e){}const t=document.createElement('textarea');t.value=text;t.style.position='fixed';t.style.opacity='0';document.body.appendChild(t);t.select();let ok=false;try{ok=document.execCommand('copy');}catch(e){}t.remove();return ok;}
 function copyBtn(value,label){return `<button class="small copyBtn" data-copy="${esc(value)}">${esc(label||'복사')}</button>`;}
-function bindCopy(root){root.querySelectorAll('.copyBtn').forEach(b=>b.onclick=async()=>{const ok=await copyText(b.dataset.copy);notice(ok?`「${b.dataset.copy}」 복사했어요.`:'복사가 막혔어요. 다른 브라우저로 열어 주세요.',!ok);});}
 /** 기본은 A4 세로. 칸이 많은 CMS 결과목록만 가로로 출력 */
 function printHtml(html,landscape){
   const opt=typeof landscape==='object'&&landscape?landscape:{landscape:!!landscape};
@@ -449,7 +446,16 @@ function printHtml(html,landscape){
   if(!st){st=document.createElement('style');st.id='pageStyle';document.head.appendChild(st);}
   st.textContent=`@media print{@page{size:A4 ${opt.landscape?'landscape':'portrait'};margin:${opt.margin!=null?opt.margin:(opt.landscape?'12mm':'15mm 15mm')}}}`;
   $('printArea').innerHTML=html;setTimeout(()=>window.print(),50);}
-function xlsxDownload(name,rows){if(!window.XLSX){notice('엑셀 기능을 불러오지 못했어요. 새로고침해 주세요.',true);return;}const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rows),'Sheet1');XLSX.writeFile(wb,name);}
+/* 엑셀·그래프 도구는 화면을 먼저 띄운 뒤, 쓸 때 받아요 (예전에는 약 1MB를 다 받은 다음에야 화면이 떴어요) */
+const LIBS={xlsx:{src:'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js',name:'XLSX',fail:'엑셀 기능을 불러오지 못했어요. 인터넷 연결을 확인하고 다시 해 주세요.'},
+  chart:{src:'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js',name:'Chart',fail:'그래프를 불러오지 못했어요.'}},libLoading={};
+function needLib(key){const L=LIBS[key];if(window[L.name])return Promise.resolve();if(libLoading[key])return libLoading[key];
+  return libLoading[key]=new Promise((ok,no)=>{const s=document.createElement('script');s.src=L.src;s.async=true;
+    s.onload=()=>window[L.name]?ok():no(Error(L.fail));s.onerror=()=>{s.remove();no(Error(L.fail));};document.head.appendChild(s);})
+    .catch(e=>{delete libLoading[key];throw e;});}
+// 화면이 뜨고 조금 뒤에 엑셀 도구를 미리 받아 둬요 (파일을 고를 때 기다리지 않게)
+window.addEventListener('load',()=>setTimeout(()=>needLib('xlsx').catch(()=>{}),2000));
+async function xlsxDownload(name,rows){try{await needLib('xlsx');}catch(e){notice(e.message,true);return;}const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rows),'Sheet1');XLSX.writeFile(wb,name);}
 const korDate=d=>{const [y,m,dd]=String(d).split('-').map(Number);return `${y}년 ${m}월 ${dd}일`;};
 
 /* ── 금결원 엑셀 읽기 ── */
@@ -507,7 +513,7 @@ $('cmsFile').addEventListener('change',async e=>{
   pendingCms=null;$('saveCms').disabled=true;const f=e.target.files[0];if(!f)return;
   $('cmsPreview').textContent='파일을 읽는 중입니다.';
   try{
-    if(!window.XLSX)throw Error('엑셀 기능을 불러오지 못했어요. 새로고침해 주세요.');
+    await needLib('xlsx');
     const wb=XLSX.read(await f.arrayBuffer(),{type:'array',cellDates:true});
     let found=null,diag=null;
     for(const name of wb.SheetNames){const m=mapSheet(XLSX.utils.sheet_to_json(wb.Sheets[name],{header:1,raw:true,defval:''}));if(m.rows.length){found=m;break;}if(!diag||m.seen.length>diag.seen.length)diag=Object.assign({sheet:name},m);}
@@ -553,7 +559,6 @@ async function loadLedger(){
 }
 $('loadLedger').onclick=loadLedger;$('cmsDate').onchange=loadLedger;
 const LEDGER_HEAD=['구분','출금일','후원자번호','후원자명','주민번호앞자리','은행','계좌번호','연락처','출금의뢰금액','통장기재내용','출금형태','정상출금액','오류코드','오류내용','수수료'];
-const ledgerRow=r=>[r.seq,r.date,r.no,r.name,r.front,r.bank,r.account,r.phone,r.requested,r.memo,r.type,r.paid,r.errCode,r.errMsg,r.fee];
 // 출력·엑셀용 간단 목록 (기존 종이 양식과 같은 10칸)
 const PRINT_HEAD=['구분','출금일','후원자번호','후원자명','계좌번호','출금의뢰금액','정상출금액','오류코드','오류내용','수수료'];
 const printRow=r=>[r.seq,r.date,r.no,r.name,r.account,r.requested,r.paid,r.errCode,r.errMsg,r.fee];
@@ -665,6 +670,7 @@ $('moFile').addEventListener('change',async e=>{
   const f=e.target.files[0];monthly=null;$('moResultPanel').hidden=true;if(!f)return;
   $('moStatus').textContent='파일을 읽는 중입니다.';
   try{
+    await needLib('xlsx');
     const wb=XLSX.read(await f.arrayBuffer(),{type:'array',cellDates:true});let r=null;
     for(const name of wb.SheetNames){const x=computeMonthly(XLSX.utils.sheet_to_json(wb.Sheets[name],{header:1,raw:true,defval:''}));if(!x.error){r=x;break;}if(!r)r=x;}
     if(r.error){$('moStatus').innerHTML=`<div class="notice">${esc(r.error)}</div>`;return;}
@@ -896,7 +902,7 @@ const AN={acct:null,goods:{},cash:null,gift:null,ctx:null,saved:null,mode:"draft
 const anYear=()=>Number($('anYear').value);
 const vIn=id=>{const v=$(id).value.replace(/[,\s]/g,'');return v===''?null:Number(v);};
 const setIn=(id,v)=>{$(id).value=v==null?'':String(v);};
-async function readBook(file){const wb=XLSX.read(await file.arrayBuffer(),{type:'array',cellDates:true});return wb.SheetNames.map(n=>XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,raw:true,defval:''}));}
+async function readBook(file){await needLib('xlsx');const wb=XLSX.read(await file.arrayBuffer(),{type:'array',cellDates:true});return wb.SheetNames.map(n=>XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,raw:true,defval:''}));}
 function clearAnnualDraft(){
  AN.acct=null;AN.goods={};AN.cash=null;AN.gift=null;AN.autoInfo=null;donorAgg=null;
  ['anAcct','anGoods','anDonors','aCntD','aCntN','aCntCms','aInCount','aInQty','aInAmount','aOutCount','aOutQty','aOutAmount','anMemo'].forEach(id=>$(id).value='');
@@ -1091,7 +1097,8 @@ function renderDonors(){
 }
 $('donorSearch').addEventListener('input',renderDonors);$('donorMissing').onchange=renderDonors;$('donorEnded').onchange=renderDonors;$('reloadDonors').onclick=loadDonors;
 
-api('getMyRole').then(role=>{
+// 권한은 앱을 열 때 이미 확인해서 화면에 같이 보내요 (서버에 한 번 덜 물어봐서 첫 화면이 빨라져요)
+(document.body.dataset.role?Promise.resolve(document.body.dataset.role):api('getMyRole')).then(role=>{
   if(role==='viewer'){
     // 기획담당 등: 정기후원 이체결과만
     document.querySelectorAll('nav button').forEach(b=>{if(b.dataset.tab!=='transfer')b.remove();});
@@ -1317,7 +1324,7 @@ async function loadDash(){
   const draw=(id,cfg)=>{const canvas=$(id);if(!canvas)return;
     if(dashCharts[id]){dashCharts[id].destroy();delete dashCharts[id];}
     const box=canvas.parentNode;let warning=box.querySelector('.chartWarning');
-    if(!window.Chart){canvas.hidden=true;if(!warning){warning=document.createElement('p');warning.className='small muted chartWarning';warning.textContent='그래프를 불러오지 못했어요. 아래 표로 확인해 주세요.';box.appendChild(warning);}return;}
+    if(!window.Chart){needLib('chart').then(()=>{if($(id)===canvas&&canvas.isConnected)draw(id,cfg);}).catch(()=>{canvas.hidden=true;if(!box.querySelector('.chartWarning')){const w=document.createElement('p');w.className='small muted chartWarning';w.textContent='그래프를 불러오지 못했어요. 아래 표로 확인해 주세요.';box.appendChild(w);}});return;}
     canvas.hidden=false;if(warning)warning.remove();dashCharts[id]=new Chart(canvas,cfg);};
   const line=(a,b,key)=>({type:'line',data:{labels,datasets:[
     {label:d.year+'년',data:a.map(x=>x[key]),borderColor:C_THIS,backgroundColor:C_THIS,borderWidth:2,pointRadius:4,tension:.25,spanGaps:false},

@@ -32,8 +32,10 @@ function owner_(){
 }
 function requireOwner_(){if(!owner_())throw Error('이 기능은 담당자만 사용할 수 있습니다.');}
 function doGet(){
-  if(!role_())return HtmlService.createHtmlOutput('<p style="font-family:sans-serif;padding:24px">접근 권한이 없습니다.</p>').setTitle('후원 업무 도우미');
-  return HtmlService.createHtmlOutputFromFile('Index').setTitle('후원 업무 도우미').addMetaTag('viewport','width=device-width, initial-scale=1');
+  const role=role_();
+  if(!role)return HtmlService.createHtmlOutput('<p style="font-family:sans-serif;padding:24px">접근 권한이 없습니다.</p>').setTitle('후원 업무 도우미');
+  const page=HtmlService.createTemplateFromFile('Index');page.role=role;   // 권한을 화면에 같이 보내서 첫 화면에서 한 번 덜 물어봄
+  return page.evaluate().setTitle('후원 업무 도우미').addMetaTag('viewport','width=device-width, initial-scale=1');
 }
 /* 한 번 실행하는 동안 같은 탭을 여러 번 읽지 않도록 기억해 둠 (저장할 때는 비움) */
 let _SS=null,_TAB={},_ROWS={},_CMS=null,_SAVE_LOCK_HELD=false;
@@ -213,7 +215,6 @@ function resultOk_(code,msg,paid){
 }
 function hasResult_(code,msg,paid){return String(code==null?'':code).trim()!==''||String(msg==null?'':msg).trim()!==''||num_(paid)>0;}
 function feeOf_(code,msg,paid){if(!hasResult_(code,msg,paid))return 0;return resultOk_(code,msg,paid)?FEE_OK:FEE_ERROR;}
-function fee_(code){return feeOf_(code,'',0);}
 function isOk_(r){return resultOk_(r.errCode,r.errMsg,r.paid);}
 
 /* ── CMS: 가져오기 ── */
