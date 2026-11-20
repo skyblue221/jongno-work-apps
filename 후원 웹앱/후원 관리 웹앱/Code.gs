@@ -34,8 +34,9 @@ function requireOwner_(){if(!owner_())throw Error('이 기능은 담당자만 �
 function doGet(){
   const role=role_();
   if(!role)return HtmlService.createHtmlOutput('<p style="font-family:sans-serif;padding:24px">접근 권한이 없습니다.</p>').setTitle('후원 업무 도우미');
-  const page=HtmlService.createTemplateFromFile('Index');page.role=role;   // 권한을 화면에 같이 보내서 첫 화면에서 한 번 덜 물어봄
-  return page.evaluate().setTitle('후원 업무 도우미').addMetaTag('viewport','width=device-width, initial-scale=1');
+  // 권한을 화면에 같이 보내서 첫 화면에서 한 번 덜 물어봄 (템플릿 대신 글자 바꾸기: 예전과 같은 방식으로 화면을 만듦)
+  const html=HtmlService.createHtmlOutputFromFile('Index').getContent().replace('<body data-role="">','<body data-role="'+role+'">');
+  return HtmlService.createHtmlOutput(html).setTitle('후원 업무 도우미').addMetaTag('viewport','width=device-width, initial-scale=1');
 }
 /* 한 번 실행하는 동안 같은 탭을 여러 번 읽지 않도록 기억해 둠 (저장할 때는 비움) */
 let _SS=null,_TAB={},_ROWS={},_CMS=null,_SAVE_LOCK_HELD=false;
