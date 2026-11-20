@@ -124,7 +124,8 @@ function doGet(e) {
 }
 
 /* ───────── 공통 ───────── */
-const ss_ = () => SpreadsheetApp.getActive();
+let SS_ = null;
+const ss_ = () => SS_ || (SS_ = SpreadsheetApp.getActive());
 const str_ = v => (v == null ? '' : String(v).trim());
 const num_ = v => { const n = Number(String(v == null ? '' : v).replace(/[^\d.\-]/g, '')); return isFinite(n) ? n : 0; };
 const norm_ = s => str_(s).replace(/[\s()（）]/g, '');
@@ -137,7 +138,16 @@ function ymd_(v) {
 }
 function toDate_(s) { const m = String(s).match(/^(\d{4})-(\d{2})-(\d{2})$/); return m ? new Date(+m[1], +m[2] - 1, +m[3]) : s; }
 const colL_ = n => { let s = ''; while (n > 0) { const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - 1) / 26); } return s; };
-const props_ = () => PropertiesService.getScriptProperties();
+/* 속도: 설정값을 한 번에 다 읽어 두고, 바꿀 때는 서버와 읽어 둔 값을 같이 고침 */
+let PROPS_ = null;
+const props_ = () => PROPS_ || (PROPS_ = (() => {
+  const s = PropertiesService.getScriptProperties(), all = s.getProperties();
+  return {
+    getProperty: k => (Object.prototype.hasOwnProperty.call(all, k) ? all[k] : null),
+    setProperty: (k, v) => { s.setProperty(k, v); all[k] = String(v); },
+    deleteProperty: k => { s.deleteProperty(k); delete all[k]; }
+  };
+})());
 const me_ = () => (Session.getActiveUser().getEmail() || '').toLowerCase();
 function isAdmin_() {
   const me = me_(); if (!me) return false;
@@ -171,7 +181,14 @@ function saveViewers(list) {
 /** 기관 계정이 아니면(외부 서명용 배포로 들어온 경우) 서명 화면 말고는 아무것도 못 하게 막음 */
 function needOrg_() { if (!me_()) throw new Error('기관 계정으로 로그인해야 쓸 수 있어요.'); }
 function saveVoucherUsers(list) { needAdmin_(); const v = String(list || '').toLowerCase().split(/[,\s]+/).filter(x => /@/.test(x)); props_().setProperty('VUSERS', v.join(',')); return v; }
-function withLock_(fn) { const l = LockService.getScriptLock(); l.waitLock(30000); clearCache_(); try { return fn(); } finally { clearCache_(); l.releaseLock(); } }
+/* keepCache=true: 재고와 상관없는 일(서명 링크 열기 등)은 재고 계산값을 지우지 않음 */
+function withLock_(fn, keepCache) {
+  const l = LockService.getScriptLock(); l.waitLock(30000);
+  PROPS_ = null; clearMemo_(); // 잠근 뒤 최신 설정값으로 다시 읽기
+  try { return fn(); } finally { if (keepCache) clearMemo_(); else clearCache_(); l.releaseLock(); }
+}
+function clearMemo_() { Object.keys(MEMO).forEach(k => delete MEMO[k]); }
+function withLockKeep_(fn) { return withLock_(fn, true); }
 /* 속도: 한 번 실행 안에서 같은 탭을 여러 번 읽지 않게(MEMO), 재고 계산은 1시간까지 저장(CacheService)
    - 앱에서 저장하거나 시트에서 직접 고치면(onEdit) '버전'이 바뀌어 바로 새로 계산
    - 설문지 응답처럼 onEdit이 안 생기는 추가도 탭의 마지막 줄 번호가 바뀌면 새로 계산
@@ -226,9 +243,10 @@ function installWarmTrigger() {
 
 /** 탭 이름 앞의 번호(「2. 폐기 목록」)나 띄어쓰기가 달라도 찾음 */
 function sheet_(key) {
-  const want = APP.sheets[key], ex = ss_().getSheetByName(want); if (ex) return ex;
+  const mk = 'sheet_' + key; if (MEMO[mk] !== undefined) return MEMO[mk];
+  const want = APP.sheets[key], ex = ss_().getSheetByName(want); if (ex) return (MEMO[mk] = ex);
   const n = s => String(s).replace(/^\s*\d+\s*[.)_\-]\s*/, '').replace(/\s+/g, '');
-  return ss_().getSheets().find(s => n(s.getName()) === n(want)) || null;
+  return (MEMO[mk] = ss_().getSheets().find(s => n(s.getName()) === n(want)) || null);
 }
 
 /* ───────── 칸 찾기·확인 ───────── */
@@ -1353,7 +1371,7 @@ const SIGN_DAYS = 14;
 /** 가정 서명 명단의 한 분에게 보낼 서명 링크 (한 분 = 링크 하나, 서명하면 닫힘) */
 function makeSignLink(id, idx, phone) {
   needOrg_();
-  return withLock_(() => {
+  return withLockKeep_(() => {
     const base = str_(props_().getProperty('PUBLIC_URL'));
     if (!base) throw new Error('설정 탭에서 「외부 서명용 주소」를 먼저 넣어 주세요.');
     const x = findHome_(id), h = homeData_(x), p = h.d.people[idx];
@@ -1392,7 +1410,7 @@ function checkWho_(c, code) {
   if (!want || got !== want) { p.tries = (p.tries || 0) + 1; c.h.f.setContent(JSON.stringify(c.h.d)); throw new Error('입력한 번호가 맞지 않아요. (' + (5 - p.tries) + '번 남음)'); }
 }
 function publicSignInfo(token, code) {
-  return withLock_(() => {
+  return withLockKeep_(() => {
     const c = signTarget_(token);
     if (code === undefined) return { name: c.p.name.slice(0, 1) + '○' + c.p.name.slice(2), check: c.p.birth ? '생년월일 6자리 (예: 1965년 3월 12일생 → 650312)' : '연락처 뒤 4자리' };
     checkWho_(c, code);
@@ -1400,7 +1418,7 @@ function publicSignInfo(token, code) {
   });
 }
 function publicSign(token, code, dataUrl) {
-  return withLock_(() => {
+  return withLockKeep_(() => {
     const c = signTarget_(token);
     checkWho_(c, code);
     if (!/^data:image\/png;base64,/.test(String(dataUrl)) || String(dataUrl).length > 400000) throw new Error('서명을 다시 해 주세요.');
