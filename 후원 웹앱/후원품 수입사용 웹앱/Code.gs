@@ -188,7 +188,7 @@ function cacheStamp_() {
 }
 function cached_(key, fn) {
   if (MEMO[key]) return MEMO[key];
-  const c = CacheService.getScriptCache(), prefix = 'v3:' + key + ':' + cacheStamp_();
+  const c = CacheService.getScriptCache(), prefix = 'v4:' + key + ':' + cacheStamp_();
   try {
     const m = JSON.parse(c.get(prefix) || 'null');
     if (m && m.count > 0) {
@@ -422,15 +422,18 @@ function staffRead_() {
 }
 function stock_(compare) {
   const lots = {}, firstLot = {}, order = [];
-  readSheet_('REG', ['photo', 'value']).forEach(r => {
+  // 사진 칸은 드라이브 링크 글자라 같이 읽어도 가벼워요 (📷 사진 보기에 씀). 환가액만 건너뜀
+  readSheet_('REG', ['value']).forEach(r => {
     const name = str_(r.name); if (!name) return;
     const d = ymd_(r.date), k = name + '|' + d;
     if (!lots[k]) {
       lots[k] = { key: k, name: name, inDate: d, inQty: 0, unit: str_(r.unit), donor: str_(r.donor),
-        expiry: ymd_(r.expiry), photo: str_(r.photo), purpose: '', out: 0, disp: 0, pending: 0 };
+        expiry: ymd_(r.expiry), photo: '', purpose: '', out: 0, disp: 0, pending: 0 };
       order.push(k);
     }
     // 사용목적(지정 용도): 같은 묶음에 여러 줄이면 겹치지 않게 모아서 보여 줌
+    const ph = str_(r.photo);
+    if (ph && lots[k].photo.indexOf(ph) < 0 && lots[k].photo !== ph) lots[k].photo = lots[k].photo ? lots[k].photo + ', ' + ph : ph;
     const pu = str_(r.purpose);
     if (pu && lots[k].purpose.split(' / ').indexOf(pu) < 0) lots[k].purpose = lots[k].purpose ? lots[k].purpose + ' / ' + pu : pu;
     lots[k].inQty += num_(r.qty);
@@ -467,7 +470,7 @@ function photoAllowed_(id) {
   let list = c.get(key);
   if (!list) {
     const ids = [];
-    readSheet_('REG', ['photo']).forEach(r => String(r.photo || '').replace(/(?:[?&]id=|\/d\/)([\w-]{20,})/g, (m, x) => { ids.push(x); return m; }));
+    readSheet_('REG', Object.keys(FIELDS.REG).filter(f => f !== 'photo')).forEach(r => String(r.photo || '').replace(/(?:[?&]id=|\/d\/)([\w-]{20,})/g, (m, x) => { ids.push(x); return m; }));
     list = ids.join(',');
     if (list.length < 90000) c.put(key, list, 600);
   }
