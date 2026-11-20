@@ -109,7 +109,7 @@ input[type=checkbox],input[type=radio]{width:auto;min-height:0;margin:0 6px 0 0;
 .preview{border-radius:0}
 @media(max-width:640px){header h1::before{display:block;margin:0 0 2px}nav{gap:20px}.card{padding:16px}}
 @media print{
-  @page{margin:10mm}
+  @page{margin:15mm}
   body{background:#fff}
   #app,#toast,#modal{display:none!important}
   #printArea{display:block}
@@ -289,12 +289,13 @@ function orgHtml(o){
   \x3cp style="text-align:right;font-size:13pt;margin:0 20px 40px;line-height:2.2">인수 기관 : ${esc(org.name)}${org.contact?`\x3cbr>수령자 : ${esc(org.contact)} &nbsp;(인)`:' &nbsp;(인)'}\x3c/p>
   \x3cp style="text-align:center;font-size:16pt;font-weight:bold">${esc(S.boot.org)}장 귀하\x3c/p>\x3c/div>`;
 }
+/* 출력 여백: 사방 15mm (예전 10mm는 종이 끝에 너무 붙어 보였어요). 쓸 수 있는 넓이·높이 = A4에서 여백 30mm를 뺀 크기 */
 function fitPage(html, landscape){
-  const W=landscape?1045:715, H=landscape?715:1045, m=document.createElement('div');
+  const W=landscape?1009:680, H=landscape?680:1009, m=document.createElement('div');
   m.style.cssText=`position:absolute;left:-99999px;top:0;width:${W}px;visibility:hidden`;
   m.innerHTML=html; document.body.appendChild(m);
   const z=Math.min(1, W/Math.max(m.scrollWidth,1), H/Math.max(m.scrollHeight,1)); m.remove();
-  return `\x3cstyle>@page{size:A4 ${landscape?'landscape':'portrait'};margin:10mm}\x3c/style>\x3cdiv style="zoom:${z.toFixed(3)}">${html}\x3c/div>`;
+  return `\x3cstyle>@page{size:A4 ${landscape?'landscape':'portrait'};margin:15mm}\x3c/style>\x3cdiv style="zoom:${z.toFixed(3)}">${html}\x3c/div>`;
 }
 function rgbHex(c){ const m=String(c).match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?/); if(!m||m[4]==='0') return ''; return '#'+[m[1],m[2],m[3]].map(x=>(+x).toString(16).padStart(2,'0')).join(''); }
 function htmlModel(html, landscape){
