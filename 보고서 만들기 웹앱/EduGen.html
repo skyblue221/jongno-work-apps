@@ -195,7 +195,7 @@ var EduGen = (function () {
     return tblOpen(rows.length, B.length - 1, X.R, H, 5, 0) + xml + '</hp:tbl>';
   }
 
-  // 첨부 그림 여러 장을 한 줄에 cols장씩 (a.cols: 0=자동 · 1~3). 그림은 글자처럼 줄에 놓이는 개체라 한 문단에 나란히 넣어요
+  // 첨부 그림 여러 장을 한 줄에 cols장씩 (a.cols: 0=자동 · 1~3). 선 없는 표의 칸에 한 장씩 넣어요 (한글에서 줄이 넘치지 않게)
   function attCols(a) {
     var n = (a.images || []).length, c = Number(a.cols) || 0;
     if (c >= 1 && c <= 3) return c;
@@ -203,18 +203,16 @@ var EduGen = (function () {
   }
   function picGrid(images, list, tw, cols, maxH1) {
     if (cols <= 1) return list.map(function (im) { return picPara(images[im.fileId], im.fileId, tw, maxH1); }).filter(Boolean);
-    var gap = 850, w = Math.floor((tw - gap * cols) / cols), maxH = Math.round(w * 1.4), out = [];
-    for (var i = 0; i < list.length; i += cols) {
-      var ps = list.slice(i, i + cols).map(function (im) { return picPara(images[im.fileId], im.fileId, w, maxH); }).filter(Boolean);
-      if (!ps.length) continue;
-      var first = ps[0].x, head = first.slice(0, first.indexOf('<hp:pic ')), tail = first.slice(first.lastIndexOf('</hp:pic>') + 9);
-      var pics = ps.map(function (p) {
-        return p.x.slice(p.x.indexOf('<hp:pic '), p.x.lastIndexOf('</hp:pic>') + 9)
-          .replace('<hp:outMargin left="0" right="0"', '<hp:outMargin left="' + gap / 2 + '" right="' + gap / 2 + '"');
-      }).join('');
-      out.push({ x: head + pics + tail, h: Math.max.apply(null, ps.map(function (p) { return p.h; })) });
+    var ok = list.filter(function (im) { var g = images[im.fileId]; return g && g.w; });
+    if (!ok.length) return [];
+    var cw = Math.floor((tw - 600) / cols), pw = cw - PAD - 400, maxH = Math.round(pw * 1.45), trs = '', H = 0, nr = 0;
+    for (var i = 0; i < ok.length; i += cols) {
+      var ps = ok.slice(i, i + cols).map(function (im) { return picPara(images[im.fileId], im.fileId, pw, maxH); });
+      var rh = Math.max.apply(null, ps.map(function (p) { return p ? p.h : 0; })) + VPAD + 300, cells = '';
+      for (var c = 0; c < cols; c++) cells += cell({ r: nr, c: c, w: cw, h: rh, bf: 1, body: ps[c] ? ps[c].x : para(P.cellC, '', cw - PAD).x });
+      trs += '<hp:tr>' + cells + '</hp:tr>'; H += rh; nr++;
     }
-    return out;
+    return [{ x: pOpen(P.cellC) + '<hp:run charPrIDRef="' + C.normal + '">' + tblOpen(nr, cols, cw * cols, H, 1, 3) + trs + '</hp:tbl><hp:t/></hp:run></hp:p>', h: H + 1400 }];
   }
   // ── 첨부 자료 (계획서·결과보고서와 같은 방식, 새 쪽에서 시작) ──
   function attachments(d, images) {

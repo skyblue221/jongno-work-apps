@@ -1892,7 +1892,7 @@ function printReport(){
   var head = Array.prototype.map.call(document.querySelectorAll('style, link[rel=stylesheet]'), function(n){ return n.outerHTML; }).join('');
   w.document.open();
   w.document.write('<!DOCTYPE html><html lang="ko"><head><meta charset="utf-8"><title>' + h(name) + '</title>' + head +
-    '<style>body{margin:0;background:#888}#pvWrap{display:block!important;position:static;background:#888}@media print{body{background:#fff}}</style></head><body>' +
+    '<style>body{margin:0;background:#888}#pvWrap{display:block!important;position:static;background:#888}@media print{body,#pvWrap{background:#fff!important}}</style></head><body>' +
     '<div id="pvWrap"><div id="pv">' + document.getElementById('pv').innerHTML + '</div></div></body></html>');
   w.document.close();
   w.onafterprint = function(){ w.close(); };

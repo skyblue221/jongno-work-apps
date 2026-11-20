@@ -150,8 +150,8 @@ var HwpxGen = (function () {
       o.body + '</hp:subList><hp:cellAddr colAddr="' + o.c + '" rowAddr="' + o.r + '"/><hp:cellSpan colSpan="' + (o.cs || 1) + '" rowSpan="' + (o.rs || 1) + '"/>' +
       '<hp:cellSz width="' + o.w + '" height="' + Math.round(o.h) + '"/><hp:cellMargin left="510" right="510" top="141" bottom="141"/></hp:tc>';
   }
-  function tblOpen(id, rows, cols, width, height, z, vOff, inline) {
-    return '<hp:tbl id="' + id + '" zOrder="' + z + '" numberingType="TABLE" textWrap="TOP_AND_BOTTOM" textFlow="BOTH_SIDES" lock="0" dropcapstyle="None" pageBreak="' + PAGE_BREAK + '" repeatHeader="1" rowCnt="' + rows + '" colCnt="' + cols + '" cellSpacing="0" borderFillIDRef="2" noAdjust="0">' +
+  function tblOpen(id, rows, cols, width, height, z, vOff, inline, bf) {
+    return '<hp:tbl id="' + id + '" zOrder="' + z + '" numberingType="TABLE" textWrap="TOP_AND_BOTTOM" textFlow="BOTH_SIDES" lock="0" dropcapstyle="None" pageBreak="' + PAGE_BREAK + '" repeatHeader="1" rowCnt="' + rows + '" colCnt="' + cols + '" cellSpacing="0" borderFillIDRef="' + (bf || 2) + '" noAdjust="0">' +
       '<hp:sz width="' + width + '" widthRelTo="ABSOLUTE" height="' + Math.round(height) + '" heightRelTo="ABSOLUTE" protect="0"/>' +
       '<hp:pos treatAsChar="' + (inline ? 1 : 0) + '" affectLSpacing="0" flowWithText="1" allowOverlap="0" holdAnchorAndSO="0" vertRelTo="PARA" horzRelTo="PARA" vertAlign="TOP" horzAlign="LEFT" vertOffset="' + (vOff || 0) + '" horzOffset="0"/>' +
       '<hp:outMargin left="283" right="283" top="283" bottom="283"/><hp:inMargin left="510" right="510" top="141" bottom="141"/>';
@@ -446,7 +446,7 @@ var HwpxGen = (function () {
     return tblOpen(1927477144, r, 6, sum(W, 0, 6), H, 1, 4075 + TITLE_EXTRA) + xml + '</hp:tbl>';
   }
 
-  // 첨부 그림 여러 장을 한 줄에 cols장씩 (a.cols: 0=자동 · 1~3). 그림은 글자처럼 줄에 놓이는 개체라 한 문단에 나란히 넣어요
+  // 첨부 그림 여러 장을 한 줄에 cols장씩 (a.cols: 0=자동 · 1~3). 선 없는 표의 칸에 한 장씩 넣어요 (한글에서 줄이 넘치지 않게)
   function attCols(a) {
     var n = (a.images || []).length, c = Number(a.cols) || 0;
     if (c >= 1 && c <= 3) return c;
@@ -454,18 +454,16 @@ var HwpxGen = (function () {
   }
   function picGrid(images, list, tw, cols, maxH1) {
     if (cols <= 1) return list.map(function (im) { return picPara(images[im.fileId], im.fileId, tw, maxH1); }).filter(Boolean);
-    var gap = 850, w = Math.floor((tw - gap * cols) / cols), maxH = Math.round(w * 1.4), out = [];
-    for (var i = 0; i < list.length; i += cols) {
-      var ps = list.slice(i, i + cols).map(function (im) { return picPara(images[im.fileId], im.fileId, w, maxH); }).filter(Boolean);
-      if (!ps.length) continue;
-      var first = ps[0].x, head = first.slice(0, first.indexOf('<hp:pic ')), tail = first.slice(first.lastIndexOf('</hp:pic>') + 9);
-      var pics = ps.map(function (p) {
-        return p.x.slice(p.x.indexOf('<hp:pic '), p.x.lastIndexOf('</hp:pic>') + 9)
-          .replace('<hp:outMargin left="0" right="0"', '<hp:outMargin left="' + gap / 2 + '" right="' + gap / 2 + '"');
-      }).join('');
-      out.push({ x: head + pics + tail, h: Math.max.apply(null, ps.map(function (p) { return p.h; })) });
+    var ok = list.filter(function (im) { var g = images[im.fileId]; return g && g.w; });
+    if (!ok.length) return [];
+    var cw = Math.floor((tw - 600) / cols), pw = cw - CELL_PAD - 200, maxH = Math.round(pw * 1.45), trs = '', H = 0, nr = 0;
+    for (var i = 0; i < ok.length; i += cols) {
+      var ps = ok.slice(i, i + cols).map(function (im) { return picPara(images[im.fileId], im.fileId, pw, maxH); });
+      var rh = Math.max.apply(null, ps.map(function (p) { return p ? p.h : 0; })) + CELL_VPAD + 300, cells = '';
+      for (var c = 0; c < cols; c++) cells += cell({ r: nr, c: c, w: cw, h: rh, bf: 1, body: ps[c] ? ps[c].x : para(P.center, '', cw - CELL_PAD).x });
+      trs += '<hp:tr>' + cells + '</hp:tr>'; H += rh; nr++;
     }
-    return out;
+    return [{ x: pOpen(P.center) + '<hp:run charPrIDRef="5">' + tblOpen(nid(), nr, cols, cw * cols, H, 3, 0, false, 1) + trs + '</hp:tbl><hp:t/></hp:run></hp:p>', h: H + 566 + 400 }];
   }
   // ── 첨부 자료: 새 쪽에서 시작하는 1칸짜리 표 ──
   function attachments(d, images) {
