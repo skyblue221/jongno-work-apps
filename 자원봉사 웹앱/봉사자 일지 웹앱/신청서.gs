@@ -544,18 +544,18 @@ function buildApplicationHtml_(apps) {
     'h1{text-align:center;font-size:18pt;margin:0 0 6px}' +
     '.intro{font-size:8.5pt;line-height:1.45;margin:0}' +
     'table.t{width:100%;border-collapse:collapse;table-layout:fixed}' +
-    'table.t th,table.t td{border:1px solid #000;padding:2px 4px;height:7mm;text-align:center;vertical-align:middle;font-size:9pt;word-wrap:break-word}' +
+    'table.t th,table.t td{border:1px solid #000;padding:2px 4px;height:8mm;text-align:center;vertical-align:middle;font-size:9pt;word-wrap:break-word}' +
     'table.t th{background:#dce4ef;-webkit-print-color-adjust:exact;print-color-adjust:exact}' +
     '@media print{th,.lab{-webkit-print-color-adjust:exact;print-color-adjust:exact}}' +
     'td.l{text-align:left}.c{text-align:center}.sm{font-size:6.5pt;font-weight:normal}' +
     '.lab{background:#dce4ef;-webkit-print-color-adjust:exact;print-color-adjust:exact}' +
     '.note{text-align:right;font-size:7.5pt;margin-top:2px}' +
-    '.law{font-size:7.5pt;line-height:1.4;margin:4mm 0 1mm}' +
-    '.q{font-weight:bold;font-size:8.5pt;margin:2mm 0 1mm}' +
-    'table.yn td{height:6mm}table.kid{margin-top:3mm}table.kid td,table.kid th{height:6mm;font-size:8.5pt}' +
+    '.law{font-size:7.5pt;line-height:1.4;margin:5mm 0 1mm}' +
+    '.q{font-weight:bold;font-size:8.5pt;margin:2.5mm 0 1.5mm}' +
+    'table.yn td{height:7mm}table.kid{margin-top:4mm}table.kid td,table.kid th{height:7mm;font-size:8.5pt}' +
     '.bx{display:inline-block;width:11px;height:11px;line-height:10px;border:1.3px solid #000;font-size:12px;text-align:center;overflow:hidden;font-family:"Malgun Gothic","Noto Sans KR",sans-serif}' +
     '.bx.on{background:#000;-webkit-print-color-adjust:exact;print-color-adjust:exact}' +
-    '.date{text-align:center;font-weight:bold;font-size:11pt;margin:4mm 0 2mm}' +
+    '.date{text-align:center;font-weight:bold;font-size:11pt;margin:6mm 0 2mm}' +
     'table.sign{margin-left:auto;border-collapse:collapse}table.sign td{padding:0 6px;height:12mm;vertical-align:middle;font-size:10.5pt}' +
     'td.who{font-weight:bold}td.nm{min-width:28mm}td.im{width:38mm;text-align:center}td.in{font-weight:bold}' +
     '.sig{max-height:11mm;max-width:36mm}' +
