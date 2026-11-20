@@ -189,7 +189,7 @@ var SaupGen = (function () {
     });
   }
   // rows: [[{c,cs,rs,body,hdr,hdrLast,diag,valign}]]
-  function grid(w, rows) {
+  function grid(w, rows, uniform) {
     var n = w.length, nR = rows.length, hs = [];
     // 안쪽 표는 높이를 넉넉하지 않게 어림 (모자라면 한글이 열 때 늘려요)
     rows.forEach(function (cells, r) {
@@ -204,6 +204,8 @@ var SaupGen = (function () {
         if (need > have) hs[r + rs - 1] += need - have;
       });
     });
+    // 명단표: 머리 줄 아래 모든 줄을 같은 높이로
+    if (uniform && nR > 1) { var um = 1700; for (var u = 1; u < nR; u++) um = Math.max(um, hs[u]); for (u = 1; u < nR; u++) hs[u] = um; }
     var H = L.sum(hs, 0, nR), nHdr = 0;
     while (nHdr < nR && rows[nHdr].some(function (o) { return o.hdr; })) nHdr++;
     var trs = rows.map(function (cells, r) {
@@ -259,23 +261,24 @@ var SaupGen = (function () {
   }
   // 표 블록 — b.merge: 앞에서부터 몇 칸까지 「빈 칸은 위 칸과 합치기」
   function tableBlock(b, avail) {
+    b = L.viewBlock(b);
     var pre = L.presetOf(b), cols = (b.cols && b.cols.length === pre.cols.length) ? b.cols : pre.cols, n = cols.length;
     var w = widths(avail, pre.w);
     var dr = L.dataRows(b), data = dr.map(function (x) { return x.r; });
-    var al = L.alignOf(b, pre), sp = L.spansOf(b, data, n), span = sp.span, skip = sp.skip, pc = L.picCol(al);
+    var al = L.alignOf(b, pre), sp = L.spansOf(b, data, n), span = sp.span, skip = sp.skip, cspan = sp.cspan, pc = L.picCol(al);
     var rows = [cols.map(function (t, c) { return { c: c, hdr: true, hdrLast: true, body: boldC(t, w[c] - PAD) }; })];
     data.forEach(function (r, i) {
       var cells = [];
       for (var c = 0; c < n; c++) {
         if (skip[i][c]) continue;
-        var v = r[c] == null ? '' : r[c], tw = w[c] - PAD;
+        var cs = cspan[i][c] || 1, v = r[c] == null ? '' : r[c], tw = L.sum(w, c, cs) - PAD;
         var body = al[c] === 'l' ? lines(v, tw, true) : centerLines(v, tw);
         if (c === pc && dr[i].pics.length) body = join([body].concat(L.cellPics(dr[i].pics, tw)));
-        cells.push({ c: c, rs: span[i][c] || 1, body: body });
+        cells.push({ c: c, rs: span[i][c] || 1, cs: cs, body: body });
       }
       rows.push(cells);
     });
-    return grid(w, rows);
+    return grid(w, rows, b.uniform);
   }
   function blockChunks(blocks, w) {
     var chunks = [], pending = null, avail = w - PAD;
@@ -322,7 +325,8 @@ var SaupGen = (function () {
 
     // 제목 (표의 첫 행) + 빈 행
     var NO = ['NONE', '0.1', '#000000'], TRI = ['SLIM_THICK_SLIM', '1.0', '#000000'];
-    R([val(0, FULL, para(P.center, d.title || defaultTitle(d), FULL - PAD, C.title), { bd: { l: NO, r: NO, t: TRI, b: TRI } })]);
+    var tls = String(d.title || defaultTitle(d)).replace(/\r/g, '').split('\n').filter(function (l, i, a) { return l.trim() || a.length === 1; });
+    R([val(0, FULL, join(tls.map(function (l) { return para(P.center, l.trim(), FULL - PAD, C.title); })), { bd: { l: NO, r: NO, t: TRI, b: TRI }, lines: tls.length })]);
     R([val(0, FULL, para(P.center, '', FULL - PAD), { bd: { l: NO, r: NO, t: TRI, b: ['SOLID', T4, '#000000'] } })]);
 
     section(isRes ? '사 업 명' : '사업명', [centerLines(d.programName, CW - PAD)], 0, T4);
@@ -501,7 +505,7 @@ var SaupGen = (function () {
       cells.forEach(function (o) { if ((o.rs || 1) === 1 && obj(o)) m = Math.max(m, o.body.h + VPAD + 200); });
       return m;
     });
-    hs[0] = 3125; hs[1] = 2125;   // 제목 행, 빈 행 (원본 높이)
+    hs[0] = 3125 + ((rows[0][0].lines || 1) - 1) * 2560; hs[1] = 2125;   // 제목 행(줄 바꾼 만큼 16pt×160%씩 더), 빈 행 (원본 높이)
     rows.forEach(function (cells, r) {
       cells.forEach(function (o) {
         var rs = o.rs || 1; if (rs === 1 || !obj(o)) return;
