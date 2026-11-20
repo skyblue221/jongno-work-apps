@@ -276,6 +276,7 @@ function saveActivityLog(data) {
       mealStatus: cleanText(data.mealStatus)
     };
   } finally {
+    activityChanged_();
     lock.releaseLock();
   }
 }
@@ -605,6 +606,7 @@ function approveLog(data) {
 
     return { success: true, volunteerName: r.name, finalApprovedTimeText: formatMinutes(minutes) };
   } finally {
+    activityChanged_();
     lock.releaseLock();
   }
 }
@@ -637,6 +639,7 @@ function rejectLog(data) {
 
     return { success: true, volunteerName: r.name };
   } finally {
+    activityChanged_();
     lock.releaseLock();
   }
 }
@@ -652,6 +655,7 @@ function reassignLog(rowNumber, logId, staffName) {
   // 빈 값 = 직접 바꾼 담당자를 지우고, 프로그램에 등록된 담당자로 자동
   if (!cleanText(staffName)) {
     sheet.getRange(r.rowNumber, ACTIVITY_COLUMNS.ASSIGNED_STAFF).clearContent();
+    activityChanged_();
     const auto = findAssignedStaff_(staff, r.program);
     return { success: true, assigned: auto ? auto.name + ' (프로그램 담당자)' : '미배정' };
   }
@@ -660,6 +664,7 @@ function reassignLog(rowNumber, logId, staffName) {
   if (!target) throw new Error('담당자를 찾지 못했어요.');
 
   sheet.getRange(r.rowNumber, ACTIVITY_COLUMNS.ASSIGNED_STAFF).setValue(target.name);
+  activityChanged_();
   return { success: true, assigned: target.name };
 }
 
@@ -752,6 +757,7 @@ function leaderApprove(items) {
 
     return { success: true, count: done };
   } finally {
+    activityChanged_();
     lock.releaseLock();
   }
 }
@@ -788,6 +794,7 @@ function leaderReturn(items, reason) {
 
     return { success: true, count: done };
   } finally {
+    activityChanged_();
     lock.releaseLock();
   }
 }
@@ -959,6 +966,7 @@ function setInputDone(items, done) {
     if (done) sheet.getRange(r.rowNumber, C.INPUT_AT).setNumberFormat('yyyy-mm-dd hh:mm');
     count++;
   });
+  activityChanged_();
 
   return { success: true, count: count };
 }
@@ -1234,6 +1242,7 @@ function linkRegisteredVolunteers_(rows) {
     }
     linked++;
   });
+  if (linked) activityChanged_();
 
   return linked;
 }
@@ -1293,11 +1302,11 @@ function archiveMonthlyPdfsLocked_() {
     rows.forEach(function (r) {
       sheet.getRange(r.rowNumber, ACTIVITY_COLUMNS.PDF_FILE_ID).setValue(file.getId());
     });
-    SpreadsheetApp.flush();
+    activityChanged_();
     const verified=rows.every(r=>cleanText(sheet.getRange(r.rowNumber,ACTIVITY_COLUMNS.PDF_FILE_ID).getValue())===file.getId());
     if(!verified)throw new Error('보관 PDF의 시트 연결을 확인하지 못했어요. 기존 PDF는 유지했어요.');
     // 새 PDF 저장과 시트 연결이 끝난 뒤, 다른 일지가 참조하지 않는 이전 PDF만 정리합니다.
-    const referenced=new Set(readActivity_().map(r=>r.pdfId).filter(Boolean));
+    const referenced=new Set(readActivitySheet_().map(r=>r.pdfId).filter(Boolean));
     Array.from(new Set(old)).filter(id=>id!==file.getId()&&!referenced.has(id)).forEach(function(id){
       try {DriveApp.getFileById(id).setTrashed(true);}catch(e){/* 이전 PDF 정리 실패 시 파일을 유지합니다. */}
     });
@@ -1717,7 +1726,62 @@ function findAssignedStaff_(staff, program) {
 }
 
 
+/* ── 활동원본 읽기 임시 저장(캐시) ──
+   예전에는 담당자·팀장·현황판·실적입력 화면을 열 때마다 활동원본 전체를 두 번씩(값·보이는 값) 새로 읽어서,
+   일지가 쌓일수록 모든 화면이 느려졌어요. 이제 읽은 결과를 최대 30분 기억해 두고, 아래 경우에만 새로 읽어요.
+   - 앱에서 일지를 저장·확인·반려·실적입력 등으로 고친 뒤 (activityChanged_)
+   - 시트를 직접 고친 뒤 (구글 드라이브의 '마지막 수정 시각'이 바뀜)
+   확인·반려 같은 실제 작업은 언제나 그 줄을 시트에서 새로 읽어서 처리해요(getActivityRecord_). */
+const ACTIVITY_CACHE_SECONDS = 1800;
+let ACTIVITY_MEMO_ = null;
+function activityChanged_() {
+  ACTIVITY_MEMO_ = null;
+  try {
+    SpreadsheetApp.flush();   // 시트에 다 쓴 다음에 표시를 바꿔야, 그 사이에 옛 내용을 기억하지 않아요
+    PropertiesService.getScriptProperties().setProperty('activityRev', Utilities.getUuid().slice(0, 8));
+  } catch (e) { /* 기억 장치 오류가 나도 저장 자체는 끝난 상태예요 */ }
+}
+function activityCacheKey_() {
+  const rev = PropertiesService.getScriptProperties().getProperty('activityRev') || '0';
+  const edited = DriveApp.getFileById(SPREADSHEET_ID).getLastUpdated().getTime();
+  return 'act-v1:' + rev + ':' + edited;
+}
 function readActivity_() {
+  if (!ACTIVITY_MEMO_) {
+    let cache = null, key = '';
+    try {
+      cache = CacheService.getScriptCache();
+      key = activityCacheKey_();
+      const head = JSON.parse(cache.get(key) || 'null');
+      if (head && head.count > 0) {
+        const keys = [];
+        for (let i = 0; i < head.count; i++) keys.push(key + ':' + head.token + ':' + i);
+        const parts = cache.getAll(keys);
+        if (keys.every(function (k) { return typeof parts[k] === 'string'; })) {
+          ACTIVITY_MEMO_ = JSON.parse(keys.map(function (k) { return parts[k]; }).join(''));
+        }
+      }
+    } catch (e) { cache = null; }
+    if (!ACTIVITY_MEMO_) {
+      ACTIVITY_MEMO_ = readActivitySheet_();
+      if (cache && key) {
+        try {
+          // 한 칸에 100KB까지만 들어가서 30,000자씩 나눠 저장 (너무 크면 기억하지 않고 매번 읽어요)
+          const json = JSON.stringify(ACTIVITY_MEMO_), count = Math.ceil(json.length / 30000);
+          if (count > 0 && count <= 80) {
+            const token = Utilities.getUuid().slice(0, 8), parts = {};
+            for (let i = 0; i < count; i++) parts[key + ':' + token + ':' + i] = json.slice(i * 30000, (i + 1) * 30000);
+            cache.putAll(parts, ACTIVITY_CACHE_SECONDS);
+            cache.put(key, JSON.stringify({ count: count, token: token }), ACTIVITY_CACHE_SECONDS);
+          }
+        } catch (e) { /* 기억하지 못해도 읽은 내용은 그대로 써요 */ }
+      }
+    }
+  }
+  return ACTIVITY_MEMO_.map(function (r) { return Object.assign({}, r); });
+}
+/** 시트에서 바로 읽기 (기억해 둔 것을 쓰면 안 되는 곳: PDF 정리 등) */
+function readActivitySheet_() {
   const sheet = getRequiredSheet(ss_(), ACTIVITY_SHEET_NAME);
   const lastRow = sheet.getLastRow();
   if (lastRow < 2) return [];
